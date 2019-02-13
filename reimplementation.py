@@ -653,18 +653,28 @@ if __name__ == '__main__':
 
     ### Naomi's part ###
     # Assign the correct replicates to the same sample for the single body fluids.
-    sheet_to_df_map = read_original_data('Datasets/Dataset_NFI_original.xlsx')
-    # remove irrelevant rows
-
+    sheet_to_df_map = read_original_data('Datasets/Dataset_NFI_adj.xlsx')
     relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
-    shortened_names = [relevant_column[i][-1] for i in range(len(relevant_column))]
+    shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
 
     replicate_values = OrderedDict()
+    indexes_to_be_checked = []
     for i in range(len(shortened_names)):
+        # TODO: include exceptions:
+        # if 0.3 should be different
+        # if for example 'L' than probably a 1
+        #
         try:
-            replicate_values[i] = int(shortened_names[i])
+            replicate_values[i] = int(shortened_names[i][-1])
         except ValueError:
-            replicate_values[i] = "Check rv: " + shortened_names[i]
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+        if shortened_names[i] in ['0.3', '.75', '0.5']:
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+
+    for i in indexes_to_be_checked:
+        print(shortened_names[i])
 
 
 
