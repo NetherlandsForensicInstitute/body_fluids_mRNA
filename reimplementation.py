@@ -344,6 +344,7 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
     :param dists: N_experimental_mixture_samples iterable of distances to nearest augmented data point. Indication of
             whether the point may be an outlier (eg measurement error or problem with augmentation scheme)
     """
+    # This is a test comment
     y_prob = model.predict_proba(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, mixtures_in_classes_of_interest)
 
