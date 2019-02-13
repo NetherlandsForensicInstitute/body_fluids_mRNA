@@ -1,6 +1,6 @@
 import math
 import pickle
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, OrderedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -523,6 +523,15 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
+def read_original_data(filename):
+    xls = pd.ExcelFile(filename)
+
+    sheet_to_df_map = {}
+    for sheet_name in xls.sheet_names:
+        sheet_to_df_map[sheet_name] = xls.parse(sheet_name)
+
+    return sheet_to_df_map
+
 
 if __name__ == '__main__':
     developing = False
@@ -641,3 +650,21 @@ if __name__ == '__main__':
                                        dists_from_xmixtures_to_closest_augmented)
 
     plot_calibration(h1_h2_scores, classes_to_evaluate)
+
+    ### Naomi's part ###
+    # Assign the correct replicates to the same sample for the single body fluids.
+    sheet_to_df_map = read_original_data('Datasets/Dataset_NFI_original.xlsx')
+    # remove irrelevant rows
+
+    relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
+    shortened_names = [relevant_column[i][-1] for i in range(len(relevant_column))]
+
+    replicate_values = OrderedDict()
+    for i in range(len(shortened_names)):
+        try:
+            replicate_values[i] = int(shortened_names[i])
+        except ValueError:
+            replicate_values[i] = "Check rv: " + shortened_names[i]
+
+
+
