@@ -1,6 +1,7 @@
 import math
 import pickle
 import csv
+import os
 from collections import Counter, defaultdict, OrderedDict
 
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ def read_df(filename, binarize):
         # then sure that it includes replicate_values
         df_rv = pd.read_excel(filename, delimiter=';')
         df = df_rv[df_rv.columns.values[:-1]]
-        rv = df_rv[['replicate value']]
+        rv = df_rv[['replicate_value']]
         df.fillna(0, inplace=True)
         if binarize:
             df = 1 * (df > 150)
@@ -85,7 +86,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
     n_per_class = Counter(classes)
     n_features = len(df.columns)
 
-    X_raw = np.zeros([0, rv['replicate value'].max(), n_features])
+    X_raw = np.zeros([0, rv['replicate_value'].max(), n_features])
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
@@ -97,25 +98,25 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                                   rv_set_per_class[i-1] > rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)
                 n_per_class[classes_map[clas]] = n_full_samples
-                data_for_class = np.zeros((n_full_samples, rv['replicate value'].max(), n_features))
+                data_for_class = np.zeros((n_full_samples, rv['replicate_value'].max(), n_features))
                 n_discarded = 0
 
-                # TODO: split the dataset correctly
+                # TODO: split the dataset correctly --> check!
                 end_replicate.insert(len(end_replicate), len(rv_set_per_class)+1)
                 for i in range(n_full_samples):
                     if i == 0:
                         candidate_samples = full_set_per_class[:end_replicate[i], :]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv['replicate value'].max() - candidate_samples.shape[0],
+                            [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
                     else:
                         candidate_samples = full_set_per_class[end_replicate[i-1]:end_replicate[i], :]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv['replicate value'].max() - candidate_samples.shape[0],
+                            [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
-                    print(candidate_samples.shape)
                     # TODO: is 3 still a good threshold now that replicates can be of size < 3.
-                    if sum(candidate_samples[:, -1]) < 3 or sum(candidate_samples[:, -2]) < 3 and 'Blank' not in clas:
+                    if np.sum(candidate_samples[:, -1]) < 3 or np.sum(candidate_samples[:, -2]) < 3 \
+                            and 'Blank' not in clas:
                         n_full_samples -= 1
                         data_for_class = data_for_class[:n_full_samples, :, :]
                         n_discarded += 1
@@ -554,7 +555,6 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
-### Naomi's part ###
 def getNumeric(prompt):
     while True:
         response = input(prompt)
@@ -563,13 +563,15 @@ def getNumeric(prompt):
         except ValueError:
             print("Please enter a number.")
 
+
 if __name__ == '__main__':
     developing = False
     include_blank = False
-    unknown_replicatenumbers = False
+    unknown_replicatenumbers_single = False
+    unknown_replicatenumbers_mixture = False
 
     # Assign the correct replicates to the same sample for the single body fluids.
-    if unknown_replicatenumbers:
+    if unknown_replicatenumbers_single:
         xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
         sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
 
@@ -587,14 +589,14 @@ if __name__ == '__main__':
             if shortened_names[i] in ['0.3', '.75', '0.5', 'a_1', 'n_1', 'n_4']:
                 indexes_to_be_checked.append(i)
                 replicate_values[i] = shortened_names[i]
-            if shortened_names[i][-1] in ['0', '6']:
+            if shortened_names[i][-1] in ['0', '6', '7']:
                 indexes_to_be_checked.append(i)
                 replicate_values[i] = shortened_names[i]
 
         # Iterate over the index and manually adjust
         replace_replicate = []
         for i in range(len(indexes_to_be_checked)):
-            print("The middle rowname of the following rownames should be adjusted:",
+            print("The middle rowname of the following rownames should get assigned a replicate number:",
                   relevant_column[indexes_to_be_checked[i]-1:indexes_to_be_checked[i]+2])
             replace_replicate.append(getNumeric("Give the replicate number"))
 
@@ -626,6 +628,52 @@ if __name__ == '__main__':
         mergedac.to_excel("Datasets/Dataset_NFI_meta_rv.xlsx", index=False)
         mergedbc.to_excel("Datasets/Dataset_NFI_rv.xlsx", index=False)
 
+        os.remove("Datasets/Dataset_NFI_meta.csv")
+        os.remove("Datasets/Dataset_NFI_adj.csv")
+        os.remove("Datasets/replicate_numbers_single.csv")
+
+    if unknown_replicatenumbers_mixture:
+        xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
+        sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+        relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
+        shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
+
+        replicate_values = OrderedDict([])
+        indexes_to_be_checked = []
+        for i in range(len(shortened_names)):
+            try:
+                replicate_values[i] = int(shortened_names[i][-1])
+            except ValueError:
+                print("Some samples do not have clear replicate numbers")
+
+        replicates = list(replicate_values.values())
+        replicates.insert(0, "replicate_value")
+        csvfile = "Datasets/replicate_numbers_mixture.csv"
+
+        with open(csvfile, "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            for val in replicates:
+                writer.writerow([val])
+
+        sheet_to_df_map['Mix + details'].to_csv('Datasets/Dataset_mixture_meta.csv', encoding='utf-8')
+        sheet_to_df_map['Mix data uitgekleed'].to_csv('Datasets/Dataset_mixture_adj.csv', encoding='utf-8')
+        a = pd.read_csv("Datasets/Dataset_mixture_meta.csv", delimiter=',')
+        b = pd.read_csv("Datasets/Dataset_mixture_adj.csv", delimiter=',')
+        c = pd.read_csv("Datasets/replicate_numbers_mixture.csv")
+        mergedac = pd.concat([a, c], axis=1)
+        for i in range(len(mergedac.columns.values)):
+            if 'Unnamed' in mergedac.columns.values[i]:
+                mergedac.columns.values[i] = None
+        mergedbc = pd.concat([b, c], axis=1)
+        for i in range(len(mergedbc.columns.values)):
+            if 'Unnamed' in mergedbc.columns.values[i]:
+                mergedbc.columns.values[i] = None
+        mergedac.to_excel("Datasets/Dataset_mixtures_meta_rv.xlsx", index=False)
+        mergedbc.to_excel("Datasets/Dataset_mixtures_rv.xlsx", index=False)
+
+        os.remove("Datasets/Dataset_mixture_meta.csv")
+        os.remove("Datasets/Dataset_mixture_adj.csv")
+        os.remove("Datasets/replicate_numbers_mixture.csv")
 
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
