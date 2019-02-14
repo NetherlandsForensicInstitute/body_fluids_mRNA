@@ -523,6 +523,7 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
+### Naomi's part ###
 def read_original_data(filename):
     xls = pd.ExcelFile(filename)
 
@@ -532,6 +533,13 @@ def read_original_data(filename):
 
     return sheet_to_df_map
 
+def getNumeric(prompt):
+    while True:
+        response = input(prompt)
+        try:
+            return int(response)
+        except ValueError:
+            print("Please enter a number.")
 
 if __name__ == '__main__':
     developing = False
@@ -660,21 +668,28 @@ if __name__ == '__main__':
     replicate_values = OrderedDict()
     indexes_to_be_checked = []
     for i in range(len(shortened_names)):
-        # TODO: include exceptions:
-        # if 0.3 should be different
-        # if for example 'L' than probably a 1
-        #
         try:
             replicate_values[i] = int(shortened_names[i][-1])
         except ValueError:
             indexes_to_be_checked.append(i)
             replicate_values[i] = shortened_names[i]
-        if shortened_names[i] in ['0.3', '.75', '0.5']:
+        if shortened_names[i] in ['0.3', '.75', '0.5', 'a_1', 'n_1', 'n_4']:
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+        if shortened_names[i][-1] in ['0', '6']:
             indexes_to_be_checked.append(i)
             replicate_values[i] = shortened_names[i]
 
+    # TODO: adjust the shortened_names
+    # TODO: iterate over the index and manually adjust
+    # if str --> 1
+    # if ends with either 0.3, 0.75, 0.5 --> check
+    # if ends with a 6 --> check
+    # if ends with a 0 --> 1
+    # if ends with _1 --> check
+
+    k = getNumeric("Give the number of buckets:")
+
     for i in indexes_to_be_checked:
-        print(shortened_names[i])
-
-
+        print("The rowname in the excel file is:", relevant_column[i])
 
