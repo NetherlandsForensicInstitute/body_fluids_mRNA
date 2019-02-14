@@ -43,7 +43,8 @@ def read_df(filename, binarize):
         return df
 
 
-def get_data_per_cell_type(filename='Datasets/Dataset_NFI.xlsx', binarize=True, developing=False, include_blank=False):
+def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=True, developing=False,
+                           include_blank=False):
     """
     returns data per specified cell types
 
@@ -60,15 +61,18 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI.xlsx', binarize=True, 
                 dict: cell type index -> N_measurements for cell type
 
     """
-    df = read_df(filename, binarize)
+    df, rv = read_df(filename, binarize)
     # restructure data
     classes_labels = np.array(df.index)
     # penile skin should be treated separately
     classes_set = set(classes_labels)
     classes_set.remove('Skin.penile')
+
+    # initialize
     classes_map = {}
     inv_classes_map = {}
     i = 0
+
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
             if not developing or ('Skin' not in clas and 'Blank' not in clas):
@@ -80,24 +84,37 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI.xlsx', binarize=True, 
                and (include_blank or 'Blank' not in clas)]
     n_per_class = Counter(classes)
     n_features = len(df.columns)
-    X_raw = np.zeros([0, 4, n_features])
+
+    X_raw = np.zeros([0, rv['replicate value'].max(), n_features])
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
             if not developing or ('Skin' not in clas and 'Blank' not in clas):
+                # TODO: implement which make pairs of 4 replicates
                 full_set_per_class = np.array(df.loc[clas])
-                # TODO find which make pairs of 4
-                # assuming they are ordered 4 together
-                n_samples, n_features = full_set_per_class.shape
-                print(clas, n_samples / 4)
-                # for now, discard the remainder?
-                n_full_samples = int(n_samples / 4)
+                rv_set_per_class = np.array(rv.loc[clas]).flatten()
+                end_replicate = [ i for i in range(1, len(rv_set_per_class)) if
+                                  rv_set_per_class[i-1] > rv_set_per_class[i]]
+                n_full_samples = len(end_replicate)
                 n_per_class[classes_map[clas]] = n_full_samples
-                data_for_class = np.zeros((n_full_samples, 4, n_features))
+                data_for_class = np.zeros((n_full_samples, rv['replicate value'].max(), n_features))
                 n_discarded = 0
+
+                # TODO: split the dataset correctly
+                end_replicate.insert(len(end_replicate), len(rv_set_per_class)+1)
                 for i in range(n_full_samples):
-                    candidate_samples = full_set_per_class[i * 4:(i + 1) * 4, :]
-                    # discard if the structural measurements were empty
+                    if i == 0:
+                        candidate_samples = full_set_per_class[:end_replicate[i], :]
+                        candidate_samples = np.vstack(
+                            [candidate_samples, np.zeros([rv['replicate value'].max() - candidate_samples.shape[0],
+                                                         n_features], dtype='int')])
+                    else:
+                        candidate_samples = full_set_per_class[end_replicate[i-1]:end_replicate[i], :]
+                        candidate_samples = np.vstack(
+                            [candidate_samples, np.zeros([rv['replicate value'].max() - candidate_samples.shape[0],
+                                                         n_features], dtype='int')])
+                    print(candidate_samples.shape)
+                    # TODO: is 3 still a good threshold now that replicates can be of size < 3.
                     if sum(candidate_samples[:, -1]) < 3 or sum(candidate_samples[:, -2]) < 3 and 'Blank' not in clas:
                         n_full_samples -= 1
                         data_for_class = data_for_class[:n_full_samples, :, :]
