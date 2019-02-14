@@ -18,16 +18,29 @@ from metrics import get_lr_metrics
 
 def read_df(filename, binarize):
     """
-    reads in an xls file as a dataframe, replacing NA and binarizing if required
+    Reads in an xls file as a dataframe, replacing NA and binarizing if required.
+
     :param filename: name of file to read in
     :param binarize: whether to binarize - use a cutoff value to convert to 0/1
     :return: dataframe
     """
-    df = pd.read_excel(filename)
-    df.fillna(0, inplace=True)
-    if binarize:
-        df = 1 * (df > 150)
-    return df
+
+    if '_rv' in filename:
+        # then sure that it includes replicate_values
+        df_rv = pd.read_excel(filename, delimiter=';')
+        df = df_rv[df_rv.columns.values[:-1]]
+        rv = df_rv[['replicate value']]
+        df.fillna(0, inplace=True)
+        if binarize:
+            df = 1 * (df > 150)
+        return df, rv
+
+    else:
+        df = pd.read_excel(filename, delimiter=';')
+        df.fillna(0, inplace=True)
+        if binarize:
+            df = 1 * (df > 150)
+        return df
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI.xlsx', binarize=True, developing=False, include_blank=False):
@@ -694,10 +707,9 @@ if __name__ == '__main__':
             replicate_values[indexes_to_be_checked[i]] = replace_replicate[i]
 
         replicates = list(replicate_values.values())
-        replicates.insert(0, "replicate value")
+        replicates.insert(0, "replicate_value")
         csvfile = "Datasets/replicate_numbers_single.csv"
 
-        # Assuming res is a flat list
         with open(csvfile, "w") as output:
             writer = csv.writer(output, lineterminator='\n')
             for val in replicates:
@@ -709,6 +721,13 @@ if __name__ == '__main__':
     b = pd.read_csv("Datasets/Dataset_NFI_adj.csv", delimiter=',')
     c = pd.read_csv("Datasets/replicate_numbers_single.csv")
     mergedac = pd.concat([a, c], axis=1)
+    for i in range(len(mergedac.columns.values)):
+        if 'Unnamed' in mergedac.columns.values[i]:
+            mergedac.columns.values[i] = None
     mergedbc = pd.concat([b, c], axis=1)
-    mergedac.to_csv("Datasets/Dataset_NFI_meta.csv", sep=';', index=False, float_format='%.f')
-    mergedbc.to_csv("Datasets/Dataset_NFI_adj.csv", sep=';', index=False, float_format='%.f')
+    for i in range(len(mergedbc.columns.values)):
+        if 'Unnamed' in mergedbc.columns.values[i]:
+            mergedbc.columns.values[i] = None
+    mergedac.to_excel("Datasets/Dataset_NFI_meta_rv.xlsx", index=False)
+    mergedbc.to_excel("Datasets/Dataset_NFI_rv.xlsx", index=False)
+
