@@ -284,7 +284,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class):
     return res_prob
 
 
-def read_mixture_data(n_single_cell_types_no_penile, binarize=True):
+def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map, binarize=True):
     """
     reads in the experimental mixture data that is used as test data
     :param n_single_cell_types_no_penile: int: number of single cell types excluding penile skine
@@ -780,7 +780,8 @@ if __name__ == '__main__':
 
     evaluate_model(model, 'train', X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type)
 
-    X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(n_single_cell_types - 1)
+    X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(
+        n_single_cell_types - 1, n_features, classes_map)
 
     X_augmented, y_augmented, _, _ = augment_data(
         X_raw_singles, y_raw_singles, n_single_cell_types, n_features, from_penile=from_penile)
