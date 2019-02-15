@@ -63,7 +63,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
 
     """
     df, rv = read_df(filename, binarize)
-    # restructure data
+    rv_max = rv['replicate_value'].max()
     class_labels = np.array(df.index)
     # penile skin should be treated separately
     classes_set = set(class_labels)
@@ -86,7 +86,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
     n_per_class = Counter(classes)
     n_features = len(df.columns)
 
-    X_raw = np.zeros([0, rv['replicate_value'].max(), n_features])
+    X_raw = np.zeros([0, rv_max, n_features])
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
@@ -97,26 +97,27 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                 end_replicate = [ i for i in range(1, len(rv_set_per_class)) if
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
-                n_full_samples = len(end_replicate)
-                n_per_class[classes_map[clas]] = n_full_samples
-                data_for_class = np.zeros((n_full_samples, rv['replicate_value'].max(), n_features))
+                n_full_samples = len(end_replicate)+1
+                data_for_class = np.zeros((n_full_samples, rv_max, n_features))
                 n_discarded = 0
 
-                # TODO: split the dataset correctly --> check!
-                end_replicate.insert(len(end_replicate), len(rv_set_per_class)+1)
+                end_replicate.insert(len(end_replicate), len(rv_set_per_class))
                 for i in range(n_full_samples):
                     if i == 0:
                         candidate_samples = data_for_this_label[:end_replicate[i], :]
+                        numerator = candidate_samples.shape[0]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
+                            [candidate_samples, np.zeros([rv_max - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
                     else:
                         candidate_samples = data_for_this_label[end_replicate[i-1]:end_replicate[i], :]
+                        numerator = candidate_samples.shape[0]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
+                            [candidate_samples, np.zeros([rv_max - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
-                    # TODO: is 3 still a good threshold now that replicates can be of size < 3?
-                    if np.sum(candidate_samples[:, -1]) < 3 or np.sum(candidate_samples[:, -2]) < 3 \
+                    # Treshold is set depending on the number of replicates per sample.
+                    if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
+                            np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
                             and 'Blank' not in clas:
                         n_full_samples -= 1
                         data_for_class = data_for_class[:n_full_samples, :, :]
@@ -126,6 +127,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
 
                 print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(
                     clas, n_full_samples, n_discarded))
+                n_per_class[classes_map[clas]] = n_full_samples
                 X_raw = np.append(X_raw, data_for_class, axis=0)
                 y += [classes_map[clas]] * n_full_samples
 
@@ -303,7 +305,11 @@ def read_mixture_data(n_single_cell_types_no_penile, binarize=True):
     X_mixtures = np.zeros((0, rv_max, n_features))
     y_mixtures = []
     inv_test_map = {}
-    y_mixtures_n_hot = np.zeros((len(df), n_single_cell_types_no_penile), dtype=int)
+
+    rvs = np.array(rv).flatten()
+    N_full_samples = len([i for i in range(1, len(rvs)) if rvs[i-1] > rvs[i] or
+                          rvs[i-1] == rvs[i]])+1
+    y_mixtures_n_hot = np.zeros((N_full_samples, n_single_cell_types_no_penile), dtype=int)
     n_total = 0
 
     for clas in sorted(set(class_labels)):
@@ -312,13 +318,13 @@ def read_mixture_data(n_single_cell_types_no_penile, binarize=True):
         data_for_this_label = np.array(df.loc[clas], dtype=float)
         rv_set_per_class = np.array(rv.loc[clas]).flatten()
         end_replicate = [i for i in range(1, len(rv_set_per_class)) if
-                         rv_set_per_class[i - 1] > rv_set_per_class[i] or
+                         rv_set_per_class[i-1] > rv_set_per_class[i] or
                          rv_set_per_class[i-1] == rv_set_per_class[i]]
-        n_full_samples = len(end_replicate)
-        n = data_for_this_label.shape[0] # leave this in?
+        n_full_samples = len(end_replicate)+1
+        n = data_for_this_label.shape[0]
 
         data_for_mixt_class = np.zeros((n_full_samples, rv_max, n_features))
-        end_replicate.insert(len(end_replicate), len(rv_set_per_class) + 1)
+        end_replicate.insert(len(end_replicate), len(rv_set_per_class))
         for i in range(n_full_samples):
             if i == 0:
                 sample = data_for_this_label[:end_replicate[i], :]
@@ -339,7 +345,6 @@ def read_mixture_data(n_single_cell_types_no_penile, binarize=True):
             y_mixtures_n_hot[n_total:n_total + n, classes_map[cell_type]] = 1
         inv_test_map[class_label] = clas
         n_total += n
-        print(X_mixtures.shape, data_for_mixt_class.shape)
         X_mixtures = np.append(X_mixtures, data_for_mixt_class, axis=0)
         y_mixtures += [class_label] * data_for_mixt_class.shape[0]
     return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
@@ -578,7 +583,8 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
         mixture_classes_in_classes_to_evaluate.append(list(set(labels)))
         for i in set(labels):
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
-
+    print(y_mixtures_matrix.shape)
+    print(y_combi.shape)
     return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
@@ -710,7 +716,7 @@ if __name__ == '__main__':
     N_SAMPLES_PER_COMBINATION = 100
     MAX_LR=10
     from_penile = False
-    retrain = False
+    retrain = True
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -818,3 +824,5 @@ if __name__ == '__main__':
                                        dists_from_xmixtures_to_closest_augmented)
 
     plot_calibration(h1_h2_scores, classes_to_evaluate)
+
+    plt.close('all')
