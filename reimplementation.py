@@ -27,7 +27,7 @@ def read_df(filename, binarize):
     """
 
     if '_rv' in filename:
-        # then sure that it includes replicate_values
+        # then sure that it includes 'replicate_values'
         df_rv = pd.read_excel(filename, delimiter=';')
         df = df_rv[df_rv.columns.values[:-1]]
         rv = df_rv[['replicate_value']]
@@ -47,7 +47,7 @@ def read_df(filename, binarize):
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=True, developing=False,
                            include_blank=False):
     """
-    returns data per specified cell types
+    Returns data per specified cell types
 
     :param filename: name of file to read in
     :param binarize: whether to binarize raw measurement values
@@ -64,9 +64,9 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
     """
     df, rv = read_df(filename, binarize)
     # restructure data
-    classes_labels = np.array(df.index)
+    class_labels = np.array(df.index)
     # penile skin should be treated separately
-    classes_set = set(classes_labels)
+    classes_set = set(class_labels)
     classes_set.remove('Skin.penile')
 
     # initialize
@@ -80,7 +80,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                 classes_map[clas] = i
                 inv_classes_map[i] = clas
                 i += 1
-    classes = [classes_map[clas] for clas in classes_labels if
+    classes = [classes_map[clas] for clas in class_labels if
                (not developing or ('Skin' not in clas and 'Blank' not in clas))
                and (include_blank or 'Blank' not in clas)]
     n_per_class = Counter(classes)
@@ -91,11 +91,12 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
             if not developing or ('Skin' not in clas and 'Blank' not in clas):
-                # TODO: implement which make pairs of 4 replicates
-                full_set_per_class = np.array(df.loc[clas])
+                # Implement which make pairs of 4 replicates
+                data_for_this_label = np.array(df.loc[clas])
                 rv_set_per_class = np.array(rv.loc[clas]).flatten()
                 end_replicate = [ i for i in range(1, len(rv_set_per_class)) if
-                                  rv_set_per_class[i-1] > rv_set_per_class[i]]
+                                  rv_set_per_class[i-1] > rv_set_per_class[i] or
+                                  rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)
                 n_per_class[classes_map[clas]] = n_full_samples
                 data_for_class = np.zeros((n_full_samples, rv['replicate_value'].max(), n_features))
@@ -105,16 +106,16 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                 end_replicate.insert(len(end_replicate), len(rv_set_per_class)+1)
                 for i in range(n_full_samples):
                     if i == 0:
-                        candidate_samples = full_set_per_class[:end_replicate[i], :]
+                        candidate_samples = data_for_this_label[:end_replicate[i], :]
                         candidate_samples = np.vstack(
                             [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
                     else:
-                        candidate_samples = full_set_per_class[end_replicate[i-1]:end_replicate[i], :]
+                        candidate_samples = data_for_this_label[end_replicate[i-1]:end_replicate[i], :]
                         candidate_samples = np.vstack(
                             [candidate_samples, np.zeros([rv['replicate_value'].max() - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
-                    # TODO: is 3 still a good threshold now that replicates can be of size < 3.
+                    # TODO: is 3 still a good threshold now that replicates can be of size < 3?
                     if np.sum(candidate_samples[:, -1]) < 3 or np.sum(candidate_samples[:, -2]) < 3 \
                             and 'Blank' not in clas:
                         n_full_samples -= 1
@@ -123,19 +124,21 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                     else:
                         data_for_class[i - n_discarded, :, :] = candidate_samples
 
-                print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(clas,
-                                                                                                       n_full_samples,
-                                                                                                       n_discarded))
+                print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(
+                    clas, n_full_samples, n_discarded))
                 X_raw = np.append(X_raw, data_for_class, axis=0)
                 y += [classes_map[clas]] * n_full_samples
-    return X_raw, y, len(classes_map), n_features, classes_map, inv_classes_map, n_per_class
+
+    n_single_cell_types = len(classes_map)
+
+    return X_raw, y, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class
 
 
 def combine_samples(data_for_class):
     """
-    takes a n_samples x 4 x n_features matrix and returns the n_samples x n_markers matrix
-    :param data_for_class:
-    :return: n_samples x N_markers array
+    takes a n_samples x : x n_features matrix and returns the n_samples x n_markers matrix
+    :param data_for_class: a n_samples x : x n_features numpy array
+    :return: n_samples x N_markers numpy array
     """
     return np.mean(data_for_class, axis=1)
 
@@ -162,7 +165,6 @@ def classify_single(X, y, inv_classes_map):
     print(inv_classes_map)
 
 
-
 def construct_random_samples(X, y, n, classes_to_include, n_features):
     """
     returns n generated samples that contain classes classes_to_include.
@@ -176,14 +178,14 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     """
     if len(classes_to_include) == 0:
         return np.zeros((n, n_features))
-    sampled = np.zeros((len(classes_to_include), n, 4, n_features))
+    sampled = np.zeros((len(classes_to_include), n, 6, n_features))
     for j, clas in enumerate(classes_to_include):
         n_in_class = sum(np.array(y) == clas)
         data_for_class = np.array([X[i, :, :] for i in range(len(X)) if y[i] == clas])
         sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
         # shuffle them
         for i in range(n):
-            sampled[j, i, :, :] = sampled[j, i, np.random.permutation(4), :]
+            sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
     combined = np.max(sampled, axis=0)
     return combine_samples(combined)
 
@@ -292,29 +294,54 @@ def read_mixture_data(n_single_cell_types_no_penile, binarize=True):
                 dict: mixture class label -> mixture name
     """
     # read test data
-    df = read_df('Datasets/Dataset_mixtures.xlsx', binarize)
-    # restructure data
-    # TODO this is one per replicate currently! - are there replications?
-    test_labels = np.array(df.index)
+    df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
+    rv_max = rv['replicate_value'].max()
+
+    # initialize
+    class_labels = np.array(df.index)
     test_map = defaultdict(list)
-    X_mixtures = np.zeros((0, n_features))
+    X_mixtures = np.zeros((0, rv_max, n_features))
     y_mixtures = []
     inv_test_map = {}
     y_mixtures_n_hot = np.zeros((len(df), n_single_cell_types_no_penile), dtype=int)
     n_total = 0
-    for test_label in sorted(set(test_labels)):
-        labels = test_label.split('+')
+
+    for clas in sorted(set(class_labels)):
+        cell_types = clas.split('+')
         class_label = 0
-        data_for_this_label = np.array(df.loc[test_label], dtype=float)
-        n = data_for_this_label.shape[0]
-        for label in labels:
-            test_map[test_label].append(classes_map[label])
-            class_label += 2 ** classes_map[label]
-            y_mixtures_n_hot[n_total:n_total + n, classes_map[label]] = 1
-        inv_test_map[class_label] = test_label
+        data_for_this_label = np.array(df.loc[clas], dtype=float)
+        rv_set_per_class = np.array(rv.loc[clas]).flatten()
+        end_replicate = [i for i in range(1, len(rv_set_per_class)) if
+                         rv_set_per_class[i - 1] > rv_set_per_class[i] or
+                         rv_set_per_class[i-1] == rv_set_per_class[i]]
+        n_full_samples = len(end_replicate)
+        n = data_for_this_label.shape[0] # leave this in?
+
+        data_for_mixt_class = np.zeros((n_full_samples, rv_max, n_features))
+        end_replicate.insert(len(end_replicate), len(rv_set_per_class) + 1)
+        for i in range(n_full_samples):
+            if i == 0:
+                sample = data_for_this_label[:end_replicate[i], :]
+                data_for_mixt_class[i, :, :] = np.vstack([
+                    sample,
+                    np.zeros([rv_max - sample.shape[0], n_features],
+                    dtype='int')])
+            else:
+                sample = data_for_this_label[end_replicate[i-1]:end_replicate[i], :]
+                data_for_mixt_class[i, :, :] = np.vstack([
+                    sample,
+                    np.zeros([rv_max - sample.shape[0], n_features],
+                    dtype='int')])
+
+        for cell_type in cell_types:
+            test_map[clas].append(classes_map[cell_type])
+            class_label += 2 ** classes_map[cell_type]
+            y_mixtures_n_hot[n_total:n_total + n, classes_map[cell_type]] = 1
+        inv_test_map[class_label] = clas
         n_total += n
-        X_mixtures = np.append(X_mixtures, data_for_this_label, axis=0)
-        y_mixtures += [class_label] * data_for_this_label.shape[0]
+        print(X_mixtures.shape, data_for_mixt_class.shape)
+        X_mixtures = np.append(X_mixtures, data_for_mixt_class, axis=0)
+        y_mixtures += [class_label] * data_for_mixt_class.shape[0]
     return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
 
 
@@ -570,7 +597,7 @@ if __name__ == '__main__':
     unknown_replicatenumbers_single = False
     unknown_replicatenumbers_mixture = False
 
-    # Assign the correct replicates to the same sample for the single body fluids.
+    # Assign the correct replicates to the same sample for the single cell types.
     if unknown_replicatenumbers_single:
         xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
         sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
@@ -632,6 +659,7 @@ if __name__ == '__main__':
         os.remove("Datasets/Dataset_NFI_adj.csv")
         os.remove("Datasets/replicate_numbers_single.csv")
 
+    # Assign the correct replicates to the same sample for the mixture cell types.
     if unknown_replicatenumbers_mixture:
         xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
         sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
@@ -758,6 +786,7 @@ if __name__ == '__main__':
                                                                                                  n_features,
                                                                                                  from_penile=from_penile)
 
+
     evaluate_model(model, 'train', X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type)
 
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(n_single_cell_types - 1)
@@ -768,10 +797,10 @@ if __name__ == '__main__':
                                                   from_penile=from_penile)
 
     if retrain:
-        unique_augmenteds = np.unique(X_augmented, axis=0)
+        unique_augmented = np.unique(X_augmented, axis=0)
         dists_from_xmixtures_to_closest_augmented = []
         for x in tqdm(X_mixtures, 'computing distances'):
-            dists_from_xmixtures_to_closest_augmented.append(np.min([np.linalg.norm(x - y) for y in unique_augmenteds]))
+            dists_from_xmixtures_to_closest_augmented.append(np.min([np.linalg.norm(x - y) for y in unique_augmented]))
         pickle.dump(dists_from_xmixtures_to_closest_augmented, open('dists', 'wb'))
     else:
         dists_from_xmixtures_to_closest_augmented = pickle.load(open('dists', 'rb'))
