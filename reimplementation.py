@@ -29,7 +29,7 @@ def read_df(filename, binarize):
     if '_rv' in filename:
         # then sure that it includes 'replicate_values'
         df_rv = pd.read_excel(filename, delimiter=';')
-        df = df_rv[df_rv.columns.values[:-1]]
+        df = df_rv.loc[:, (df_rv.columns.values[:-1])]
         rv = df_rv[['replicate_value']]
         df.fillna(0, inplace=True)
         if binarize:
@@ -228,9 +228,8 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features, from
         if from_penile:
             # also (always) add penile skin samples
             y_n_hot[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_single_cell_types - 1] = 1
-        X = np.append(X, construct_random_samples(X_singles_raw, y_singles, N_SAMPLES_PER_COMBINATION,
-                                                  classes_in_current_mixture,
-                                                  n_features), axis=0)
+        X = np.append(X, construct_random_samples(
+            X_singles_raw, y_singles, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
         y += [i] * N_SAMPLES_PER_COMBINATION
     return X, y, y_n_hot[:, :n_single_cell_types_not_penile], mixtures_containing_single_cell_type
 
@@ -247,6 +246,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
     :param labels_in_class:
     :return: iterable with for each class a list of len 2, with scores for all h1 and h2 scenarios
     """
+    print(X.shape)
     y_pred = model.predict(X)
     print('{} accuracy for mixtures: {}'.format(dataset_label, accuracy_score(y, y_pred)))
     y_prob = model.predict_proba(X)
@@ -583,8 +583,6 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
         mixture_classes_in_classes_to_evaluate.append(list(set(labels)))
         for i in set(labels):
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
-    print(y_mixtures_matrix.shape)
-    print(y_combi.shape)
     return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
@@ -716,7 +714,7 @@ if __name__ == '__main__':
     N_SAMPLES_PER_COMBINATION = 100
     MAX_LR=10
     from_penile = False
-    retrain = True
+    retrain = False
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -739,16 +737,12 @@ if __name__ == '__main__':
             while len(set(y_test)) != len(set(y_train)):
                 # make sure we have all labels in both sets
                 X_train, X_test, y_train, y_test = train_test_split(X_raw_singles, y_raw_singles)
-            X_augmented_train, y_augmented_train, _, _ = augment_data(X_train,
-                                                                      y_train,
-                                                                      n_single_cell_types, n_features,
-                                                                      from_penile=from_penile)
+            X_augmented_train, y_augmented_train, _, _ = augment_data(
+                X_train, y_train, n_single_cell_types, n_features, from_penile=from_penile)
 
             print(
-                'fitting on {} samples, {} features, {} classes'.format(len(y_augmented_train),
-                                                                        X_augmented_train.shape[1],
-
-                                                                        len(set(y_augmented_train))))
+                'fitting on {} samples, {} features, {} classes'.format(
+                    len(y_augmented_train), X_augmented_train.shape[1], len(set(y_augmented_train))))
 
             #  try calibration - or skip that?
             # TODO get the mixture data from dorum
@@ -756,51 +750,40 @@ if __name__ == '__main__':
             model.fit(X_augmented_train, y_augmented_train)
 
             X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-                X_test, y_test,
-                n_single_cell_types,
-                n_features,
-                from_penile=from_penile)
+                X_test, y_test, n_single_cell_types, n_features, from_penile=from_penile)
 
             evaluate_model(model, 'fold {}'.format(n), X_augmented_test, y_augmented_test, y_augmented_matrix,
                            mixture_classes_in_single_cell_type)
 
             mixture_classes_in_classes_to_evaluate, _ = create_information_on_classes_to_evaluate(
-                mixture_classes_in_single_cell_type, classes_map, class_combinations_to_evaluate, y_augmented_train, y_augmented_matrix)
+                mixture_classes_in_single_cell_type, classes_map, class_combinations_to_evaluate, y_augmented_train,
+                y_augmented_matrix)
 
             if n == 0:
                 # only plot single class performance once
-                boxplot_per_single_class_category(X_augmented_test, y_augmented_matrix,
-                                                  classes_to_evaluate,
-                                                  mixture_classes_in_classes_to_evaluate,
-                                                  class_combinations_to_evaluate)
+                boxplot_per_single_class_category(
+                    X_augmented_test, y_augmented_matrix, classes_to_evaluate, mixture_classes_in_classes_to_evaluate,
+                    class_combinations_to_evaluate)
 
         # train on the full set and test on independent mixtures set
-        X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(X_raw_singles,
-                                                                                                 y_raw_singles,
-                                                                                                 n_single_cell_types,
-                                                                                                 n_features,
-                                                                                                 from_penile=from_penile)
+        X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
+            X_raw_singles, y_raw_singles, n_single_cell_types, n_features, from_penile=from_penile)
 
         model.fit(X_train, y_train)
 
         pickle.dump(model, open(model_file_name, 'wb'))
     else:
         model = pickle.load(open(model_file_name, 'rb'))
-        X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(X_raw_singles,
-                                                                                                 y_raw_singles,
-                                                                                                 n_single_cell_types,
-                                                                                                 n_features,
-                                                                                                 from_penile=from_penile)
+        X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
+            X_raw_singles, y_raw_singles, n_single_cell_types, n_features, from_penile=from_penile)
 
 
     evaluate_model(model, 'train', X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type)
 
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(n_single_cell_types - 1)
 
-    X_augmented, y_augmented, _, _ = augment_data(X_raw_singles,
-                                                  y_raw_singles,
-                                                  n_single_cell_types, n_features,
-                                                  from_penile=from_penile)
+    X_augmented, y_augmented, _, _ = augment_data(
+        X_raw_singles, y_raw_singles, n_single_cell_types, n_features, from_penile=from_penile)
 
     if retrain:
         unique_augmented = np.unique(X_augmented, axis=0)
@@ -814,14 +797,13 @@ if __name__ == '__main__':
     mixture_classes_in_classes_to_evaluate, y_mixtures_classes_to_evaluate_n_hot = create_information_on_classes_to_evaluate(
         mixture_classes_in_single_cell_type, classes_map, class_combinations_to_evaluate, y_mixtures, y_mixtures_matrix)
 
-    h1_h2_scores = evaluate_model(model, 'test mixtures', X_mixtures, y_mixtures,
-                                  y_mixtures_classes_to_evaluate_n_hot,
-                                  mixture_classes_in_classes_to_evaluate)
+    h1_h2_scores = evaluate_model(
+        model, 'test mixtures', combine_samples(X_mixtures), y_mixtures, y_mixtures_classes_to_evaluate_n_hot,
+        mixture_classes_in_classes_to_evaluate)
 
-    plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_classes_to_evaluate_n_hot,
-                                       inv_test_map, classes_to_evaluate,
-                                       mixture_classes_in_classes_to_evaluate, n_single_cell_types - 1,
-                                       dists_from_xmixtures_to_closest_augmented)
+    plot_for_experimental_mixture_data(
+        combine_samples(X_mixtures), y_mixtures, y_mixtures_classes_to_evaluate_n_hot, inv_test_map, classes_to_evaluate,
+        mixture_classes_in_classes_to_evaluate, n_single_cell_types - 1, dists_from_xmixtures_to_closest_augmented)
 
     plot_calibration(h1_h2_scores, classes_to_evaluate)
 
