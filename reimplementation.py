@@ -23,7 +23,7 @@ def read_df(filename, binarize):
 
     :param filename: name of file to read in
     :param binarize: whether to binarize - use a cutoff value to convert to 0/1
-    :return: dataframe
+    :return: (dataframe, list of indices)
     """
 
     if '_rv' in filename:
@@ -37,11 +37,7 @@ def read_df(filename, binarize):
         return df, rv
 
     else:
-        df = pd.read_excel(filename, delimiter=';')
-        df.fillna(0, inplace=True)
-        if binarize:
-            df = 1 * (df > 150)
-        return df
+        raise ValueError('data file should contain column of indices, indicated by "rv" in file name')
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=True, developing=False,
@@ -98,10 +94,11 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
+                #TODO variabel aantal samples toestaan
                 data_for_class = np.zeros((n_full_samples, rv_max, n_features))
                 n_discarded = 0
 
-                end_replicate.insert(len(end_replicate), len(rv_set_per_class))
+                end_replicate.append(len(rv_set_per_class))
                 for i in range(n_full_samples):
                     if i == 0:
                         candidate_samples = data_for_this_label[:end_replicate[i], :]
@@ -116,6 +113,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                             [candidate_samples, np.zeros([rv_max - candidate_samples.shape[0],
                                                          n_features], dtype='int')])
                     # Treshold is set depending on the number of replicates per sample.
+                    #TODO make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
                             np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
                             and 'Blank' not in clas:
@@ -480,7 +478,12 @@ def plot_calibration(h1_h2_scores, classes_to_evaluate):
         h1_lrs = h1_scores / (1 - h1_scores)
         h2_lrs = h2_scores / (1 - h2_scores)
         if len(h1_scores) > 0:
-            m = get_lr_metrics(h1_scores=h1_scores, h2_scores=h2_scores, h1_lrs=h1_lrs, h2_lrs=h2_lrs, hp_prior=0.5)
+            m = get_lr_metrics(h1_scores=h1_scores,
+                               h2_scores=h2_scores,
+                               h1_lrs=h1_lrs,
+                               h2_lrs=h2_lrs,
+                               hp_prior=0.5
+                               )
             print(classes_to_evaluate[j], ['{}: {}'.format(a[0], round(a[1], 2)) for a in m])
         scale = 10
         bins0 = defaultdict(float)
@@ -601,6 +604,101 @@ def getNumeric(prompt):
             print("Please enter a number.")
 
 
+def manually_refactor_indices():
+    global xls, sheet_to_df_map, relevant_column, shortened_names, replicate_values, indexes_to_be_checked, i, replicates, csvfile, output, writer, val, a, b, c, mergedac, mergedbc
+    xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
+    sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+    relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
+    shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
+    replicate_values = OrderedDict([])
+    indexes_to_be_checked = []
+    for i in range(len(shortened_names)):
+        try:
+            replicate_values[i] = int(shortened_names[i][-1])
+        except ValueError:
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+        if shortened_names[i] in ['0.3', '.75', '0.5', 'a_1', 'n_1', 'n_4']:
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+        if shortened_names[i][-1] in ['0', '6', '7']:
+            indexes_to_be_checked.append(i)
+            replicate_values[i] = shortened_names[i]
+    # Iterate over the index and manually adjust
+    replace_replicate = []
+    for i in range(len(indexes_to_be_checked)):
+        print("The middle rowname of the following rownames should get assigned a replicate number:",
+              relevant_column[indexes_to_be_checked[i] - 1:indexes_to_be_checked[i] + 2])
+        replace_replicate.append(getNumeric("Give the replicate number"))
+    for i in range(len(indexes_to_be_checked)):
+        replicate_values[indexes_to_be_checked[i]] = replace_replicate[i]
+    replicates = list(replicate_values.values())
+    replicates.insert(0, "replicate_value")
+    csvfile = "Datasets/replicate_numbers_single.csv"
+    with open(csvfile, "w") as output:
+        writer = csv.writer(output, lineterminator='\n')
+        for val in replicates:
+            writer.writerow([val])
+    sheet_to_df_map['Samples + details'].to_csv('Datasets/Dataset_NFI_meta.csv', encoding='utf-8')
+    sheet_to_df_map['Data uitgekleed'].to_csv('Datasets/Dataset_NFI_adj.csv', encoding='utf-8')
+    a = pd.read_csv("Datasets/Dataset_NFI_meta.csv", delimiter=',')
+    b = pd.read_csv("Datasets/Dataset_NFI_adj.csv", delimiter=',')
+    c = pd.read_csv("Datasets/replicate_numbers_single.csv")
+    mergedac = pd.concat([a, c], axis=1)
+    for i in range(len(mergedac.columns.values)):
+        if 'Unnamed' in mergedac.columns.values[i]:
+            mergedac.columns.values[i] = None
+    mergedbc = pd.concat([b, c], axis=1)
+    for i in range(len(mergedbc.columns.values)):
+        if 'Unnamed' in mergedbc.columns.values[i]:
+            mergedbc.columns.values[i] = None
+    mergedac.to_excel("Datasets/Dataset_NFI_meta_rv.xlsx", index=False)
+    mergedbc.to_excel("Datasets/Dataset_NFI_rv.xlsx", index=False)
+    os.remove("Datasets/Dataset_NFI_meta.csv")
+    os.remove("Datasets/Dataset_NFI_adj.csv")
+    os.remove("Datasets/replicate_numbers_single.csv")
+
+
+def manually_refactor_indices_mixtures():
+    global xls, sheet_to_df_map, relevant_column, i, shortened_names, replicate_values, indexes_to_be_checked, replicates, csvfile, output, writer, val, a, b, c, mergedac, mergedbc
+    xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
+    sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+    relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
+    shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
+    replicate_values = OrderedDict([])
+    indexes_to_be_checked = []
+    for i in range(len(shortened_names)):
+        try:
+            replicate_values[i] = int(shortened_names[i][-1])
+        except ValueError:
+            print("Some samples do not have clear replicate numbers")
+    replicates = list(replicate_values.values())
+    replicates.insert(0, "replicate_value")
+    csvfile = "Datasets/replicate_numbers_mixture.csv"
+    with open(csvfile, "w") as output:
+        writer = csv.writer(output, lineterminator='\n')
+        for val in replicates:
+            writer.writerow([val])
+    sheet_to_df_map['Mix + details'].to_csv('Datasets/Dataset_mixture_meta.csv', encoding='utf-8')
+    sheet_to_df_map['Mix data uitgekleed'].to_csv('Datasets/Dataset_mixture_adj.csv', encoding='utf-8')
+    a = pd.read_csv("Datasets/Dataset_mixture_meta.csv", delimiter=',')
+    b = pd.read_csv("Datasets/Dataset_mixture_adj.csv", delimiter=',')
+    c = pd.read_csv("Datasets/replicate_numbers_mixture.csv")
+    mergedac = pd.concat([a, c], axis=1)
+    for i in range(len(mergedac.columns.values)):
+        if 'Unnamed' in mergedac.columns.values[i]:
+            mergedac.columns.values[i] = None
+    mergedbc = pd.concat([b, c], axis=1)
+    for i in range(len(mergedbc.columns.values)):
+        if 'Unnamed' in mergedbc.columns.values[i]:
+            mergedbc.columns.values[i] = None
+    mergedac.to_excel("Datasets/Dataset_mixtures_meta_rv.xlsx", index=False)
+    mergedbc.to_excel("Datasets/Dataset_mixtures_rv.xlsx", index=False)
+    os.remove("Datasets/Dataset_mixture_meta.csv")
+    os.remove("Datasets/Dataset_mixture_adj.csv")
+    os.remove("Datasets/replicate_numbers_mixture.csv")
+
+
 if __name__ == '__main__':
     developing = False
     include_blank = False
@@ -609,109 +707,11 @@ if __name__ == '__main__':
 
     # Assign the correct replicates to the same sample for the single cell types.
     if unknown_replicatenumbers_single:
-        xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
-        sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
-
-        relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
-        shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
-
-        replicate_values = OrderedDict([])
-        indexes_to_be_checked = []
-        for i in range(len(shortened_names)):
-            try:
-                replicate_values[i] = int(shortened_names[i][-1])
-            except ValueError:
-                indexes_to_be_checked.append(i)
-                replicate_values[i] = shortened_names[i]
-            if shortened_names[i] in ['0.3', '.75', '0.5', 'a_1', 'n_1', 'n_4']:
-                indexes_to_be_checked.append(i)
-                replicate_values[i] = shortened_names[i]
-            if shortened_names[i][-1] in ['0', '6', '7']:
-                indexes_to_be_checked.append(i)
-                replicate_values[i] = shortened_names[i]
-
-        # Iterate over the index and manually adjust
-        replace_replicate = []
-        for i in range(len(indexes_to_be_checked)):
-            print("The middle rowname of the following rownames should get assigned a replicate number:",
-                  relevant_column[indexes_to_be_checked[i]-1:indexes_to_be_checked[i]+2])
-            replace_replicate.append(getNumeric("Give the replicate number"))
-
-        for i in range(len(indexes_to_be_checked)):
-            replicate_values[indexes_to_be_checked[i]] = replace_replicate[i]
-
-        replicates = list(replicate_values.values())
-        replicates.insert(0, "replicate_value")
-        csvfile = "Datasets/replicate_numbers_single.csv"
-
-        with open(csvfile, "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            for val in replicates:
-                writer.writerow([val])
-
-        sheet_to_df_map['Samples + details'].to_csv('Datasets/Dataset_NFI_meta.csv', encoding='utf-8')
-        sheet_to_df_map['Data uitgekleed'].to_csv('Datasets/Dataset_NFI_adj.csv', encoding='utf-8')
-        a = pd.read_csv("Datasets/Dataset_NFI_meta.csv", delimiter=',')
-        b = pd.read_csv("Datasets/Dataset_NFI_adj.csv", delimiter=',')
-        c = pd.read_csv("Datasets/replicate_numbers_single.csv")
-        mergedac = pd.concat([a, c], axis=1)
-        for i in range(len(mergedac.columns.values)):
-            if 'Unnamed' in mergedac.columns.values[i]:
-                mergedac.columns.values[i] = None
-        mergedbc = pd.concat([b, c], axis=1)
-        for i in range(len(mergedbc.columns.values)):
-            if 'Unnamed' in mergedbc.columns.values[i]:
-                mergedbc.columns.values[i] = None
-        mergedac.to_excel("Datasets/Dataset_NFI_meta_rv.xlsx", index=False)
-        mergedbc.to_excel("Datasets/Dataset_NFI_rv.xlsx", index=False)
-
-        os.remove("Datasets/Dataset_NFI_meta.csv")
-        os.remove("Datasets/Dataset_NFI_adj.csv")
-        os.remove("Datasets/replicate_numbers_single.csv")
+        manually_refactor_indices()
 
     # Assign the correct replicates to the same sample for the mixture cell types.
     if unknown_replicatenumbers_mixture:
-        xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
-        sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
-        relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
-        shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
-
-        replicate_values = OrderedDict([])
-        indexes_to_be_checked = []
-        for i in range(len(shortened_names)):
-            try:
-                replicate_values[i] = int(shortened_names[i][-1])
-            except ValueError:
-                print("Some samples do not have clear replicate numbers")
-
-        replicates = list(replicate_values.values())
-        replicates.insert(0, "replicate_value")
-        csvfile = "Datasets/replicate_numbers_mixture.csv"
-
-        with open(csvfile, "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            for val in replicates:
-                writer.writerow([val])
-
-        sheet_to_df_map['Mix + details'].to_csv('Datasets/Dataset_mixture_meta.csv', encoding='utf-8')
-        sheet_to_df_map['Mix data uitgekleed'].to_csv('Datasets/Dataset_mixture_adj.csv', encoding='utf-8')
-        a = pd.read_csv("Datasets/Dataset_mixture_meta.csv", delimiter=',')
-        b = pd.read_csv("Datasets/Dataset_mixture_adj.csv", delimiter=',')
-        c = pd.read_csv("Datasets/replicate_numbers_mixture.csv")
-        mergedac = pd.concat([a, c], axis=1)
-        for i in range(len(mergedac.columns.values)):
-            if 'Unnamed' in mergedac.columns.values[i]:
-                mergedac.columns.values[i] = None
-        mergedbc = pd.concat([b, c], axis=1)
-        for i in range(len(mergedbc.columns.values)):
-            if 'Unnamed' in mergedbc.columns.values[i]:
-                mergedbc.columns.values[i] = None
-        mergedac.to_excel("Datasets/Dataset_mixtures_meta_rv.xlsx", index=False)
-        mergedbc.to_excel("Datasets/Dataset_mixtures_rv.xlsx", index=False)
-
-        os.remove("Datasets/Dataset_mixture_meta.csv")
-        os.remove("Datasets/Dataset_mixture_adj.csv")
-        os.remove("Datasets/replicate_numbers_mixture.csv")
+        manually_refactor_indices_mixtures()
 
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
@@ -744,7 +744,12 @@ if __name__ == '__main__':
                 # make sure we have all labels in both sets
                 X_train, X_test, y_train, y_test = train_test_split(X_raw_singles, y_raw_singles)
             X_augmented_train, y_augmented_train, _, _ = augment_data(
-                X_train, y_train, n_single_cell_types, n_features, from_penile=from_penile)
+                X_train,
+                y_train,
+                n_single_cell_types,
+                n_features,
+                from_penile=from_penile
+            )
 
             print(
                 'fitting on {} samples, {} features, {} classes'.format(
