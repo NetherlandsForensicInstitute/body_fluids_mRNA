@@ -368,6 +368,9 @@ def boxplot_per_single_class_category(X_augmented_test, y_augmented_matrix, clas
     y_prob = model.predict_proba(X_augmented_test)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, mixtures_in_classes_of_interest)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+    pickle.dump(log_lrs_per_class, open('log_LRs_single', 'wb'))
+    lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
+    pickle.dump(lrs_per_class, open('LRs_single', 'wb'))
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(n_single_classes_to_draw):
         indices = [j for j in range(y_augmented_matrix.shape[0]) if
@@ -408,11 +411,13 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
     :param dists: N_experimental_mixture_samples iterable of distances to nearest augmented data point. Indication of
             whether the point may be an outlier (eg measurement error or problem with augmentation scheme)
     """
-    # This is a test comment
     y_prob = model.predict_proba(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, mixtures_in_classes_of_interest)
 
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+    pickle.dump(log_lrs_per_class, open('log_LRs_mixt', 'wb'))
+    lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
+    pickle.dump(lrs_per_class, open('LRs_mixt', 'wb'))
     plt.subplots(3, 3, figsize=(18, 9))
     for i, i_clas in enumerate(set(y_mixtures)):
         indices_experiments = [j for j in range(len(y_mixtures)) if y_mixtures[j] == i_clas]
