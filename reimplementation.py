@@ -20,12 +20,15 @@ from metrics import get_lr_metrics
 def read_df(filename, binarize):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.
+    Returns the original dataframe and a separate list of indices that are the
+    replicate numbers that belong to each sample.
+
+    Note that this function only works if '_rv' is in the filename.
 
     :param filename: name of file to read in
     :param binarize: whether to binarize - use a cutoff value to convert to 0/1
     :return: (dataframe, list of indices)
     """
-
     if '_rv' in filename:
         # then sure that it includes 'replicate_values'
         df_rv = pd.read_excel(filename, delimiter=';')
@@ -37,20 +40,31 @@ def read_df(filename, binarize):
         return df, rv
 
     else:
-        raise ValueError('data file should contain column of indices, indicated by "rv" in file name')
+        raise ValueError('Data file should contain column '
+                         'of indices, indicated by "rv" in file name.'
+                         'Change te filename by concatenating "_rv" only'
+                         'if you are sure that a column is present in the'
+                         'data file.')
 
 
-def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=True, developing=False,
-                           include_blank=False):
+def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
+                           binarize=True, developing=False, include_blank=False):
     """
-    Returns data per specified cell types
+    Returns data per specified cell types.
 
-    :param filename: name of file to read in
+    Note that the samples are saved in a separate numpy array
+    based on their replicate indices. As the size differs per
+    sample, the array is filled up with zeros to get the correct
+    dimension.
+
+    :param filename: name of file to read in, must include "_rv"
     :param binarize: whether to binarize raw measurement values
     :param developing: if developing, ignore Skin and Blank category for speed
     :param include_blank: whether to include Blank as a separate cell type
-    :return: (N_single_cell_experimental_samples x N_measurements per sample x N_markers array of measurements,
-                N_single_cell_experimental_samples array of int labels of which cell type was measured,
+    :return: (N_single_cell_experimental_samples x N_measurements per sample x
+        N_markers array of measurements,
+                N_single_cell_experimental_samples array of int labels of which
+                    cell type was measured,
                 N_cell types,
                 N_markers (=N_features),
                 dict: cell type name -> cell type index,
@@ -79,22 +93,29 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
     classes = [classes_map[clas] for clas in class_labels if
                (not developing or ('Skin' not in clas and 'Blank' not in clas))
                and (include_blank or 'Blank' not in clas)]
-    n_per_class = Counter(classes)
+    n_per_class = Counter(classes) # This is not the final number per class!
+                                   # Samples can be discarded later on.
     n_features = len(df.columns)
 
+    # Set the second dimension to rv_max so know for sure all measurements per
+    # sample will fit and get no dimension errors.
     X_raw = np.zeros([0, rv_max, n_features])
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
             if not developing or ('Skin' not in clas and 'Blank' not in clas):
-                # Implement which make pairs of 4 replicates
+                # Implement which make pairs of replicates
                 data_for_this_label = np.array(df.loc[clas])
                 rv_set_per_class = np.array(rv.loc[clas]).flatten()
+                # Save the index when a 'new sample' starts and save in
+                # end_replicate. This is when the next integer is lower or equal
+                # than the current integer. (e.g. 4 > 1 or 2 == 2).
                 end_replicate = [ i for i in range(1, len(rv_set_per_class)) if
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
-                #TODO variabel aantal samples toestaan?
+                #TODO variabel aantal samples toestaan? --> wordt nu opgelost
+                # in ;combine_samples'.
                 data_for_class = np.zeros((n_full_samples, rv_max, n_features))
                 n_discarded = 0
 
@@ -104,16 +125,20 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                         candidate_samples = data_for_this_label[:end_replicate[i], :]
                         numerator = candidate_samples.shape[0]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv_max - candidate_samples.shape[0],
-                                                         n_features], dtype='int')])
+                            [candidate_samples,
+                             np.zeros([rv_max - candidate_samples.shape[0],
+                                       n_features], dtype='int')])
                     else:
-                        candidate_samples = data_for_this_label[end_replicate[i-1]:end_replicate[i], :]
+                        candidate_samples = data_for_this_label[
+                                            end_replicate[i-1]:end_replicate[i], :
+                                            ]
                         numerator = candidate_samples.shape[0]
                         candidate_samples = np.vstack(
-                            [candidate_samples, np.zeros([rv_max - candidate_samples.shape[0],
-                                                         n_features], dtype='int')])
+                            [candidate_samples,
+                             np.zeros([rv_max - candidate_samples.shape[0],
+                                       n_features], dtype='int')])
                     # Treshold is set depending on the number of replicates per sample.
-                    #TODO make this at least one okay?
+                    # TODO make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
                             np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
                             and 'Blank' not in clas:
@@ -123,7 +148,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
                     else:
                         data_for_class[i - n_discarded, :, :] = candidate_samples
 
-                print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(
+                print('{} has {} samples (after discarding {} due to QC on '
+                      'structural markers)'.format(
                     clas,
                     n_full_samples,
                     n_discarded
@@ -134,12 +160,21 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', binarize=Tru
 
     n_single_cell_types = len(classes_map)
 
-    return X_raw, y, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class
+    return X_raw, y, n_single_cell_types, n_features, classes_map, \
+           inv_classes_map, n_per_class
 
 
 def combine_samples(data_for_class, n_features):
     """
-    takes a n_samples x : x n_features matrix and returns the n_samples x n_markers matrix
+    Takes a n_samples x rv_max x n_features matrix and returns the
+    n_samples x n_markers matrix. The rows including solely zeros are not
+    taken into account.
+
+    Note that the latter assumes that there exist no samples in which none of
+    the marker values is on. This makes sense as the marker values ACTB and
+    18S-rRNA always should be present for the sample to be relevant and is/may
+    be deleted if not present.
+
     :param data_for_class: a n_samples x : x n_features numpy array
     :return: n_samples x N_markers numpy array
     """
@@ -150,30 +185,41 @@ def combine_samples(data_for_class, n_features):
         if null in data_for_class[i, :, :]:
             for j in range(data_for_class.shape[1]):
                 if np.array_equal(data_for_class[i, j, :], null):
-                    # want to delete this row
+                    # Want to delete row j.
                     delete_rows.append(j)
         if len(delete_rows) > 0:
-            data_for_class_mean[i, :] = np.mean(data_for_class[i, :-1*len(delete_rows), :], axis=0)
+            data_for_class_mean[i, :] = np.mean(
+                data_for_class[i, :-1*len(delete_rows), :], axis=0
+            )
         else:
-            data_for_class_mean[i, :] = np.mean(data_for_class[i, :, :], axis=0)
+            data_for_class_mean[i, :] = np.mean(
+                data_for_class[i, :, :], axis=0
+            )
+
     return data_for_class_mean
 
 
 def classify_single(X, y, inv_classes_map):
     """
-    very simple analysis of single cell type classification, useful as preliminary test
+    Very simple analysis of single cell type classification, useful as
+    preliminary test.
     """
     # classify single classes
     single_samples = combine_samples(X, n_features)
-    print('fitting on {} samples, {} features, {} classes'.format(len(y), single_samples.shape[1],
-
-                                                                  len(set(y))))
+    print('fitting on {} samples, {} features, {} classes'.format(
+        len(y),
+        single_samples.shape[1],
+        len(set(y)))
+    )
 
     X_train, X_test, y_train, y_test = train_test_split(single_samples, y)
     single_model = MLPClassifier(random_state=0)
     single_model.fit(X_train, y_train)
     y_pred = single_model.predict(X_test)
-    print('train accuracy for single classes: {}'.format(accuracy_score(y_test, y_pred)))
+    print('train accuracy for single classes: {}'.format(
+        accuracy_score(y_test, y_pred))
+    )
+
     # Compute confusion matrix
     cnf_matrix = confusion_matrix(y_test, y_pred)
     np.set_printoptions(precision=2)
@@ -183,12 +229,17 @@ def classify_single(X, y, inv_classes_map):
 
 def construct_random_samples(X, y, n, classes_to_include, n_features):
     """
-    returns n generated samples that contain classes classes_to_include.
-    A sample is generated by random sampling a sample for each class, and adding the shuffled replicates
-    :param X: N_single_cell_experimental_samples x N_measurements per sample x N_markers array of measurements
-    :param y: N_single_cell_experimental_samples array of int labels of which cell type was measured
+    Returns n generated samples that contain classes classes_to_include.
+    A sample is generated by random sampling a sample for each class, and adding
+    the shuffled replicates
+
+    :param X: N_single_cell_experimental_samples x N_measurements per sample x
+        N_markers array of measurements
+    :param y: N_single_cell_experimental_samples array of int labels of which
+        cell type was measured
     :param n: int: number of samples to generate
-    :param classes_to_include:  iterable of int, cell type indices to include in the mixtures
+    :param classes_to_include:  iterable of int, cell type indices to include
+        in the mixtures
     :param n_features: int N_markers (=N_features),
     :return n x n_features array
     """
@@ -197,38 +248,51 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     sampled = np.zeros((len(classes_to_include), n, 6, n_features))
     for j, clas in enumerate(classes_to_include):
         n_in_class = sum(np.array(y) == clas)
-        data_for_class = np.array([X[i, :, :] for i in range(len(X)) if y[i] == clas])
+        data_for_class = np.array([
+            X[i, :, :] for i in range(len(X)) if y[i] == clas
+        ])
         sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
         # shuffle them
         for i in range(n):
             sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
     combined = np.max(sampled, axis=0)
+
     return combine_samples(combined, n_features)
 
 
-def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features, from_penile=False):
+def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
+                 from_penile=False):
     """
     Generate data for the power set of single cell types
 
-    :param X_singles_raw: N_single_cell_experimental_samples x N_measurements per sample x N_markers array of measurements
-    :param y_singles: N_single_cell_experimental_samples array of int labels of which cell type was measured
+    :param X_singles_raw: N_single_cell_experimental_samples x N_measurements
+        per sample x N_markers array of measurements
+    :param y_singles: N_single_cell_experimental_samples array of int labels of
+        which cell type was measured
     :param n_single_cell_types: int: number of single cell types
     :param n_features: int: N_markers
-    :param from_penile: bool: generate samplew that (T) always or (F) never also contain penile skin
+    :param from_penile: bool: generate samplew that (T) always or (F) never
+        also contain penile skin
     :return: N_experiments x N_markers array,
-                N_experiment array of int labels for the powerset (=mixtures) classes,
-                N_augmented_data_samples x N_single_cell_classes matrix of 0, 1, indicating for each augmented sample
-                            which single cell types it was made up of. Does not contain a column for penile skin,
-                list of length N_single_cell_classes of lists, that indicate the mixture labels each single cell type
-                            features in
+                N_experiment array of int labels for the powerset (=mixtures)
+                    classes,
+                N_augmented_data_samples x N_single_cell_classes matrix of 0, 1,
+                            indicating for each augmented sample which single cell
+                            types it was made up of. Does not contain a column for
+                            penile skin,
+                list of length N_single_cell_classes of lists, that indicate the
+                            mixture labels each single cell type features in
     """
-    # generate more data
+    # Generate more data
     X = np.zeros((0, n_features))
     y = []
     n_single_cell_types_not_penile = n_single_cell_types - 1
-    y_n_hot = np.zeros((2 ** n_single_cell_types_not_penile * N_SAMPLES_PER_COMBINATION, n_single_cell_types),
-                       dtype=int)
+    y_n_hot = np.zeros((
+        2 ** n_single_cell_types_not_penile * N_SAMPLES_PER_COMBINATION,
+        n_single_cell_types
+    ), dtype=int)
     mixtures_containing_single_cell_type = [[] for _ in range(n_single_cell_types_not_penile)]
+
     for i in range(2 ** n_single_cell_types_not_penile):
         binary = bin(i)[2:]
         while len(binary) < n_single_cell_types_not_penile:
@@ -245,12 +309,14 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features, from
         X = np.append(X, construct_random_samples(
             X_singles_raw, y_singles, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
         y += [i] * N_SAMPLES_PER_COMBINATION
-    return X, y, y_n_hot[:, :n_single_cell_types_not_penile], mixtures_containing_single_cell_type
+
+    return X, y, y_n_hot[:, :n_single_cell_types_not_penile], \
+           mixtures_containing_single_cell_type
 
 
 def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
     """
-    computes metrics for performance of the model on dataset X, y
+    Computes metrics for performance of the model on dataset X, y
 
     :param model: sklearn-like model to evaluate
     :param dataset_label:
@@ -258,15 +324,18 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
     :param y:
     :param y_n_hot:
     :param labels_in_class:
-    :return: iterable with for each class a list of len 2, with scores for all h1 and h2 scenarios
+    :return: iterable with for each class a list of len 2, with scores for all
+        h1 and h2 scenarios
     """
     print(X.shape)
     y_pred = model.predict(X)
-    print('{} accuracy for mixtures: {}'.format(dataset_label, accuracy_score(y, y_pred)))
+    print('{} accuracy for mixtures: {}'.format(
+        dataset_label, accuracy_score(y, y_pred)))
     y_prob = model.predict_proba(X)
     scores_per_class = {}
     # marginal for each single class sample
-    prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, labels_in_class)
+    prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+        y_prob, labels_in_class)
     for j in range(y_n_hot.shape[1]):
         # get the probability per single class sample
         total_proba = prob_per_class[:, j]
@@ -277,17 +346,20 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
             # print(inv_classes_map[j], np.quantile(probas_without_cell_type, [0.05, .25, .5, .75, .95]),
             #       np.quantile(probas_with_cell_type, [0.05, .25, .5, .75, .95]))
             scores_per_class[j] = (probas_with_cell_type, probas_without_cell_type)
+
     return scores_per_class
 
 
 def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class):
     """
-    converts n_samples x n_mixture_classes matrix of probabilities to a n_samples x n_classes_of_interest matrix, by
-    summing over the relevant mixtures
+    Converts n_samples x n_mixture_classes matrix of probabilities to a
+    n_samples x n_classes_of_interest matrix, by summing over the relevant
+    mixtures.
 
     :param prob: n_samples x n_mixture_classes matrix of probabilities
-    :param labels_in_class: iterable of len n_classes_of_interest. For each class, the list of mixture classes that contain
-    the class of interest are given
+    :param labels_in_class: iterable of len n_classes_of_interest. For each
+        class, the list of mixture classes that contain the class of interest
+        are given.
     :return: n_samples x n_classes_of_interest matrix of probabilities
     """
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
@@ -297,17 +369,29 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class):
     epsilon = 10 ** -MAX_LR
     res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
     res_prob = np.where(res_prob < epsilon, epsilon, res_prob)
+
     return res_prob
 
 
-def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map, binarize=True):
+def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
+                      binarize=True):
     """
-    reads in the experimental mixture data that is used as test data
-    :param n_single_cell_types_no_penile: int: number of single cell types excluding penile skine
+    Reads in the experimental mixture data that is used as test data.
+
+    Note that the samples are saved in a separate numpy array
+    based on their replicate indices. As the size differs per
+    sample, the array is filled up with zeros to get the correct
+    dimension.
+
+    :param n_single_cell_types_no_penile: int: number of single cell types
+        excluding penile skine
     :param binarize: bool: whether to binarize values
-    :return: N_samples x N_markers array of measurements NB only one replicate per sample,
-                N_samples iterable of mixture class labels - corresponds to the labels used in data augmentation,
-                N_samples x N_single_cell_type n_hot encoding of the labels NB in in single cell type space!
+    :return: N_samples x N_markers array of measurements NB only one replicate per
+                    sample,
+                N_samples iterable of mixture class labels - corresponds to the labels
+                    used in data augmentation,
+                N_samples x N_single_cell_type n_hot encoding of the labels NB in
+                    in single cell type space!
                 dict: mixture name -> list of int single cell type labels
                 dict: mixture class label -> mixture name
     """
@@ -325,7 +409,10 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map, bi
     rvs = np.array(rv).flatten()
     N_full_samples = len([i for i in range(1, len(rvs)) if rvs[i-1] > rvs[i] or
                           rvs[i-1] == rvs[i]])+1
-    y_mixtures_n_hot = np.zeros((N_full_samples, n_single_cell_types_no_penile), dtype=int)
+    y_mixtures_n_hot = np.zeros(
+        (N_full_samples, n_single_cell_types_no_penile),
+        dtype=int
+    )
     n_total = 0
 
     for clas in sorted(set(class_labels)):
@@ -339,7 +426,7 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map, bi
         n_full_samples = len(end_replicate)+1
 
         data_for_mixt_class = np.zeros((n_full_samples, rv_max, n_features))
-        end_replicate.insert(len(end_replicate), len(rv_set_per_class))
+        end_replicate.append(len(rv_set_per_class))
         for i in range(n_full_samples):
             if i == 0:
                 sample = data_for_this_label[:end_replicate[i], :]
@@ -362,30 +449,35 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map, bi
         n_total += n_full_samples
         X_mixtures = np.append(X_mixtures, data_for_mixt_class, axis=0)
         y_mixtures += [class_label] * data_for_mixt_class.shape[0]
+
     return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
 
 
-def boxplot_per_single_class_category(X_augmented_test, y_augmented_matrix, classes_to_evaluate,
-                                      mixtures_in_classes_of_interest, class_combinations_to_evaluate):
+def boxplot_per_single_class_category(X_augmented_test,
+                                      y_augmented_matrix,
+                                      classes_to_evaluate,
+                                      mixtures_in_classes_of_interest,
+                                      class_combinations_to_evaluate):
     """
-    for single cell type, plot the distribution of marginal LRs for each cell type, as well as for specified
-    combinations of classes
+    for single cell type, plot the distribution of marginal LRs for each cell type,
+    as well as for specified combinations of classes.
 
     :param X_augmented_test: N_samples x N_markers array of observations
-    :param y_augmented_matrix: N_samples x (N_single_cell_types + N_combos) n_hot encoding
+    :param y_augmented_matrix: N_samples x (N_single_cell_types + N_combos)
+        n_hot encoding
     :param classes_to_evaluate: list of str, names of classes to evaluate
-    :param mixtures_in_classes_of_interest: list of lists, specifying for each class in classes_to_evaluate which
+    :param mixtures_in_classes_of_interest: list of lists, specifying for each
+        class in classes_to_evaluate which
     mixture labels contain these
-    :param class_combinations_to_evaluate: list of lists of int, specifying combinations of single cell types to consider
+    :param class_combinations_to_evaluate: list of lists of int, specifying
+        combinations of single cell types to consider
     :return: None
     """
     n_single_classes_to_draw = y_augmented_matrix.shape[1]
     y_prob = model.predict_proba(X_augmented_test)
-    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, mixtures_in_classes_of_interest)
+    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+        y_prob, mixtures_in_classes_of_interest)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-    pickle.dump(log_lrs_per_class, open('log_LRs_single', 'wb'))
-    lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
-    pickle.dump(lrs_per_class, open('LRs_single', 'wb'))
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(n_single_classes_to_draw):
         indices = [j for j in range(y_augmented_matrix.shape[0]) if
@@ -406,33 +498,41 @@ def boxplot_per_single_class_category(X_augmented_test, y_augmented_matrix, clas
     plt.savefig('singles boxplot')
 
 
-def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix, inv_test_map, classes_to_evaluate,
+def plot_for_experimental_mixture_data(X_mixtures,
+                                       y_mixtures,
+                                       y_mixtures_matrix,
+                                       inv_test_map,
+                                       classes_to_evaluate,
                                        mixtures_in_classes_of_interest,
-                                       n_single_cell_types_no_penile, dists):
+                                       n_single_cell_types_no_penile,
+                                       dists):
     """
-    for each mixture category that we have measurements on, plot the distribution of marginal LRs for each cell type,
-    as well as for the special combinations (eg vaginal+menstrual)
-    also plot LRs as a function of distance to nearest data point
-    also plot experimental measurements together with LRs found and distance in a large matrix plot
+    for each mixture category that we have measurements on, plot the
+    distribution of marginal LRs for each cell type, as well as for the special
+    combinations (eg vaginal+menstrual) also plot LRs as a function of distance
+    to nearest data point also plot experimental measurements together with LRs
+    found and distance in a large matrix plot
 
-    :param X_mixtures: N_experimental_mixture_samples x N_markers array of observations
+    :param X_mixtures: N_experimental_mixture_samples x N_markers array of
+        observations
     :param y_mixtures: N_experimental_mixture_samples array of int mixture labels
-    :param y_mixtures_matrix:  N_experimental_mixture_samples x (N_single_cell_types + N_combos) n_hot encoding
+    :param y_mixtures_matrix:  N_experimental_mixture_samples x
+        (N_single_cell_types + N_combos) n_hot encoding
     :param inv_test_map: dict: mixture label -> mixture name
     :param classes_to_evaluate: list of str, classes to evaluate
-    :param mixtures_in_classes_of_interest:  list of lists, specifying for each class in classes_to_evaluate which
-    mixture labels contain these
-    :param n_single_cell_types_no_penile: int: number of single cell types excluding penile skin
-    :param dists: N_experimental_mixture_samples iterable of distances to nearest augmented data point. Indication of
-            whether the point may be an outlier (eg measurement error or problem with augmentation scheme)
+    :param mixtures_in_classes_of_interest:  list of lists, specifying for each
+        class in classes_to_evaluate which mixture labels contain these
+    :param n_single_cell_types_no_penile: int: number of single cell types
+        excluding penile skin
+    :param dists: N_experimental_mixture_samples iterable of distances to
+        nearest augmented data point. Indication of whether the point may be an
+        outlier (eg measurement error or problem with augmentation scheme)
     """
     y_prob = model.predict_proba(X_mixtures)
-    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(y_prob, mixtures_in_classes_of_interest)
+    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+        y_prob, mixtures_in_classes_of_interest)
 
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-    pickle.dump(log_lrs_per_class, open('log_LRs_mixt', 'wb'))
-    lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
-    pickle.dump(lrs_per_class, open('LRs_mixt', 'wb'))
     plt.subplots(3, 3, figsize=(18, 9))
     for i, i_clas in enumerate(set(y_mixtures)):
         indices_experiments = [j for j in range(len(y_mixtures)) if y_mixtures[j] == i_clas]
@@ -457,8 +557,12 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
     for i in range(y_mixtures_matrix.shape[1]):
         plt.subplot(3, 3, i + 1)
         plt.ylim([-MAX_LR - .5, MAX_LR + .5])
-        plt.scatter(dists + np.random.random(len(dists)) / 20, log_lrs_per_class[:, i],
-                    color=['red' if iv else 'blue' for iv in y_mixtures_matrix[:, i]], alpha=0.1)
+        plt.scatter(
+            dists + np.random.random(len(dists)) / 20,
+            log_lrs_per_class[:, i],
+            color=['red' if iv else 'blue' for iv in y_mixtures_matrix[:, i]],
+            alpha=0.1
+        )
         plt.ylabel('LR')
         plt.xlabel('distance to nearest data point')
         plt.title(classes_to_evaluate[i])
@@ -466,8 +570,32 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
 
     plt.figure()
     plt.matshow(
-        np.append(np.append(X_mixtures, log_lrs_per_class, axis=1), np.expand_dims(np.array([d*5 for d in dists]), axis=1), axis=1))
+        np.append(
+            np.append(X_mixtures, log_lrs_per_class, axis=1),
+            np.expand_dims(np.array([d*5 for d in dists]), axis=1),
+            axis=1))
     plt.savefig('mixtures binned data and log lrs')
+
+
+def calculate_loglrs(X, model, mixtures_in_classes_of_interest):
+    """
+    Calculates the log likehood ratios.
+
+    :param model: model that has been trained
+    :param X: numpy array used to predict the probabilites of labels with
+    :param mixtures_in_classes_of_interest:
+    :return: the log likelihood ratios for all samples and makers
+    """
+    if len(X.shape) > 2:
+        X = combine_samples(X, n_features)
+
+    y_prob = model.predict_proba(X)
+    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+        y_prob, mixtures_in_classes_of_interest)
+
+    log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+
+    return log_lrs_per_class
 
 
 def plot_data(X):
@@ -482,8 +610,11 @@ def plot_data(X):
 
 def plot_calibration(h1_h2_scores, classes_to_evaluate):
     """
-    print metrics on and generate plots on calibration NB the confidence intervals appear to still have issues
-    :param h1_h2_scores: iterable with for each class to evaluate a list of len two, containing scores for h1 and h2
+    Print metrics on and generate plots on calibration NB the confidence
+    intervals appear to still have issues
+
+    :param h1_h2_scores: iterable with for each class to evaluate a list of len
+        two, containing scores for h1 and h2
     :param classes_to_evaluate: list of str classes to evaluate
     """
     plt.subplots(2, 5, figsize=(18, 9))
@@ -500,7 +631,8 @@ def plot_calibration(h1_h2_scores, classes_to_evaluate):
                                h2_lrs=h2_lrs,
                                hp_prior=0.5
                                )
-            print(classes_to_evaluate[j], ['{}: {}'.format(a[0], round(a[1], 2)) for a in m])
+            print(classes_to_evaluate[j], ['{}: {}'.format(
+                a[0], round(a[1], 2)) for a in m])
         scale = 10
         bins0 = defaultdict(float)
         for v in h2_lrs:
@@ -528,21 +660,24 @@ def plot_calibration(h1_h2_scores, classes_to_evaluate):
         plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
         if len(bins1) > 0:
             bins1_x, bins1_y = zip(*sorted(bins1.items()))
-            plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='red')
+            plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
             if len(std_err1) > 0:
                 bins_se1_x, vals = zip(*sorted(std_err1.items()))
                 bins_se1_y, y1 = zip(*vals)
-                plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='red')
+                plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
         # plt.legend()
         plt.title(classes_to_evaluate[j])
     plt.savefig('calibration separate')
 
     plt.figure()
-    all_std_err0, all_bins0 = transform_counts(all_bins0, sum([len(b[1]) for a, b in h1_h2_scores.items()]), scale,
-                                               True)
+    all_std_err0, all_bins0 = transform_counts(
+        all_bins0, sum([len(b[1]) for a, b in h1_h2_scores.items()]),
+        scale, True
+    )
 
-    all_std_err1, all_bins1 = transform_counts(all_bins1, sum([len(b[0]) for a, b in h1_h2_scores.items()]), scale,
-                                               False)
+    all_std_err1, all_bins1 = transform_counts(
+        all_bins1, sum([len(b[0]) for a, b in h1_h2_scores.items()]),
+        scale, False)
 
     bins0_x, bins0_y = zip(*sorted(all_bins0.items()))
     plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
@@ -551,11 +686,11 @@ def plot_calibration(h1_h2_scores, classes_to_evaluate):
         bins_se1_y, y1 = zip(*vals)
         plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y)
     bins1_x, bins1_y = zip(*sorted(all_bins1.items()))
-    plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='red')
+    plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
     if len(all_std_err1) > 0:
         bins_se1_x, vals = zip(*sorted(all_std_err1.items()))
         bins_se1_y, y1 = zip(*vals)
-        plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='red')
+        plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
     plt.legend()
     plt.title('all')
     plt.savefig('calibration all')
@@ -563,16 +698,18 @@ def plot_calibration(h1_h2_scores, classes_to_evaluate):
 
 def transform_counts(bins, n_obs, scale, is_h2):
     """
-    transform counts so h1 and h2 fractions can be visually compared
-    if the score is 'correct' (ie log > 0 for h1 and < 0 for h2), just take the fraction
-    if the score is 'incorrect', multiply by how much more often the score should occur in the 'correct' scenario, ie by
-    10**the value of the score
-    also provides an (apparently incorrect) standard error for each bin
+    Transform counts so h1 and h2 fractions can be visually compared
+    if the score is 'correct' (ie log > 0 for h1 and < 0 for h2), just take the
+    fraction if the score is 'incorrect', multiply by how much more often the
+    score should occur in the 'correct' scenario, ie by 10**the value of the
+    score also provides an (apparently incorrect) standard error for each bin
+
     :param bins: dict: rounded score -> count
     :param n_obs: int: total number of observations
     :param scale: logscale, eg 10
     :param is_h2: whether these are the counts for h2 (ie False -> h1)
-    :return: dict: rounded score -> (standard error * adjustment factor, adjustment factor),
+    :return: dict: rounded score -> (standard error * adjustment factor,
+                    adjustment factor),
                 dict: rounded score -> (possibly adjusted) fraction
     """
     std_err = {}
@@ -584,14 +721,19 @@ def transform_counts(bins, n_obs, scale, is_h2):
             adjusted_y = bins[x] / n_obs * (scale ** abs(x))
             std_err[x] = (math.sqrt(p * (1 - p) * n_obs) * adjusted_y, adjusted_y)
             bins[x] = adjusted_y
+
     return std_err, bins
 
 
-def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type, classes_map,
-                                              class_combinations_to_evaluate, y_mixtures, y_mixtures_matrix):
+def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
+                                              classes_map,
+                                              class_combinations_to_evaluate,
+                                              y_mixtures,
+                                              y_mixtures_matrix):
     """
-    generates data structures pertaining to all classes to evaluate, which are single cell types and certain
-    combinations thereof
+    Generates data structures pertaining to all classes to evaluate, which are
+    single cell types and certain combinations thereof
+
     :param mixture_classes_in_single_cell_type:
     :param classes_map:
     :param class_combinations_to_evaluate:
@@ -608,7 +750,9 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
         mixture_classes_in_classes_to_evaluate.append(list(set(labels)))
         for i in set(labels):
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
-    return mixture_classes_in_classes_to_evaluate, np.append(y_mixtures_matrix, y_combi, axis=1)
+
+    return mixture_classes_in_classes_to_evaluate, \
+           np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
 def getNumeric(prompt):
@@ -621,7 +765,18 @@ def getNumeric(prompt):
 
 
 def manually_refactor_indices():
-    global xls, sheet_to_df_map, relevant_column, shortened_names, replicate_values, indexes_to_be_checked, i, replicates, csvfile, output, writer, val, a, b, c, mergedac, mergedbc
+    """
+    Takes the single cell type dataset with two sheets of which one is metadata.
+    From the information the replicate numbers are retrieved and an extra column
+    is added to the dataframe. If it is not clear to which replicate  sample
+    belongs, in a python shell an integer can be set manually.
+
+    :return: excel file with a column "replicate_values" added
+    """
+    global xls, sheet_to_df_map, relevant_column, shortened_names, \
+        replicate_values, indexes_to_be_checked, i, replicates, csvfile, \
+        output, writer, val, a, b, c, mergedac, mergedbc
+
     xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
     sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
     relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
@@ -640,6 +795,7 @@ def manually_refactor_indices():
         if shortened_names[i][-1] in ['0', '6', '7']:
             indexes_to_be_checked.append(i)
             replicate_values[i] = shortened_names[i]
+
     # Iterate over the index and manually adjust
     replace_replicate = []
     for i in range(len(indexes_to_be_checked)):
@@ -655,6 +811,7 @@ def manually_refactor_indices():
         writer = csv.writer(output, lineterminator='\n')
         for val in replicates:
             writer.writerow([val])
+
     sheet_to_df_map['Samples + details'].to_csv('Datasets/Dataset_NFI_meta.csv', encoding='utf-8')
     sheet_to_df_map['Data uitgekleed'].to_csv('Datasets/Dataset_NFI_adj.csv', encoding='utf-8')
     a = pd.read_csv("Datasets/Dataset_NFI_meta.csv", delimiter=',')
@@ -676,13 +833,24 @@ def manually_refactor_indices():
 
 
 def manually_refactor_indices_mixtures():
-    global xls, sheet_to_df_map, relevant_column, i, shortened_names, replicate_values, indexes_to_be_checked, replicates, csvfile, output, writer, val, a, b, c, mergedac, mergedbc
+    """
+    Takes the mixture cell type dataset with two sheets of which one is metadata.
+    From the information the replicate numbers are retrieved and an extra column
+    is added to the dataframe. If it is not clear to which replicate  sample
+    belongs, in a python shell an integer can be set manually.
+
+    :return: excel file with a column "replicate_values" added
+    """
+    global xls, sheet_to_df_map, relevant_column, i, shortened_names, \
+        replicate_values, indexes_to_be_checked, replicates, csvfile, output, \
+        writer, val, a, b, c, mergedac, mergedbc
     xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
     sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
     relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
     shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
     replicate_values = OrderedDict([])
     indexes_to_be_checked = []
+
     for i in range(len(shortened_names)):
         try:
             replicate_values[i] = int(shortened_names[i][-1])
@@ -691,10 +859,12 @@ def manually_refactor_indices_mixtures():
     replicates = list(replicate_values.values())
     replicates.insert(0, "replicate_value")
     csvfile = "Datasets/replicate_numbers_mixture.csv"
+
     with open(csvfile, "w") as output:
         writer = csv.writer(output, lineterminator='\n')
         for val in replicates:
             writer.writerow([val])
+
     sheet_to_df_map['Mix + details'].to_csv('Datasets/Dataset_mixture_meta.csv', encoding='utf-8')
     sheet_to_df_map['Mix data uitgekleed'].to_csv('Datasets/Dataset_mixture_adj.csv', encoding='utf-8')
     a = pd.read_csv("Datasets/Dataset_mixture_meta.csv", delimiter=',')
@@ -769,7 +939,10 @@ if __name__ == '__main__':
 
             print(
                 'fitting on {} samples, {} features, {} classes'.format(
-                    len(y_augmented_train), X_augmented_train.shape[1], len(set(y_augmented_train))))
+                    len(y_augmented_train),
+                    X_augmented_train.shape[1],
+                    len(set(y_augmented_train)))
+            )
 
             #  try calibration - or skip that?
             # TODO get the mixture data from dorum
