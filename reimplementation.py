@@ -335,7 +335,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
     scores_per_class = {}
     # marginal for each single class sample
     prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, labels_in_class)
+        y_prob, labels_in_class, MAX_LR)
     for j in range(y_n_hot.shape[1]):
         # get the probability per single class sample
         total_proba = prob_per_class[:, j]
@@ -350,7 +350,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
     return scores_per_class
 
 
-def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class):
+def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, MAX_LR):
     """
     Converts n_samples x n_mixture_classes matrix of probabilities to a
     n_samples x n_classes_of_interest matrix, by summing over the relevant
@@ -476,7 +476,7 @@ def boxplot_per_single_class_category(X_augmented_test,
     n_single_classes_to_draw = y_augmented_matrix.shape[1]
     y_prob = model.predict_proba(X_augmented_test)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest)
+        y_prob, mixtures_in_classes_of_interest, MAX_LR)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(n_single_classes_to_draw):
@@ -530,7 +530,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
     """
     y_prob = model.predict_proba(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest)
+        y_prob, mixtures_in_classes_of_interest, MAX_LR)
 
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(3, 3, figsize=(18, 9))
@@ -577,13 +577,14 @@ def plot_for_experimental_mixture_data(X_mixtures,
     plt.savefig('mixtures binned data and log lrs')
 
 
-def calculate_loglrs(X, model, mixtures_in_classes_of_interest):
+def calculate_lrs(X, model, mixtures_in_classes_of_interest, MAX_LR, log):
     """
-    Calculates the log likehood ratios.
+    Calculates the (log) likehood ratios.
 
     :param model: model that has been trained
     :param X: numpy array used to predict the probabilites of labels with
     :param mixtures_in_classes_of_interest:
+    :param log: boolean if True log LRs are calculated
     :return: the log likelihood ratios for all samples and makers
     """
     if len(X.shape) > 2:
@@ -591,11 +592,15 @@ def calculate_loglrs(X, model, mixtures_in_classes_of_interest):
 
     y_prob = model.predict_proba(X)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest)
+        y_prob, mixtures_in_classes_of_interest, MAX_LR)
 
-    log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+    if log:
+        log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+        return log_lrs_per_class
 
-    return log_lrs_per_class
+    else:
+        lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
+        return lrs_per_class
 
 
 def plot_data(X):
@@ -1021,15 +1026,16 @@ if __name__ == '__main__':
         classes_map
     )
 
-    X_augmented, y_augmented, _, _ = augment_data(
-        X_raw_singles,
-        y_raw_singles,
-        n_single_cell_types,
-        n_features,
-        from_penile=from_penile
-    )
 
     if retrain:
+        X_augmented, y_augmented, _, _ = augment_data(
+            X_raw_singles,
+            y_raw_singles,
+            n_single_cell_types,
+            n_features,
+            from_penile=from_penile
+        )
+
         unique_augmented = np.unique(X_augmented, axis=0)
         dists_from_xmixtures_to_closest_augmented = []
         for x in tqdm(X_mixtures, 'computing distances'):
@@ -1045,6 +1051,8 @@ if __name__ == '__main__':
         y_mixtures,
         y_mixtures_matrix
     )
+
+    pickle.dump(mixture_classes_in_classes_to_evaluate, open('mixture_classes_in_classes_to_evaluate', 'wb'))
 
     h1_h2_scores = evaluate_model(
         model,
@@ -1069,5 +1077,3 @@ if __name__ == '__main__':
     plot_calibration(h1_h2_scores, classes_to_evaluate)
 
     plt.close('all')
-
-    #test
