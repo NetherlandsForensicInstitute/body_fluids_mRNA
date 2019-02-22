@@ -2,6 +2,7 @@ import math
 import pickle
 import csv
 import os
+import random
 from collections import Counter, defaultdict, OrderedDict
 
 import matplotlib.pyplot as plt
@@ -890,6 +891,54 @@ def manually_refactor_indices_mixtures():
     os.remove("Datasets/replicate_numbers_mixture.csv")
 
 
+def split_data(X, y):
+    '''
+    Splits the data more or less in half per cell type and assigns to either one of
+    two datasets.
+
+    :param X: numpy array containing single cell type samples
+    :param y: numpy array containing labels of cell types
+    :return: two datasets containg splitted X into train and calibration set and same
+        holds for y.
+    '''
+    index_classes = list(np.unique(y, return_index=True)[1])[1:]
+    index_classes.append(len(y))
+
+    # initialize
+    X_raw_singles_train = np.zeros([0, X.shape[1], X.shape[2]])
+    y_raw_singles_train = []
+    X_raw_singles_calibrate = np.zeros([0, X.shape[1], X.shape[2]])
+    y_raw_singles_calibrate = []
+
+    for i, idx in enumerate(index_classes):
+        if i == 0:
+            mylist = list(np.linspace(0, idx - 1, idx, dtype=int))
+            # pick random half of the samples per class and use for train sample
+            train_index = random.sample(mylist, int(idx / 2))
+            # use other half for calibration data
+            calibration_index = [x for x in mylist if x not in train_index]
+
+            X_raw_singles_train = np.append(X_raw_singles_train, X[:idx][train_index], axis=0)
+            y_raw_singles_train.extend([y[:idx][k] for k in train_index])
+            X_raw_singles_calibrate = np.append(X_raw_singles_calibrate, X[:idx][calibration_index], axis=0)
+            y_raw_singles_calibrate.extend([y[:idx][k] for k in calibration_index])
+        else:
+            j = index_classes[i] - index_classes[i - 1]
+            mylist = list(np.linspace(0, j - 1, j, dtype=int))
+            # pick random half of the samples per class and use for train sample
+            train_index = random.sample(mylist, int(j / 2))
+            # use other half for calibration data
+            calibration_index = [x for x in mylist if x not in train_index]
+
+            X_raw_singles_train = np.append(
+                X_raw_singles_train, X[index_classes[i-1]:index_classes[i]][train_index], axis=0)
+            y_raw_singles_train.extend([y[index_classes[i-1]:index_classes[i]][k] for k in train_index])
+            X_raw_singles_calibrate = np.append(
+                X_raw_singles_calibrate, X[index_classes[i-1]:index_classes[i]][calibration_index], axis=0)
+            y_raw_singles_calibrate.extend([y[index_classes[i-1]:index_classes[i]][k] for k in calibration_index])
+
+    return X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate
+
 if __name__ == '__main__':
     developing = False
     include_blank = False
@@ -921,6 +970,10 @@ if __name__ == '__main__':
     single_cell_classes = [inv_classes_map[j] for j in range(n_single_cell_types - 1)]
     class_combinations_to_evaluate = [['Vaginal.mucosa', 'Menstrual.secretion']]
     classes_to_evaluate = single_cell_classes + [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
+
+    # Split the data in two equal parts
+    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
+        split_data(X_raw_singles, y_raw_singles)
 
     if retrain:
         # NB penile skin treated like all others for classify_single
