@@ -17,9 +17,75 @@ from reimplementation import get_data_per_cell_type, read_mixture_data, \
 
 from lir.calibration import KDECalibrator
 
+
+def plot_individual_histograms(y, log_lrs, names):
+    """
+
+    :param y:
+    :param log_lrs:
+    :param names:
+    :return:
+    """
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'orange']
+    for j, j_class in enumerate(set(y)):
+        indices_experiments = [k for k in range(len(y)) if y[k] == j_class]
+        plt.subplots(2, 5, figsize=(18, 9))
+        plt.suptitle(sorted_test_map[j_class], y=1.0, fontsize=14)
+        for i in range(log_lrs.shape[1]):
+            plt.subplot(2, 5, i + 1)
+            plt.xlim([-MAX_LR - .5, MAX_LR + .5])
+            plt.hist(log_lrs[indices_experiments, i],
+                     color=colors[j])
+            plt.title(names[0][i])
+        plt.tight_layout()
+        plt.show()
+
+
+def plot_reliability_plots(log_lrs, names):
+    """
+
+    :param log_lrs:
+    :param names:
+    :return:
+    """
+    global i
+    plt.subplots(2, 5, figsize=(18, 9))
+    length_lrs = log_lrs.shape[0]
+    for i in range(log_lrs.shape[1]):
+        plt.subplot(2, 5, i + 1)
+        plt.plot(np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs),
+                 np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs),
+                 color='k')
+        plt.plot(sorted(log_lrs[:, i]),
+                 np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs))
+        plt.title(names[0][i])
+    #plt.show()
+    plt.savefig('reliability_plots.png')
+
+
+def plot_histograms_of_lrs(log_lrs, y_mixtures_matrix, inv_y_mixtures_matrix):
+    """
+
+    :param log_lrs:
+    :param y_mixtures_matrix:
+    :param inv_y_mixtures_matrix:
+    :return:
+    """
+    h1s = np.multiply(log_lrs, y_mixtures_matrix)
+    h2s = np.multiply(log_lrs, inv_y_mixtures_matrix)
+    plt.subplots(2, 5, figsize=(18, 9))
+    for i in range(log_lrs_per_class.shape[1]):
+        plt.subplot(2, 5, i + 1)
+        plt.hist(h1s[:, i], bins=30, alpha=0.7)
+        plt.hist(h2s[:, i], bins=30, alpha=0.7)
+        plt.title(names_single[0][i])
+        plt.legend(('h1', 'h2'))
+    plt.show()
+
+
 if __name__ == '__main__':
     MAX_LR = 10
-    # get correct data
+
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map,\
         inv_classes_map, n_per_class = get_data_per_cell_type()
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = \
@@ -43,38 +109,19 @@ if __name__ == '__main__':
     sorted_classes_map = collections.OrderedDict(sorted(classes_map.items(), key=itemgetter(1)))
     names_single = np.array([list(sorted_classes_map.keys())])
 
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'orange']
-    for j, j_class in enumerate(set(y_mixtures)):
-        indices_experiments = [k for k in range(len(y_mixtures)) if y_mixtures[k] == j_class]
-        plt.subplots(2, 5, figsize=(18, 9))
-        plt.suptitle(sorted_test_map[j_class], y=1.0, fontsize=14)
-        for i in range(log_lrs_per_class.shape[1]):
-            plt.subplot(2, 5, i + 1)
-            plt.xlim([-MAX_LR - .5, MAX_LR + .5])
-            plt.hist(log_lrs_per_class[indices_experiments, i],
-                     color=colors[j])
-            plt.title(names_single[0][i])
-        plt.tight_layout()
-        plt.show()
-
-    # TODO: get the correct h1 and h2: put in function
-    # h1 are all the LRs from a mixt. cell types in which a specific cell type exists
-    # h2 are all the LRs from a mixt. cell types in which the specific cell type is not
+    plot_individual_histograms(y_mixtures, log_lrs_per_class, names_single)
 
     # TODO: check whether the plotted values are correct --> sorted(log_lrs)
-    plt.subplots(2, 5, figsize=(18, 9))
-    length_lrs = log_lrs_per_class.shape[0]
-    for i in range(log_lrs_per_class.shape[1]):
-        plt.subplot(2, 5, i + 1)
-        plt.plot(np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs),
-                 np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs),
-                 color='k')
-        plt.plot(sorted(log_lrs_per_class[:, i]),
-                 np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs))
-        plt.title(names_single[0][i])
-    #plt.show()
-    plt.savefig('reliability_plots.png')
+    plot_reliability_plots(log_lrs_per_class, names_single)
 
+    # TODO: get the correct h1 and h2
+    # h1 are all the LRs from a mixt. cell types in which a specific cell type exists
+    # h2 are all the LRs from a mixt. cell types in which the specific cell type is not
+    # TODO: check skin penile and adjust log_lrs_per_class good
+    log_lrs_per_class = log_lrs_per_class[:, :-1]
+    inv_y_mixtures_matrix = np.ones_like(y_mixtures_matrix) - y_mixtures_matrix
+
+    plot_histograms_of_lrs(log_lrs_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
 
 
 
