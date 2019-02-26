@@ -75,6 +75,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
     """
     df, rv = read_df(filename, binarize)
     rv_max = rv['replicate_value'].max()
+    print("rv_max:", rv_max)
     class_labels = np.array(df.index)
     # penile skin should be treated separately
     classes_set = set(class_labels)
@@ -399,6 +400,7 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
     # read test data
     df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
     rv_max = rv['replicate_value'].max()
+    print("rv_max:", rv_max)
 
     # initialize
     class_labels = np.array(df.index)
@@ -578,7 +580,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
     plt.savefig('mixtures binned data and log lrs')
 
 
-def calculate_lrs(X, model, mixtures_in_classes_of_interest, MAX_LR, log):
+def calculate_lrs(X, model, mixtures_in_classes_of_interest, n_features, MAX_LR, log):
     """
     Calculates the (log) likehood ratios.
 
@@ -939,6 +941,7 @@ def split_data(X, y):
 
     return X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate
 
+
 if __name__ == '__main__':
     developing = False
     include_blank = False
@@ -957,7 +960,7 @@ if __name__ == '__main__':
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
     plot_data(X_raw_singles)
     n_folds = 2
-    N_SAMPLES_PER_COMBINATION = 100
+    N_SAMPLES_PER_COMBINATION = 50
     MAX_LR=10
     from_penile = False
     retrain = False
@@ -977,16 +980,16 @@ if __name__ == '__main__':
 
     if retrain:
         # NB penile skin treated like all others for classify_single
-        classify_single(X_raw_singles, y_raw_singles,inv_classes_map)
+        classify_single(X_raw_singles_train, y_raw_singles_train, inv_classes_map)
 
         model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_train, X_test, y_train, y_test = train_test_split(X_raw_singles, y_raw_singles)
+            X_train, X_test, y_train, y_test = train_test_split(X_raw_singles_train, y_raw_singles_train)
             while len(set(y_test)) != len(set(y_train)):
                 # make sure we have all labels in both sets
-                X_train, X_test, y_train, y_test = train_test_split(X_raw_singles, y_raw_singles)
+                X_train, X_test, y_train, y_test = train_test_split(X_raw_singles_train, y_raw_singles_train)
             X_augmented_train, y_augmented_train, _, _ = augment_data(
                 X_train,
                 y_train,
@@ -1043,8 +1046,8 @@ if __name__ == '__main__':
 
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles,
-            y_raw_singles,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             from_penile=from_penile
@@ -1056,8 +1059,8 @@ if __name__ == '__main__':
     else:
         model = pickle.load(open(model_file_name, 'rb'))
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles,
-            y_raw_singles,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             from_penile=from_penile
@@ -1082,8 +1085,8 @@ if __name__ == '__main__':
 
     if retrain:
         X_augmented, y_augmented, _, _ = augment_data(
-            X_raw_singles,
-            y_raw_singles,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             from_penile=from_penile
