@@ -76,7 +76,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
     """
     df, rv = read_df(filename, binarize)
     rv_max = rv['replicate_value'].max()
-    print("rv_max:", rv_max)
     class_labels = np.array(df.index)
     # penile skin should be treated separately
     classes_set = set(class_labels)
@@ -260,15 +259,16 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
             for i in range(n):
                 sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
         except:
-            raise ValueError("The number classes {} present in 'y' are greater than "
-                             "the number of samples per combination {}".format(clas, n))
+            raise ValueError("The number classes '{}' present in 'y', namely {}, is "
+                             "greater than the number of samples per combination {}".format(
+                clas, n_in_class, n))
     combined = np.max(sampled, axis=0)
 
     return combine_samples(combined, n_features)
 
 
 def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
-                 from_penile=False):
+                 N_SAMPLES_PER_COMBINATION, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -549,7 +549,6 @@ def plot_for_experimental_mixture_data(X_mixtures,
                             labels=classes_to_evaluate, patch_artist=True)
 
         for j, (patch, cla) in enumerate(zip(bplot['boxes'], classes_to_evaluate)):
-            print(n_single_cell_types_no_penile)
             if j < n_single_cell_types_no_penile:
                 # single cell type
                 if cla in inv_test_map[i_clas]:
@@ -978,6 +977,9 @@ if __name__ == '__main__':
     X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
         split_data(X_raw_singles, y_raw_singles)
 
+    pickle.dump(X_raw_singles_calibrate, open('X_raw_singles_calibrate', 'wb'))
+    pickle.dump(y_raw_singles_calibrate, open('y_raw_singles_calibrate', 'wb'))
+
     if retrain:
         # NB penile skin treated like all others for classify_single
         classify_single(X_raw_singles_train, y_raw_singles_train, inv_classes_map)
@@ -995,6 +997,7 @@ if __name__ == '__main__':
                 y_train,
                 n_single_cell_types,
                 n_features,
+                N_SAMPLES_PER_COMBINATION,
                 from_penile=from_penile
             )
 
@@ -1014,6 +1017,7 @@ if __name__ == '__main__':
                 X_test, y_test,
                 n_single_cell_types,
                 n_features,
+                N_SAMPLES_PER_COMBINATION,
                 from_penile=from_penile
             )
 
@@ -1050,6 +1054,7 @@ if __name__ == '__main__':
             y_raw_singles_train,
             n_single_cell_types,
             n_features,
+            N_SAMPLES_PER_COMBINATION,
             from_penile=from_penile
         )
 
@@ -1063,6 +1068,7 @@ if __name__ == '__main__':
             y_raw_singles_train,
             n_single_cell_types,
             n_features,
+            N_SAMPLES_PER_COMBINATION,
             from_penile=from_penile
         )
 
@@ -1089,6 +1095,7 @@ if __name__ == '__main__':
             y_raw_singles_train,
             n_single_cell_types,
             n_features,
+            N_SAMPLES_PER_COMBINATION,
             from_penile=from_penile
         )
 
