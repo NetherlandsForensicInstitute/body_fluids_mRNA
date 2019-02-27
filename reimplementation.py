@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score
-# from tqdm import tqdm
+
+from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -44,8 +45,8 @@ def read_df(filename, binarize):
         raise ValueError('Data file should contain column '
                          'of indices, indicated by "rv" in file name.'
                          'Change te filename by concatenating "_rv" only'
-                         'if you are sure that a column is present in the'
-                         'data file.')
+                         'if you are sure that such a column is present in '
+                         'the data file.')
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
@@ -117,7 +118,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
                 #TODO variabel aantal samples toestaan? --> wordt nu opgelost
-                # in ;combine_samples'.
+                # in 'combine_samples'.
                 data_for_class = np.zeros((n_full_samples, rv_max, n_features))
                 n_discarded = 0
 
@@ -140,7 +141,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                              np.zeros([rv_max - candidate_samples.shape[0],
                                        n_features], dtype='int')])
                     # Treshold is set depending on the number of replicates per sample.
-                    # TODO make this at least one okay?
+                    # TODO is make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
                             np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
                             and 'Blank' not in clas:
@@ -170,7 +171,7 @@ def combine_samples(data_for_class, n_features):
     """
     Takes a n_samples x rv_max x n_features matrix and returns the
     n_samples x n_markers matrix. The rows including solely zeros are not
-    taken into account.
+    taken into account when combining the samples.
 
     Note that the latter assumes that there exist no samples in which none of
     the marker values is on. This makes sense as the marker values ACTB and
@@ -253,10 +254,14 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         data_for_class = np.array([
             X[i, :, :] for i in range(len(X)) if y[i] == clas
         ])
-        sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
-        # shuffle them
-        for i in range(n):
-            sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
+        try:
+            sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
+            # shuffle them
+            for i in range(n):
+                sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
+        except:
+            raise ValueError("The number classes {} present in 'y' are greater than "
+                             "the number of samples per combination {}".format(clas, n))
     combined = np.max(sampled, axis=0)
 
     return combine_samples(combined, n_features)
@@ -400,7 +405,6 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
     # read test data
     df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
     rv_max = rv['replicate_value'].max()
-    print("rv_max:", rv_max)
 
     # initialize
     class_labels = np.array(df.index)
@@ -545,11 +549,13 @@ def plot_for_experimental_mixture_data(X_mixtures,
                             labels=classes_to_evaluate, patch_artist=True)
 
         for j, (patch, cla) in enumerate(zip(bplot['boxes'], classes_to_evaluate)):
+            print(n_single_cell_types_no_penile)
             if j < n_single_cell_types_no_penile:
                 # single cell type
                 if cla in inv_test_map[i_clas]:
                     patch.set_facecolor('black')
             else:
+                # sample 'Vaginal.mucosa and/or Menstrual.secretion'
                 for comb_class in cla.split(' and/or '):
                     if comb_class in inv_test_map[i_clas]:
                         patch.set_facecolor('black')
@@ -781,9 +787,6 @@ def manually_refactor_indices():
 
     :return: excel file with a column "replicate_values" added
     """
-    global xls, sheet_to_df_map, relevant_column, shortened_names, \
-        replicate_values, indexes_to_be_checked, i, replicates, csvfile, \
-        output, writer, val, a, b, c, mergedac, mergedbc
 
     xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
     sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
@@ -849,9 +852,6 @@ def manually_refactor_indices_mixtures():
 
     :return: excel file with a column "replicate_values" added
     """
-    global xls, sheet_to_df_map, relevant_column, i, shortened_names, \
-        replicate_values, indexes_to_be_checked, replicates, csvfile, output, \
-        writer, val, a, b, c, mergedac, mergedbc
     xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
     sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
     relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
