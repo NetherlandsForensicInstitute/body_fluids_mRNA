@@ -16,6 +16,7 @@ from reimplementation import get_data_per_cell_type, read_mixture_data, \
     calculate_lrs, augment_data
 
 from lir.calibration import KDECalibrator
+from lir.pav import plot
 
 
 def plot_individual_histograms(y, log_lrs, names):
@@ -124,6 +125,9 @@ if __name__ == '__main__':
 
     inv_y_mixtures_matrix = np.ones_like(y_mixtures_matrix) - y_mixtures_matrix
     #plot_histograms_of_lrs(log_lrs_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
+
+    # plot PAV plots
+    plot(lrs_per_class[:, 0], np.array(y_mixtures))
 
     # Perform calibration
     X_raw_singles_calibrate = pickle.load(open('X_raw_singles_calibrate', 'rb'))
