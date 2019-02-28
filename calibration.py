@@ -1,6 +1,7 @@
 """
 
 Check whether calibration is needed and if so perform calibration.
+Note that this script assumes that the calibrated model is used!
 
 http://danielnee.com/tag/reliability-diagram/
 
@@ -15,10 +16,11 @@ import numpy as np
 from operator import itemgetter
 
 from reimplementation import get_data_per_cell_type, read_mixture_data, \
-    calculate_lrs, augment_data
+    calculate_scores, evaluate_model, combine_samples
 
 from lir.calibration import KDECalibrator
 from lir.pav import plot
+from lir.util import Xn_to_Xy, Xy_to_Xn
 
 
 def plot_individual_histograms(y, log_lrs, names):
@@ -141,24 +143,23 @@ def reliability_curve(y_true, y_score, bins=10, normalize=False):
             print("The bin_idx is empty")
             y_score_bin_mean[i] = 0
             empirical_prob_pos[i] = 0
-    print(empirical_prob_pos)
     return y_score_bin_mean, empirical_prob_pos
 
 
-def plot_histograms_of_lrs(log_lrs, y_mixtures_matrix, inv_y_mixtures_matrix):
+def plot_histograms_of_scores(log_scores, y_mixtures_matrix, inv_y_mixtures_matrix):
     """
 
-    :param log_lrs:
+    :param log_scores:
     :param y_mixtures_matrix:
     :param inv_y_mixtures_matrix:
     :return:
     """
     # h1 are all the LRs from a mixt. cell types in which a specific cell type exists
-    h1s = np.multiply(log_lrs, y_mixtures_matrix)
+    h1s = np.multiply(log_scores, y_mixtures_matrix)
     # h2 are all the LRs from a mixt. cell types in which the specific cell type is not
     h2s = np.multiply(log_lrs, inv_y_mixtures_matrix)
     plt.subplots(2, 5, figsize=(18, 9))
-    for i in range(log_lrs_per_class.shape[1]):
+    for i in range(log_scores.shape[1]):
         plt.subplot(2, 5, i + 1)
         plt.hist(h1s[:, i], bins=30, alpha=0.7, color='mediumblue')
         plt.hist(h2s[:, i], bins=30, alpha=0.7, color='orange')
@@ -184,10 +185,10 @@ if __name__ == '__main__':
         X_mixtures, model, mixture_classes_in_classes_to_evaluate, n_features, MAX_LR, log=True)
     # exclude penile
     log_scores_per_class = log_scores_per_class[:, :-1]
-    lrs_scores_class = calculate_scores(
+    scores_per_class = calculate_scores(
         X_mixtures, model, mixture_classes_in_classes_to_evaluate, n_features, MAX_LR, log=False)
     # exclude penile
-    lrs_scores_class = lrs_scores_class[:, :-1]
+    scores_per_class = scores_per_class[:, :-1]
 
     # Plot the log_lrs_per_class per sample: histograms
     n_per_mixture_class = collections.Counter(y_mixtures)
@@ -200,7 +201,7 @@ if __name__ == '__main__':
 
     #plot_individual_histograms(y_mixtures, log_lrs_per_class, names_single)
 
-    # TODO: check whether the plotted values are correct --> sorted(log_lrs)
+    # TODO: check whether the plotted values are correct --> sorted(log_scores)
     plot_lrs_against_expectedlrs(log_scores_per_class, names_single)
 
     probabilities = (scores_per_class / (1+scores_per_class))
@@ -223,28 +224,47 @@ if __name__ == '__main__':
     plt.legend(loc=0)
 
     inv_y_mixtures_matrix = np.ones_like(y_mixtures_matrix) - y_mixtures_matrix
-    #plot_histograms_of_lrs(log_lrs_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
+    #plot_histograms_of_scores(log_scores_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
 
+    # TODO: Make this work.
     # plot PAV plots
     #plot(lrs_per_class[:, 0], np.array(y_mixtures))
 
-    '''
     # Perform calibration
-    X_raw_singles_calibrate = pickle.load(open('X_raw_singles_calibrate', 'rb'))
-    y_raw_singles_calibrate = pickle.load(open('y_raw_singles_calibrate', 'rb'))
-    X_augmented_calibrate, y_augmented_calibrate, y_augmented_matrix_calibrate, \
-    mixture_classes_in_single_cell_type = augment_data(
-        X_raw_singles_calibrate,
-        y_raw_singles_calibrate,
-        n_single_cell_types,
-        n_features,
-        N_SAMPLES_PER_COMBINATION
+    h1_h2_scores = evaluate_model(
+        model,
+        'test mixtures',
+        combine_samples(X_mixtures, n_features),
+        y_mixtures,
+        y_mixtures_matrix,
+        mixture_classes_in_classes_to_evaluate,
+        MAX_LR
     )
 
+    X, y = Xn_to_Xy(h1_h2_scores[0][0], h1_h2_scores[0][1])
     calibrator = KDECalibrator()
-    calibrator.fit(X_raw_singles_calibrate, y_raw_singles_calibrate)
-    calibrated_LRs = calibrator.transform(X_mixtures)
-    '''
+    lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
+
+    probabilities_1 = lr1 / (1-lr1)
+    y_true_1 = [1] * len(probabilities_1)
+    probabilities_2 = lr2 / (1-lr2)
+    y_true_2 = [0] * len(probabilities_2)
+
+    probabilities_after_calibration = np.append(probabilities_1, probabilities_2)
+    y_true_after_calibration = np.append(y_true_1, y_true_2)
+
+    y_score_bin_mean, empirical_prob_pos = reliability_curve(
+        y_true_after_calibration, probabilities_after_calibration, bins=10)
+
+    plt.figure(0, figsize=(8, 8))
+    plt.subplot2grid((3, 1), (0, 0), rowspan=2)
+    plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
+    scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
+    plt.plot(y_score_bin_mean[scores_not_nan],
+             empirical_prob_pos[scores_not_nan],
+             color='red')
+    plt.ylabel("Empirical probability")
+    plt.legend(loc=0)
 
 
 

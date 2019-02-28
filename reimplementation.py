@@ -321,7 +321,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
            mixtures_containing_single_cell_type
 
 
-def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class):
+def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR):
     """
     Computes metrics for performance of the model on dataset X, y
 
@@ -1032,7 +1032,8 @@ if __name__ == '__main__':
                 X_augmented_test,
                 y_augmented_test,
                 y_augmented_matrix,
-                mixture_classes_in_single_cell_type
+                mixture_classes_in_single_cell_type,
+                MAX_LR
             )
 
             mixture_classes_in_classes_to_evaluate, _ = create_information_on_classes_to_evaluate(
@@ -1084,7 +1085,8 @@ if __name__ == '__main__':
         X_train,
         y_train,
         y_augmented_matrix,
-        mixture_classes_in_single_cell_type
+        mixture_classes_in_single_cell_type,
+        MAX_LR
     )
 
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(
@@ -1112,12 +1114,13 @@ if __name__ == '__main__':
     else:
         dists_from_xmixtures_to_closest_augmented = pickle.load(open('dists', 'rb'))
 
-    mixture_classes_in_classes_to_evaluate, y_mixtures_classes_to_evaluate_n_hot = create_information_on_classes_to_evaluate(
-        mixture_classes_in_single_cell_type,
-        classes_map,
-        class_combinations_to_evaluate,
-        y_mixtures,
-        y_mixtures_matrix
+    mixture_classes_in_classes_to_evaluate, y_mixtures_classes_to_evaluate_n_hot = \
+        create_information_on_classes_to_evaluate(
+            mixture_classes_in_single_cell_type,
+            classes_map,
+            class_combinations_to_evaluate,
+            y_mixtures,
+            y_mixtures_matrix
     )
 
     pickle.dump(mixture_classes_in_classes_to_evaluate, open('mixture_classes_in_classes_to_evaluate', 'wb'))
@@ -1128,7 +1131,8 @@ if __name__ == '__main__':
         combine_samples(X_mixtures, n_features),
         y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
-        mixture_classes_in_classes_to_evaluate
+        mixture_classes_in_classes_to_evaluate,
+        MAX_LR
     )
 
     plot_for_experimental_mixture_data(
