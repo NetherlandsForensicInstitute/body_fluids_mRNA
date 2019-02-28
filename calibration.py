@@ -2,6 +2,8 @@
 
 Check whether calibration is needed and if so perform calibration.
 
+http://danielnee.com/tag/reliability-diagram/
+
 """
 
 import pickle
@@ -42,7 +44,7 @@ def plot_individual_histograms(y, log_lrs, names):
         plt.show()
 
 
-def plot_reliability_plots(log_lrs, names):
+def plot_lrs_against_expectedlrs(log_lrs, names):
     """
 
     :param log_lrs:
@@ -60,8 +62,101 @@ def plot_reliability_plots(log_lrs, names):
         plt.plot(sorted(log_lrs[:, i]),
                  np.linspace(-MAX_LR - .5, MAX_LR + .5, length_lrs))
         plt.title(names[0][i])
-    #plt.show()
-    plt.savefig('reliability_plots.png')
+        plt.xlabel("Log likelihood ratio")
+        plt.ylabel("Expected likelihood ratio")
+    plt.show()
+    #plt.savefig('reliability_plots.png')
+
+
+def reliability_curve(y_true, y_score, bins=10, normalize=False):
+    """Compute reliability curve
+
+    Reliability curves allow checking if the predicted probabilities of a
+    binary classifier are well calibrated. This function returns two arrays
+    which encode a mapping from predicted probability to empirical probability.
+    For this, the predicted probabilities are partitioned into equally sized
+    bins and the mean predicted probability and the mean empirical probabilties
+    in the bins are computed. For perfectly calibrated predictions, both
+    quantities whould be approximately equal (for sufficiently many test
+    samples).
+
+    Note: this implementation is restricted to binary classification.
+
+    Parameters
+    ----------
+
+    y_true : array, shape = [n_samples]
+        True binary labels (0 or 1).
+
+    y_score : array, shape = [n_samples]
+        Target scores, can either be probability estimates of the positive
+        class or confidence values. If normalize is False, y_score must be in
+        the interval [0, 1]
+
+    bins : int, optional, default=10
+        The number of bins into which the y_scores are partitioned.
+        Note: n_samples should be considerably larger than bins such that
+              there is sufficient data in each bin to get a reliable estimate
+              of the reliability
+
+    normalize : bool, optional, default=False
+        Whether y_score needs to be normalized into the bin [0, 1]. If True,
+        the smallest value in y_score is mapped onto 0 and the largest one
+        onto 1.
+
+
+    Returns
+    -------
+    y_score_bin_mean : array, shape = [bins]
+        The mean predicted y_score in the respective bins.
+
+    empirical_prob_pos : array, shape = [bins]
+        The empirical probability (frequency) of the positive class (+1) in the
+        respective bins.
+
+
+    References
+    ----------
+    .. [1] `Predicting Good Probabilities with Supervised Learning
+            <http://machinelearning.wustl.edu/mlpapers/paper_files/icml2005_Niculescu-MizilC05.pdf>`_
+
+    """
+    y_score = np.array(sorted(y_score))
+    if normalize:  # Normalize scores into bin [0, 1]
+        y_score = (y_score - y_score.min()) / (y_score.max() - y_score.min())
+
+    bin_width = 1.0 / bins
+    bin_centers = np.linspace(0, 1.0 - bin_width, bins) + bin_width / 2
+
+    y_score_bin_mean = np.empty(bins)
+    empirical_prob_pos = np.empty(bins)
+    for i, threshold in enumerate(bin_centers):
+        # determine all samples where y_score falls into the i-th bin
+        bin_idx = np.logical_and(threshold - bin_width / 2 < y_score,
+                                 y_score <= threshold + bin_width / 2)
+        # Store mean y_score and mean empirical probability of positive class
+        if len(y_score[bin_idx]) > 0:
+            y_score_bin_mean[i] = y_score[bin_idx].mean()
+            empirical_prob_pos[i] = y_true[bin_idx].mean()
+        else:
+            print("The bin_idx is empty")
+            y_score_bin_mean[i] = 0
+            empirical_prob_pos[i] = 0
+    print(empirical_prob_pos)
+    return y_score_bin_mean, empirical_prob_pos
+
+
+def plot_reliability_plots(y_score_bin_mean, empirical_prob_pos):
+    plt.figure(0, figsize=(8, 8))
+    plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
+
+    scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
+    plt.plot(y_score_bin_mean[scores_not_nan],
+             empirical_prob_pos[scores_not_nan], label='MLP',
+             color='orange')
+    plt.ylabel("Empirical probability")
+    plt.legend(loc=0)
+    plt.show()
 
 
 def plot_histograms_of_lrs(log_lrs, y_mixtures_matrix, inv_y_mixtures_matrix):
@@ -120,15 +215,22 @@ if __name__ == '__main__':
     #plot_individual_histograms(y_mixtures, log_lrs_per_class, names_single)
 
     # TODO: check whether the plotted values are correct --> sorted(log_lrs)
-    # TODO: check whether correct values are plotted --> transform into bins?
-    #plot_reliability_plots(log_lrs_per_class, names_single)
+    plot_lrs_against_expectedlrs(log_lrs_per_class, names_single)
+
+    probabilities = (lrs_per_class / (1+lrs_per_class))
+    for i in range(probabilities):
+    y_score_bin_mean, empirical_prob_pos = reliability_curve(
+        y_mixtures_matrix[:, 1], probabilities, bins=10)
+
+    plot_reliability_plots(y_score_bin_mean, empirical_prob_pos)
 
     inv_y_mixtures_matrix = np.ones_like(y_mixtures_matrix) - y_mixtures_matrix
     #plot_histograms_of_lrs(log_lrs_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
 
     # plot PAV plots
-    plot(lrs_per_class[:, 0], np.array(y_mixtures))
+    #plot(lrs_per_class[:, 0], np.array(y_mixtures))
 
+    '''
     # Perform calibration
     X_raw_singles_calibrate = pickle.load(open('X_raw_singles_calibrate', 'rb'))
     y_raw_singles_calibrate = pickle.load(open('y_raw_singles_calibrate', 'rb'))
@@ -144,7 +246,7 @@ if __name__ == '__main__':
     calibrator = KDECalibrator()
     calibrator.fit(X_raw_singles_calibrate, y_raw_singles_calibrate)
     calibrated_LRs = calibrator.transform(X_mixtures)
-
+    '''
 
 
 
