@@ -585,7 +585,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
     plt.savefig('mixtures binned data and log lrs')
 
 
-def calculate_lrs(X, model, mixtures_in_classes_of_interest, n_features, MAX_LR, log):
+def calculate_scores(X, model, mixtures_in_classes_of_interest, n_features, MAX_LR, log):
     """
     Calculates the (log) likehood ratios.
 
@@ -603,12 +603,12 @@ def calculate_lrs(X, model, mixtures_in_classes_of_interest, n_features, MAX_LR,
         y_prob, mixtures_in_classes_of_interest, MAX_LR)
 
     if log:
-        log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-        return log_lrs_per_class
+        log_scores_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+        return log_scores_per_class
 
     else:
-        lrs_per_class = y_prob_per_class / (1 - y_prob_per_class)
-        return lrs_per_class
+        scores_per_class = y_prob_per_class / (1 - y_prob_per_class)
+        return scores_per_class
 
 
 def plot_data(X):
@@ -963,6 +963,7 @@ if __name__ == '__main__':
     MAX_LR=10
     from_penile = False
     retrain = False
+    type_train_data = 'calibration' #or 'train'
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -977,21 +978,25 @@ if __name__ == '__main__':
     X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
         split_data(X_raw_singles, y_raw_singles)
 
-    pickle.dump(X_raw_singles_calibrate, open('X_raw_singles_calibrate', 'wb'))
-    pickle.dump(y_raw_singles_calibrate, open('y_raw_singles_calibrate', 'wb'))
+    if type_train_data == 'train':
+        train_X = X_raw_singles_train
+        train_y = y_raw_singles_train
+    elif type_train_data == 'calibration':
+        train_X = X_raw_singles_calibrate
+        train_y = y_raw_singles_calibrate
 
     if retrain:
         # NB penile skin treated like all others for classify_single
-        classify_single(X_raw_singles_train, y_raw_singles_train, inv_classes_map)
+        classify_single(train_X, train_y, inv_classes_map)
 
         model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_train, X_test, y_train, y_test = train_test_split(X_raw_singles_train, y_raw_singles_train)
+            X_train, X_test, y_train, y_test = train_test_split(train_X, train_y)
             while len(set(y_test)) != len(set(y_train)):
                 # make sure we have all labels in both sets
-                X_train, X_test, y_train, y_test = train_test_split(X_raw_singles_train, y_raw_singles_train)
+                X_train, X_test, y_train, y_test = train_test_split(train_X, train_y)
             X_augmented_train, y_augmented_train, _, _ = augment_data(
                 X_train,
                 y_train,
@@ -1050,8 +1055,8 @@ if __name__ == '__main__':
 
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+            train_X,
+            train_y,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -1064,8 +1069,8 @@ if __name__ == '__main__':
     else:
         model = pickle.load(open(model_file_name, 'rb'))
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+            train_X,
+            train_y,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -1091,8 +1096,8 @@ if __name__ == '__main__':
 
     if retrain:
         X_augmented, y_augmented, _, _ = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+            train_X,
+            train_y,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,

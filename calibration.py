@@ -51,7 +51,6 @@ def plot_lrs_against_expectedlrs(log_lrs, names):
     :param names:
     :return:
     """
-    global i
     plt.subplots(2, 5, figsize=(18, 9))
     length_lrs = log_lrs.shape[0]
     for i in range(log_lrs.shape[1]):
@@ -146,19 +145,6 @@ def reliability_curve(y_true, y_score, bins=10, normalize=False):
     return y_score_bin_mean, empirical_prob_pos
 
 
-def plot_reliability_plots(y_score_bin_mean, empirical_prob_pos):
-    plt.figure(0, figsize=(8, 8))
-    plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
-
-    scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
-    plt.plot(y_score_bin_mean[scores_not_nan],
-             empirical_prob_pos[scores_not_nan], label='MLP',
-             color='orange')
-    plt.ylabel("Empirical probability")
-    plt.legend(loc=0)
-    plt.show()
-
-
 def plot_histograms_of_lrs(log_lrs, y_mixtures_matrix, inv_y_mixtures_matrix):
     """
 
@@ -194,14 +180,14 @@ if __name__ == '__main__':
         open('mixture_classes_in_classes_to_evaluate', 'rb'))
 
     model = pickle.load(open('mlpmodel', 'rb'))
-    log_lrs_per_class = calculate_lrs(
+    log_scores_per_class = calculate_scores(
         X_mixtures, model, mixture_classes_in_classes_to_evaluate, n_features, MAX_LR, log=True)
     # exclude penile
-    log_lrs_per_class = log_lrs_per_class[:, :-1]
-    lrs_per_class = calculate_lrs(
+    log_scores_per_class = log_scores_per_class[:, :-1]
+    lrs_scores_class = calculate_scores(
         X_mixtures, model, mixture_classes_in_classes_to_evaluate, n_features, MAX_LR, log=False)
     # exclude penile
-    lrs_per_class = lrs_per_class[:, :-1]
+    lrs_scores_class = lrs_scores_class[:, :-1]
 
     # Plot the log_lrs_per_class per sample: histograms
     n_per_mixture_class = collections.Counter(y_mixtures)
@@ -215,14 +201,26 @@ if __name__ == '__main__':
     #plot_individual_histograms(y_mixtures, log_lrs_per_class, names_single)
 
     # TODO: check whether the plotted values are correct --> sorted(log_lrs)
-    plot_lrs_against_expectedlrs(log_lrs_per_class, names_single)
+    plot_lrs_against_expectedlrs(log_scores_per_class, names_single)
 
-    probabilities = (lrs_per_class / (1+lrs_per_class))
-    for i in range(probabilities):
-    y_score_bin_mean, empirical_prob_pos = reliability_curve(
-        y_mixtures_matrix[:, 1], probabilities, bins=10)
+    probabilities = (scores_per_class / (1+scores_per_class))
+    reliability_scores = {}
+    celltypes = sorted(classes_map)
+    celltypes.remove("Skin.penile")
+    for i, celltype in enumerate(celltypes):
+        reliability_scores[celltype] = reliability_curve(
+            y_mixtures_matrix[:, i], probabilities[:, i], bins=10)
 
-    plot_reliability_plots(y_score_bin_mean, empirical_prob_pos)
+    plt.figure(0, figsize=(8, 8))
+    plt.subplot2grid((3, 1), (0, 0), rowspan=2)
+    plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
+    for celltype, (y_score_bin_mean, empirical_prob_pos) in reliability_scores.items():
+        scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
+        plt.plot(y_score_bin_mean[scores_not_nan],
+                 empirical_prob_pos[scores_not_nan], label=celltype,
+                 color='orange')
+    plt.ylabel("Empirical probability")
+    plt.legend(loc=0)
 
     inv_y_mixtures_matrix = np.ones_like(y_mixtures_matrix) - y_mixtures_matrix
     #plot_histograms_of_lrs(log_lrs_per_class, y_mixtures_matrix, inv_y_mixtures_matrix)
