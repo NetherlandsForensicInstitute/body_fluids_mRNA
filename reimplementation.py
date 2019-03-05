@@ -17,6 +17,9 @@ from sklearn.neural_network import MLPClassifier
 from tqdm import tqdm
 
 from metrics import get_lr_metrics
+from calibrations import *
+from lir.calibration import KDECalibrator
+from lir.util import Xn_to_Xy, Xy_to_Xn
 
 
 def read_df(filename, binarize):
@@ -260,7 +263,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
                 sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
         except:
             raise ValueError("The number classes '{}' present in 'y', namely {}, is "
-                             "greater than the number of samples per combination {}".format(
+                             "greater/smaller than the number of samples per combination {}".format(
                 clas, n_in_class, n))
     combined = np.max(sampled, axis=0)
 
@@ -268,7 +271,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
 
 def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
-                 N_SAMPLES_PER_COMBINATION, from_penile=False):
+                 N_SAMPLES_PER_COMBINATION, classes_map, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -291,6 +294,10 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
                             mixture labels each single cell type features in
     """
     # Generate more data
+    if from_penile == False:
+        if 'Skin.penile' in classes_map:
+            del classes_map['Skin.penile']
+
     X = np.zeros((0, n_features))
     y = []
     n_single_cell_types_not_penile = n_single_cell_types - 1
@@ -298,17 +305,18 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
         2 ** n_single_cell_types_not_penile * N_SAMPLES_PER_COMBINATION,
         n_single_cell_types
     ), dtype=int)
-    mixtures_containing_single_cell_type = [[] for _ in range(n_single_cell_types_not_penile)]
+    mixtures_containing_single_cell_type = {celltype: [] for celltype in classes_map}
+    #mixtures_containing_single_cell_type_before = [[] for _ in range(n_single_cell_types_not_penile)]
 
     for i in range(2 ** n_single_cell_types_not_penile):
         binary = bin(i)[2:]
         while len(binary) < n_single_cell_types_not_penile:
             binary = '0' + binary
         classes_in_current_mixture = []
-        for j in range(n_single_cell_types_not_penile):
+        for j, celltype in enumerate(classes_map):
             if binary[-j - 1] == '1':
                 classes_in_current_mixture.append(j)
-                mixtures_containing_single_cell_type[j].append(int(i))
+                mixtures_containing_single_cell_type[celltype].append(int(i))
                 y_n_hot[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, j] = 1
         if from_penile:
             # also (always) add penile skin samples
@@ -338,8 +346,9 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR)
     y_pred = model.predict(X)
     print('{} accuracy for mixtures: {}'.format(
         dataset_label, accuracy_score(y, y_pred)))
+
     y_prob = model.predict_proba(X)
-    scores_per_class = {}
+    h1_h2_probs_per_class = {}
     # marginal for each single class sample
     prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
         y_prob, labels_in_class, MAX_LR)
@@ -347,14 +356,13 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR)
         # get the probability per single class sample
         total_proba = prob_per_class[:, j]
         if sum(total_proba) > 0:
-            # TODO: why does this have to hold?
             probas_without_cell_type = total_proba[y_n_hot[:, j] == 0]
             probas_with_cell_type = total_proba[y_n_hot[:, j] == 1]
             # print(inv_classes_map[j], np.quantile(probas_without_cell_type, [0.05, .25, .5, .75, .95]),
             #       np.quantile(probas_with_cell_type, [0.05, .25, .5, .75, .95]))
-            scores_per_class[j] = (probas_with_cell_type, probas_without_cell_type)
+            h1_h2_probs_per_class[j] = (probas_with_cell_type, probas_without_cell_type)
 
-    return scores_per_class
+    return h1_h2_probs_per_class
 
 
 def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, MAX_LR):
@@ -369,6 +377,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, MAX_LR
         are given.
     :return: n_samples x n_classes_of_interest matrix of probabilities
     """
+    # TODO: make this function work with labels_in_class as dictionary
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
     for j in range(res_prob.shape[1]):
         if len(labels_in_class[j]) > 0:
@@ -759,6 +768,7 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     for i_combination, combination in enumerate(class_combinations_to_evaluate):
         labels = []
         for cell_type in combination:
+            # TODO: make this work with mixture_classes_in_single_cell_type as dictionary
             labels += mixture_classes_in_single_cell_type[classes_map[cell_type]]
         mixture_classes_in_classes_to_evaluate.append(list(set(labels)))
         for i in set(labels):
@@ -962,7 +972,7 @@ if __name__ == '__main__':
     N_SAMPLES_PER_COMBINATION = 50
     MAX_LR=10
     from_penile = False
-    retrain = False
+    retrain = True
     type_train_data = 'calibration' #or 'train'
     model_file_name = 'mlpmodel'
     if from_penile:
@@ -974,7 +984,7 @@ if __name__ == '__main__':
     class_combinations_to_evaluate = [['Vaginal.mucosa', 'Menstrual.secretion']]
     classes_to_evaluate = single_cell_classes + [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
 
-    # Split the data in two equal parts
+    # Split the data in two equal parts: for training and calibration
     X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
         split_data(X_raw_singles, y_raw_singles)
 
@@ -1003,6 +1013,7 @@ if __name__ == '__main__':
                 n_single_cell_types,
                 n_features,
                 N_SAMPLES_PER_COMBINATION,
+                classes_map,
                 from_penile=from_penile
             )
 
@@ -1013,7 +1024,6 @@ if __name__ == '__main__':
                     len(set(y_augmented_train)))
             )
 
-            #  try calibration - or skip that?
             # TODO get the mixture data from dorum
 
             model.fit(X_augmented_train, y_augmented_train)
@@ -1023,6 +1033,7 @@ if __name__ == '__main__':
                 n_single_cell_types,
                 n_features,
                 N_SAMPLES_PER_COMBINATION,
+                classes_map,
                 from_penile=from_penile
             )
 
@@ -1054,6 +1065,57 @@ if __name__ == '__main__':
                     class_combinations_to_evaluate
                 )
 
+                # only make calibrated lrs once
+                if type_train_data == 'calibration':
+                    h1_h2_probs_calibration = evaluate_model(
+                        model,
+                        'fold {}'.format(n),
+                        X_augmented_test,
+                        y_augmented_test,
+                        y_augmented_matrix,
+                        mixture_classes_in_single_cell_type,
+                        MAX_LR
+                    )
+
+                    # TODO: plot two separate histograms in one figure
+                    #plot_histogram_log_lr()
+
+                    bins = np.linspace(-10, 10, 30)
+                    for i in range(len(h1_h2_probs_calibration)):
+                        likrats1 = (h1_h2_probs_calibration[i][0] / (1 - h1_h2_probs_calibration[i][0]))
+                        log_likrats1 = np.log10(likrats1)
+                        likrats2 = (h1_h2_probs_calibration[i][1] / (1 - h1_h2_probs_calibration[i][1]))
+                        log_likrats2 = np.log10(likrats2)
+
+                        plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
+                                 label=['h1', 'h2'])
+                        plt.legend(loc='upper right')
+                        plt.show()
+
+                        # TODO: make reliability plot before KDE calibration
+                        # Plot reliability plot
+                        probabilities_before_calibration = np.append(h1_h2_probs_calibration[i][0],
+                                                                     h1_h2_probs_calibration[i][1])
+                        y_score_bin_mean, empirical_prob_pos = reliability_curve(
+                            np.array(sorted(y_augmented_matrix[:, i], reverse=True)),
+                            probabilities_before_calibration, bins=10)
+
+                        scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
+                        plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
+                        plt.plot(y_score_bin_mean[scores_not_nan],
+                                 empirical_prob_pos[scores_not_nan],
+                                 label=str(i), color='red')
+                        plt.ylabel("Empirical probability")
+                        plt.legend(loc=0)
+
+
+                    # TODO: make this feasible for all classes
+                    X, y = Xn_to_Xy(h1_h2_probs_calibration[0][0], h1_h2_probs_calibration[0][1])
+                    calibrator = KDECalibrator()
+                    lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
+
+                    # TODO: make reliability plot after KDE calibration
+
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             train_X,
@@ -1061,6 +1123,7 @@ if __name__ == '__main__':
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
+            classes_map,
             from_penile=from_penile
         )
 
@@ -1075,9 +1138,9 @@ if __name__ == '__main__':
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
+            classes_map,
             from_penile=from_penile
         )
-
 
     evaluate_model(
         model,
@@ -1103,6 +1166,7 @@ if __name__ == '__main__':
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
+            classes_map,
             from_penile=from_penile
         )
 
@@ -1125,7 +1189,7 @@ if __name__ == '__main__':
 
     pickle.dump(mixture_classes_in_classes_to_evaluate, open('mixture_classes_in_classes_to_evaluate', 'wb'))
 
-    h1_h2_scores = evaluate_model(
+    h1_h2_probs_calibration = evaluate_model(
         model,
         'test mixtures',
         combine_samples(X_mixtures, n_features),
@@ -1146,6 +1210,6 @@ if __name__ == '__main__':
         dists_from_xmixtures_to_closest_augmented
     )
 
-    plot_calibration(h1_h2_scores, classes_to_evaluate)
+    plot_calibration(h1_h2_probs_calibration, classes_to_evaluate)
 
     plt.close('all')

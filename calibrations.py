@@ -5,6 +5,8 @@ Note that this script assumes that the calibrated model is used!
 
 http://danielnee.com/tag/reliability-diagram/
 
+http://jmetzen.github.io/2014-08-16/reliability-diagram.html
+
 """
 
 import pickle
@@ -122,7 +124,6 @@ def reliability_curve(y_true, y_score, bins=10, normalize=False):
             <http://machinelearning.wustl.edu/mlpapers/paper_files/icml2005_Niculescu-MizilC05.pdf>`_
 
     """
-    y_score = np.array(sorted(y_score))
     if normalize:  # Normalize scores into bin [0, 1]
         y_score = (y_score - y_score.min()) / (y_score.max() - y_score.min())
 
@@ -136,13 +137,8 @@ def reliability_curve(y_true, y_score, bins=10, normalize=False):
         bin_idx = np.logical_and(threshold - bin_width / 2 < y_score,
                                  y_score <= threshold + bin_width / 2)
         # Store mean y_score and mean empirical probability of positive class
-        if len(y_score[bin_idx]) > 0:
-            y_score_bin_mean[i] = y_score[bin_idx].mean()
-            empirical_prob_pos[i] = y_true[bin_idx].mean()
-        else:
-            print("The bin_idx is empty")
-            y_score_bin_mean[i] = 0
-            empirical_prob_pos[i] = 0
+        y_score_bin_mean[i] = y_score[bin_idx].mean()
+        empirical_prob_pos[i] = y_true[bin_idx].mean()
     return y_score_bin_mean, empirical_prob_pos
 
 
@@ -157,7 +153,7 @@ def plot_histograms_of_scores(log_scores, y_mixtures_matrix, inv_y_mixtures_matr
     # h1 are all the LRs from a mixt. cell types in which a specific cell type exists
     h1s = np.multiply(log_scores, y_mixtures_matrix)
     # h2 are all the LRs from a mixt. cell types in which the specific cell type is not
-    h2s = np.multiply(log_lrs, inv_y_mixtures_matrix)
+    h2s = np.multiply(log_scores, inv_y_mixtures_matrix)
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(log_scores.shape[1]):
         plt.subplot(2, 5, i + 1)
@@ -179,7 +175,7 @@ if __name__ == '__main__':
 
     mixture_classes_in_classes_to_evaluate = pickle.load(
         open('mixture_classes_in_classes_to_evaluate', 'rb'))
-
+    '''
     model = pickle.load(open('mlpmodel', 'rb'))
     log_scores_per_class = calculate_scores(
         X_mixtures, model, mixture_classes_in_classes_to_evaluate, n_features, MAX_LR, log=True)
@@ -245,6 +241,12 @@ if __name__ == '__main__':
     calibrator = KDECalibrator()
     lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
 
+    plt.hist(lr1, bins=30, alpha=0.7, color='mediumblue')
+    plt.hist(lr2, bins=30, alpha=0.7, color='pink')
+    plt.legend(('h1', 'h2'))
+    plt.show()
+
+    # Plot reliability plot
     probabilities_1 = lr1 / (1-lr1)
     y_true_1 = [1] * len(probabilities_1)
     probabilities_2 = lr2 / (1-lr2)
@@ -265,7 +267,7 @@ if __name__ == '__main__':
              color='red')
     plt.ylabel("Empirical probability")
     plt.legend(loc=0)
-
+    '''
 
 
 
