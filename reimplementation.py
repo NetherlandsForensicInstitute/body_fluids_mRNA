@@ -329,7 +329,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
            mixtures_containing_single_cell_type
 
 
-def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR):
+def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes_map, MAX_LR):
     """
     Computes metrics for performance of the model on dataset X, y
 
@@ -351,7 +351,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR)
     h1_h2_probs_per_class = {}
     # marginal for each single class sample
     prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, labels_in_class, MAX_LR)
+        y_prob, labels_in_class, classes_map, MAX_LR)
     for j in range(y_n_hot.shape[1]):
         # get the probability per single class sample
         total_proba = prob_per_class[:, j]
@@ -365,7 +365,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, MAX_LR)
     return h1_h2_probs_per_class
 
 
-def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, MAX_LR):
+def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classes_map, MAX_LR):
     """
     Converts n_samples x n_mixture_classes matrix of probabilities to a
     n_samples x n_classes_of_interest matrix, by summing over the relevant
@@ -380,8 +380,9 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, MAX_LR
     # TODO: make this function work with labels_in_class as dictionary
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
     for j in range(res_prob.shape[1]):
-        if len(labels_in_class[j]) > 0:
-            res_prob[:, j] = np.sum(prob[:, labels_in_class[j]], axis=1)
+        celltype = list(classes_map.keys())[list(classes_map.values()).index(j)]
+        if len(labels_in_class[celltype]) > 0:
+            res_prob[:, j] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
     epsilon = 10 ** -MAX_LR
     res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
     res_prob = np.where(res_prob < epsilon, epsilon, res_prob)
@@ -492,7 +493,7 @@ def boxplot_per_single_class_category(X_augmented_test,
     n_single_classes_to_draw = y_augmented_matrix.shape[1]
     y_prob = model.predict_proba(X_augmented_test)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, MAX_LR)
+        y_prob, mixtures_in_classes_of_interest, classes_map, MAX_LR)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(n_single_classes_to_draw):
@@ -546,7 +547,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
     """
     y_prob = model.predict_proba(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, MAX_LR)
+        y_prob, mixtures_in_classes_of_interest, classes_map, MAX_LR)
 
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(3, 3, figsize=(18, 9))
@@ -609,7 +610,7 @@ def calculate_scores(X, model, mixtures_in_classes_of_interest, n_features, MAX_
 
     y_prob = model.predict_proba(X)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, MAX_LR)
+        y_prob, mixtures_in_classes_of_interest, classes_map, MAX_LR)
 
     if log:
         log_scores_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
@@ -1044,6 +1045,7 @@ if __name__ == '__main__':
                 y_augmented_test,
                 y_augmented_matrix,
                 mixture_classes_in_single_cell_type,
+                classes_map,
                 MAX_LR
             )
 
@@ -1074,6 +1076,7 @@ if __name__ == '__main__':
                         y_augmented_test,
                         y_augmented_matrix,
                         mixture_classes_in_single_cell_type,
+                        classes_map,
                         MAX_LR
                     )
 
@@ -1149,6 +1152,7 @@ if __name__ == '__main__':
         y_train,
         y_augmented_matrix,
         mixture_classes_in_single_cell_type,
+        classes_map,
         MAX_LR
     )
 
@@ -1196,6 +1200,7 @@ if __name__ == '__main__':
         y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
         mixture_classes_in_classes_to_evaluate,
+        classes_map,
         MAX_LR
     )
 
