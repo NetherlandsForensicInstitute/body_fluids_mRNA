@@ -348,12 +348,12 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes
         dataset_label, accuracy_score(y, y_pred)))
 
     y_prob = model.predict_proba(X)
-    # TODO: implement label names
-    h1_h2_probs_per_class = {celltype : [] for celltype in classes_map}
+    h1_h2_probs_per_class = {}
     # marginal for each single class sample
     prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
         y_prob, labels_in_class, classes_map, MAX_LR)
     for j in range(y_n_hot.shape[1]):
+        cell_type = list(classes_map.keys())[list(classes_map.values()).index(j)]
         # get the probability per single class sample
         total_proba = prob_per_class[:, j]
         if sum(total_proba) > 0:
@@ -361,7 +361,7 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes
             probas_with_cell_type = total_proba[y_n_hot[:, j] == 1]
             # print(inv_classes_map[j], np.quantile(probas_without_cell_type, [0.05, .25, .5, .75, .95]),
             #       np.quantile(probas_with_cell_type, [0.05, .25, .5, .75, .95]))
-            h1_h2_probs_per_class[j] = (probas_with_cell_type, probas_without_cell_type)
+            h1_h2_probs_per_class[cell_type] = (probas_with_cell_type, probas_without_cell_type)
 
     return h1_h2_probs_per_class
 
@@ -594,7 +594,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
             axis=1))
     plt.savefig('mixtures binned data and log lrs')
 
-
+# TODO: check if function still needed
 def calculate_scores(X, model, mixtures_in_classes_of_interest, n_features, MAX_LR, log):
     """
     Calculates the (log) likehood ratios.
@@ -1090,15 +1090,15 @@ if __name__ == '__main__':
 
                     plot_histogram_log_lr(h1_h2_probs_calibration)
 
-                    # TODO: make reliability plot before KDE calibration
-                    # Plot reliability plot
+                    # Plot reliability plot before calibration
                     h1_h2_before_calibration = h1_h2_probs_calibration
                     plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix)
 
                     # TODO: perform calibration for all classes
-                    perform_calibration(h1_h2_before_calibration)
+                    h1_h2_after_calibration = perform_calibration(h1_h2_before_calibration)
 
                     # TODO: make reliability plot after KDE calibration
+                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix)
 
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
