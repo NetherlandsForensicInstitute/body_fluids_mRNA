@@ -377,7 +377,6 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classe
         are given.
     :return: n_samples x n_classes_of_interest matrix of probabilities
     """
-    # TODO: make this function work with labels_in_class as dictionary
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
     for j in range(res_prob.shape[1]):
         celltype = list(classes_map.keys())[list(classes_map.values()).index(j)]
@@ -493,7 +492,7 @@ def boxplot_per_single_class_category(X_augmented_test,
     n_single_classes_to_draw = y_augmented_matrix.shape[1]
     y_prob = model.predict_proba(X_augmented_test)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, classes_map, MAX_LR)
+        y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(2, 5, figsize=(18, 9))
     for i in range(n_single_classes_to_draw):
@@ -547,7 +546,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
     """
     y_prob = model.predict_proba(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, classes_map, MAX_LR)
+        y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
 
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(3, 3, figsize=(18, 9))
@@ -764,18 +763,24 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     :param y_mixtures_matrix:
     :return:
     """
-    mixture_classes_in_classes_to_evaluate = mixture_classes_in_single_cell_type
+    mixture_classes_in_classes_to_evaluate = mixture_classes_in_single_cell_type.copy()
     y_combi = np.zeros((len(y_mixtures), len(class_combinations_to_evaluate)))
+    classes_map_updated = classes_map.copy()
     for i_combination, combination in enumerate(class_combinations_to_evaluate):
         labels = []
-        for cell_type in combination:
-            # TODO: make this work with mixture_classes_in_single_cell_type as dictionary
-            labels += mixture_classes_in_single_cell_type[classes_map[cell_type]]
-        mixture_classes_in_classes_to_evaluate.append(list(set(labels)))
+        str_combination = ''
+        for k, cell_type in enumerate(combination):
+            labels += mixture_classes_in_single_cell_type[cell_type]
+            if k == 0:
+                str_combination += cell_type + ' and/or '
+            else:
+                str_combination += cell_type
+        mixture_classes_in_classes_to_evaluate[str_combination] = (list(set(labels)))
+        classes_map_updated[str_combination] = len(classes_map_updated)
         for i in set(labels):
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
 
-    return mixture_classes_in_classes_to_evaluate, \
+    return mixture_classes_in_classes_to_evaluate, classes_map_updated, \
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
@@ -1049,7 +1054,7 @@ if __name__ == '__main__':
                 MAX_LR
             )
 
-            mixture_classes_in_classes_to_evaluate, _ = create_information_on_classes_to_evaluate(
+            mixture_classes_in_classes_to_evaluate, classes_map_updated, _ = create_information_on_classes_to_evaluate(
                 mixture_classes_in_single_cell_type,
                 classes_map,
                 class_combinations_to_evaluate,
@@ -1182,7 +1187,7 @@ if __name__ == '__main__':
     else:
         dists_from_xmixtures_to_closest_augmented = pickle.load(open('dists', 'rb'))
 
-    mixture_classes_in_classes_to_evaluate, y_mixtures_classes_to_evaluate_n_hot = \
+    mixture_classes_in_classes_to_evaluate, classes_map_updated, y_mixtures_classes_to_evaluate_n_hot = \
         create_information_on_classes_to_evaluate(
             mixture_classes_in_single_cell_type,
             classes_map,
