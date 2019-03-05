@@ -18,8 +18,6 @@ from tqdm import tqdm
 
 from metrics import get_lr_metrics
 from calibrations import *
-from lir.calibration import KDECalibrator
-from lir.util import Xn_to_Xy, Xy_to_Xn
 
 
 def read_df(filename, binarize):
@@ -293,7 +291,6 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
                 list of length N_single_cell_classes of lists, that indicate the
                             mixture labels each single cell type features in
     """
-    # Generate more data
     if from_penile == False:
         if 'Skin.penile' in classes_map:
             del classes_map['Skin.penile']
@@ -313,7 +310,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
         while len(binary) < n_single_cell_types_not_penile:
             binary = '0' + binary
         classes_in_current_mixture = []
-        for j, celltype in enumerate(classes_map):
+        for j, celltype in enumerate(sorted(classes_map)):
             if binary[-j - 1] == '1':
                 classes_in_current_mixture.append(j)
                 mixtures_containing_single_cell_type[celltype].append(int(i))
@@ -328,7 +325,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
     return X, y, y_n_hot[:, :n_single_cell_types_not_penile], \
            mixtures_containing_single_cell_type
 
-# TODO: Check if gives correct results
+
 def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes_map, MAX_LR):
     """
     Computes metrics for performance of the model on dataset X, y
@@ -919,6 +916,7 @@ def split_data(X, y):
     :return: two datasets containg splitted X into train and calibration set and same
         holds for y.
     '''
+    # index where new cell type data starts
     index_classes = list(np.unique(y, return_index=True)[1])[1:]
     index_classes.append(len(y))
 
@@ -977,7 +975,7 @@ if __name__ == '__main__':
     plot_data(X_raw_singles)
     n_folds = 2
     N_SAMPLES_PER_COMBINATION = 50
-    MAX_LR=10
+    MAX_LR = 10
     from_penile = False
     retrain = True
     type_train_data = 'calibration' #or 'train'
@@ -1035,6 +1033,7 @@ if __name__ == '__main__':
 
             model.fit(X_augmented_train, y_augmented_train)
 
+            # TODO: HERE
             X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
                 X_test, y_test,
                 n_single_cell_types,
@@ -1098,7 +1097,7 @@ if __name__ == '__main__':
                     h1_h2_after_calibration = perform_calibration(h1_h2_before_calibration)
 
                     # TODO: make reliability plot after KDE calibration
-                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix)
+                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix, bins=20)
 
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(

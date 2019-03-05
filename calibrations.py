@@ -39,6 +39,7 @@ def plot_histogram_log_lr(h1_h2_probs):
         plt.subplot(2, 5, idx + 1)
         plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
                  label=['h1', 'h2'])
+        plt.axvline(x=0, color='k', linestyle='-')
         plt.legend(loc='upper right')
         plt.title(celltype)
     plt.show()
@@ -55,7 +56,7 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10):
         print("No 'before' or 'after' in the variable '{}'".format(h1_h2_probs))
 
     plt.subplots(2, 5, figsize=(18, 9))
-    plt.suptitle(maintitle, size=16)
+    plt.suptitle(maintitle, size=12, y=0.8)
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         h1h2_probs = np.append(h1_h2_probs[celltype][0], h1_h2_probs[celltype][1])
         y_true = sorted(y_matrix[:, idx], reverse=True)
@@ -84,18 +85,15 @@ def perform_calibration(h1_h2_probs):
         scores1 = h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0])
         scores2 = h1_h2_probs[celltype][1] / (1 - h1_h2_probs[celltype][1])
         X, y = Xn_to_Xy(scores1, scores2)
+        # TODO: Need all scores in stead of just for one cell type when performing calibration?
         calibrator = KDECalibrator()
         lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
-        h1_h2_after_calibration[celltype] = (lr1, lr2)
+        # make probabilities
+        probs1 = lr1 / (1+lr1)
+        probs2 = lr2 / (1+lr2)
+        h1_h2_after_calibration[celltype] = (probs1, probs2)
 
     return h1_h2_after_calibration
-
-if __name__ == '__main__':
-    pass
-
-    # TODO: Make this work.
-    # plot PAV plots
-    # plot(lrs_per_class[:, 0], np.array(y_mixtures))
 
 
 
