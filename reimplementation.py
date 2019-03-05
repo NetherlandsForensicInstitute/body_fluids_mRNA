@@ -328,7 +328,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
     return X, y, y_n_hot[:, :n_single_cell_types_not_penile], \
            mixtures_containing_single_cell_type
 
-
+# TODO: Check if gives correct results
 def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes_map, MAX_LR):
     """
     Computes metrics for performance of the model on dataset X, y
@@ -348,7 +348,8 @@ def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes
         dataset_label, accuracy_score(y, y_pred)))
 
     y_prob = model.predict_proba(X)
-    h1_h2_probs_per_class = {}
+    # TODO: implement label names
+    h1_h2_probs_per_class = {celltype : [] for celltype in classes_map}
     # marginal for each single class sample
     prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
         y_prob, labels_in_class, classes_map, MAX_LR)
@@ -1085,42 +1086,17 @@ if __name__ == '__main__':
                         MAX_LR
                     )
 
-                    # TODO: plot two separate histograms in one figure
-                    #plot_histogram_log_lr()
+                    plot_histograms_of_probabilities(h1_h2_probs_calibration)
 
-                    bins = np.linspace(-10, 10, 30)
-                    for i in range(len(h1_h2_probs_calibration)):
-                        likrats1 = (h1_h2_probs_calibration[i][0] / (1 - h1_h2_probs_calibration[i][0]))
-                        log_likrats1 = np.log10(likrats1)
-                        likrats2 = (h1_h2_probs_calibration[i][1] / (1 - h1_h2_probs_calibration[i][1]))
-                        log_likrats2 = np.log10(likrats2)
+                    plot_histogram_log_lr(h1_h2_probs_calibration)
 
-                        plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
-                                 label=['h1', 'h2'])
-                        plt.legend(loc='upper right')
-                        plt.show()
+                    # TODO: make reliability plot before KDE calibration
+                    # Plot reliability plot
+                    h1_h2_before_calibration = h1_h2_probs_calibration
+                    plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix)
 
-                        # TODO: make reliability plot before KDE calibration
-                        # Plot reliability plot
-                        probabilities_before_calibration = np.append(h1_h2_probs_calibration[i][0],
-                                                                     h1_h2_probs_calibration[i][1])
-                        y_score_bin_mean, empirical_prob_pos = reliability_curve(
-                            np.array(sorted(y_augmented_matrix[:, i], reverse=True)),
-                            probabilities_before_calibration, bins=10)
-
-                        scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
-                        plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
-                        plt.plot(y_score_bin_mean[scores_not_nan],
-                                 empirical_prob_pos[scores_not_nan],
-                                 label=str(i), color='red')
-                        plt.ylabel("Empirical probability")
-                        plt.legend(loc=0)
-
-
-                    # TODO: make this feasible for all classes
-                    X, y = Xn_to_Xy(h1_h2_probs_calibration[0][0], h1_h2_probs_calibration[0][1])
-                    calibrator = KDECalibrator()
-                    lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
+                    # TODO: perform calibration for all classes
+                    perform_calibration(h1_h2_before_calibration)
 
                     # TODO: make reliability plot after KDE calibration
 
@@ -1205,7 +1181,7 @@ if __name__ == '__main__':
         y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
         mixture_classes_in_classes_to_evaluate,
-        classes_map,
+        classes_map_updated,
         MAX_LR
     )
 
