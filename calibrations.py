@@ -27,9 +27,12 @@ def plot_histograms_of_probabilities(h1_h2_probs, n_bins=10):
     plt.show()
 
 
-def plot_histogram_log_lr(h1_h2_probs, n_bins=10):
+def plot_histogram_log_lr(h1_h2_probs, n_bins=10, title='before'):
+    maintitle = 'Histogram of log LRs title calibration'.format(title)
+
     bins = np.linspace(-10, 10, n_bins)
     plt.subplots(2, 5, figsize=(18, 9))
+    plt.suptitle(maintitle, size=16)
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         log_likrats1 = np.log10(h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0]))
         log_likrats2 = np.log10(h1_h2_probs[celltype][1] / (1 - h1_h2_probs[celltype][1]))
@@ -63,7 +66,7 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10, title='before'):
         h1h2_probs = np.append(h1_h2_probs[celltype][0], h1_h2_probs[celltype][1])
         y_true = sorted(y_matrix[:, idx], reverse=True)
 
-        y_score_bin_mean, empirical_prob_pos = calibration_curve(
+        empirical_prob_pos, y_score_bin_mean = calibration_curve(
             y_true, h1h2_probs, n_bins=bins)
 
         plt.subplot(2, 5, idx + 1)
@@ -75,31 +78,34 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10, title='before'):
                  marker='o',
                  linestyle='-',
                  label=celltype)
-        plt.xlabel("Log LR with n_bins {}".format(bins))
+        plt.xlabel("Probabilities with n_bins {}".format(bins))
         plt.ylabel("Empirical probability")
         plt.legend(loc=9)
-    #plt.show()
-    plottitle = maintitle.replace(" ", "_").lower()
-    plt.savefig(plottitle)
+    plt.show()
+    #plottitle = maintitle.replace(" ", "_").lower()
+    #plt.savefig(plottitle)
 
 
-def perform_calibration(h1_h2_probs):
-    h1_h2_after_calibration = {}
-    for idx, celltype in enumerate((h1_h2_probs.keys())):
-        # TODO: Correct values in Xn_to_Xy function?
-        scores1 = h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0])
-        scores2 = h1_h2_probs[celltype][1] / (1 - h1_h2_probs[celltype][1])
-        X, y = Xn_to_Xy(scores1, scores2)
-        # TODO: Need all scores in stead of just for one cell type when performing calibration?
-        calibrator = KDECalibrator()
-        lr1, lr2 = Xy_to_Xn(calibrator.fit_transform(X, y), y)
+# TODO: Make this function for all cell types
+def perform_calibration(X_train, y_train, X_test, classes_map, Calibrator=KDECalibrator()):
+
+    def transform_scores(X_test, calibrator):
+        lr1, lr2 = Xy_to_Xn(calibrator.transform(X_test))
         # make probabilities
-        probs1 = lr1 / (1+lr1)
-        probs2 = lr2 / (1+lr2)
+        probs1 = lr1 / (1 + lr1)
+        probs2 = lr2 / (1 + lr2)
         h1_h2_after_calibration[celltype] = (probs1, probs2)
 
-    return h1_h2_after_calibration
+        return h1_h2_after_calibration
 
+    h1_h2_after_calibration = {}
+    for j, celltype in enumerate(sorted(classes_map)):
+        calibrator = Calibrator
+        calibrator.fit(X, y)
+
+        transform_scores(X_test, calibrator)
+
+    return calibration_scores
 
 
 

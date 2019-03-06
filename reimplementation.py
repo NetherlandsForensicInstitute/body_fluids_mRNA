@@ -978,7 +978,7 @@ if __name__ == '__main__':
     MAX_LR = 10
     from_penile = False
     retrain = True
-    type_train_data = 'train' #or 'calibration'
+    type_train_data = 'calibration' # or 'train'
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -993,28 +993,36 @@ if __name__ == '__main__':
     X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
         split_data(X_raw_singles, y_raw_singles)
 
-    if type_train_data == 'train':
-        train_X = X_raw_singles_train
-        train_y = y_raw_singles_train
-    elif type_train_data == 'calibration':
-        train_X = X_raw_singles_calibrate
-        train_y = y_raw_singles_calibrate
-
     if retrain:
         # NB penile skin treated like all others for classify_single
-        classify_single(train_X, train_y, inv_classes_map)
+        classify_single(X_raw_singles_train, y_raw_singles_train, inv_classes_map)
 
         model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_train, X_test, y_train, y_test = train_test_split(train_X, train_y)
-            while len(set(y_test)) != len(set(y_train)):
+            X_calibrate_train, X_calibrate_test, y_calibrate_train, y_calibrate_test = train_test_split(
+                X_raw_singles_calibrate, y_raw_singles_calibrate)
+            while len(set(y_calibrate_test)) != len(set(y_calibrate_train)):
                 # make sure we have all labels in both sets
-                X_train, X_test, y_train, y_test = train_test_split(train_X, train_y)
+                X_calibrate_train, X_calibrate_test, y_calibrate_train, y_calibrate_test = train_test_split(
+                    X_raw_singles_calibrate, y_raw_singles_calibrate)
+
+            # augment data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = augment_data(
-                X_train,
-                y_train,
+                X_raw_singles_train,
+                y_raw_singles_train,
+                n_single_cell_types,
+                n_features,
+                N_SAMPLES_PER_COMBINATION,
+                classes_map,
+                from_penile=from_penile
+            )
+
+            # augment data to calibrate the model with and test the calibrated model on.
+            X_augmented_calibrated_train, y_augmented_calibrated_train, _, _ = augment_data(
+                X_calibrate_train,
+                y_calibrate_train,
                 n_single_cell_types,
                 n_features,
                 N_SAMPLES_PER_COMBINATION,
@@ -1033,20 +1041,23 @@ if __name__ == '__main__':
 
             model.fit(X_augmented_train, y_augmented_train)
 
-            X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-                X_test, y_test,
-                n_single_cell_types,
-                n_features,
-                N_SAMPLES_PER_COMBINATION,
-                classes_map,
-                from_penile=from_penile
+            # augment data to calibrate the model with
+            X_augmented_calibration_test, y_augmented_calibration_test, y_augmented_matrix, \
+                mixture_classes_in_single_cell_type = augment_data(
+                    X_calibrate_test, y_calibrate_test,
+                    n_single_cell_types,
+                    n_features,
+                    N_SAMPLES_PER_COMBINATION,
+                    classes_map,
+                    from_penile=from_penile
             )
 
-            evaluate_model(
+            # create probabilities from MLP on test data
+            h1_h2_probs_train = evaluate_model(
                 model,
                 'fold {}'.format(n),
-                X_augmented_test,
-                y_augmented_test,
+                X_augmented_calibration_test,
+                y_augmented_calibration_test,
                 y_augmented_matrix,
                 mixture_classes_in_single_cell_type,
                 classes_map,
@@ -1064,56 +1075,37 @@ if __name__ == '__main__':
             if n == 0:
                 # only plot single class performance once
                 boxplot_per_single_class_category(
-                    X_augmented_test,
+                    X_augmented_calibration_test,
                     y_augmented_matrix,
                     classes_to_evaluate,
                     mixture_classes_in_classes_to_evaluate,
                     class_combinations_to_evaluate
                 )
 
-                # only make calibrated lrs once
-                if type_train_data == 'calibration':
-                    h1_h2_probs_calibration = evaluate_model(
-                        model,
-                        'fold {}'.format(n),
-                        X_augmented_test,
-                        y_augmented_test,
-                        y_augmented_matrix,
-                        mixture_classes_in_single_cell_type,
-                        classes_map,
-                        MAX_LR
-                    )
+                # TODO: check if want to keep this
+                #plot_histograms_of_probabilities(h1_h2_probs_calibration, 30)
 
-                    plot_histograms_of_probabilities(h1_h2_probs_calibration, 30)
+                # plot histogram of log LRs from probabilities for model trained on
+                # training data and tested on calibration test data.
+                plot_histogram_log_lr(h1_h2_probs_train, n_bins=30, )
 
-                    plot_histogram_log_lr(h1_h2_probs_calibration, 30)
+                # Plot reliability plot before calibration
+                h1_h2_before_calibration = h1_h2_probs_train
+                plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix, bins=20)
 
-                    # Plot reliability plot before calibration
-                    h1_h2_before_calibration = h1_h2_probs_calibration
-                    plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix, bins=20)
+                # TODO: Alter this function
+                h1_h2_after_calibration = perform_calibration(
+                    X_augmented_calibrated_train,
+                    y_augmented_calibrated_train,
+                    X_augmented_calibration_test
+                )
 
-                    # TODO: perform calibration for all classes
-                    h1_h2_after_calibration = perform_calibration(h1_h2_before_calibration)
-
-                    # TODO: make reliability plot after KDE calibration
-                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix,
+                # TODO: make reliability plot after KDE calibration
+                plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix,
                                           bins=20, title='after')
-                else:
-                    h1_h2_probs_train = evaluate_model(
-                        model,
-                        'fold {}'.format(n),
-                        X_augmented_test,
-                        y_augmented_test,
-                        y_augmented_matrix,
-                        mixture_classes_in_single_cell_type,
-                        classes_map,
-                        MAX_LR
-                    )
-
-                    plot_reliability_plot(h1_h2_probs_train, y_augmented_matrix, bins=20, title='train')
-
 
         # train on the full set and test on independent mixtures set
+        # TODO: Check what to do with this?
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             train_X,
             train_y,
