@@ -2,10 +2,6 @@
 
 Check whether calibration is needed and if so perform calibration.
 
-http://danielnee.com/tag/reliability-diagram/
-
-http://jmetzen.github.io/2014-08-16/reliability-diagram.html
-
 """
 
 import matplotlib.pyplot as plt
@@ -18,19 +14,21 @@ from lir.pav import plot
 from lir.util import Xn_to_Xy, Xy_to_Xn
 
 
-def plot_histograms_of_probabilities(h1_h2_probs):
+def plot_histograms_of_probabilities(h1_h2_probs, n_bins=10):
     plt.subplots(2, 5, figsize=(18, 9))
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         plt.subplot(2, 5, idx + 1)
-        plt.hist(h1_h2_probs[celltype][0], bins=30, alpha=0.7, color='mediumblue')
-        plt.hist(h1_h2_probs[celltype][1], bins=30, alpha=0.7, color='orange')
+        plt.hist(h1_h2_probs[celltype][0], bins=n_bins, alpha=0.7, color='pink')
+        plt.hist(h1_h2_probs[celltype][1], bins=n_bins, alpha=0.7, color='blue')
         plt.title(celltype)
-        plt.legend(('h1', 'h2'))
+        plt.ylabel("Frequency")
+        plt.xlabel("Probabilities with n_bins {}".format(n_bins))
+        plt.legend(("h1", "h2"), loc=9)
     plt.show()
 
 
-def plot_histogram_log_lr(h1_h2_probs):
-    bins = np.linspace(-10, 10, 30)
+def plot_histogram_log_lr(h1_h2_probs, n_bins=10):
+    bins = np.linspace(-10, 10, n_bins)
     plt.subplots(2, 5, figsize=(18, 9))
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         log_likrats1 = np.log10(h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0]))
@@ -38,25 +36,29 @@ def plot_histogram_log_lr(h1_h2_probs):
 
         plt.subplot(2, 5, idx + 1)
         plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
-                 label=['h1', 'h2'])
+                 label=["h1", "h2"])
         plt.axvline(x=0, color='k', linestyle='-')
         plt.legend(loc='upper right')
+        plt.ylabel("Frequency")
+        plt.xlabel("log LR with n_bins {}".format(n_bins))
         plt.title(celltype)
     plt.show()
+    #plt.savefig('histogram_log_lr')
 
 
-def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10):
+def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10, title='before'):
     maintitle = ''
-    try:
-        if 'before' in str(h1_h2_probs):
-            maintitle = 'Probabilities before calibration'
-        elif 'after' in str(h1_h2_probs):
-            maintitle = ' Probabilites after calibration'
-    except:
-        print("No 'before' or 'after' in the variable '{}'".format(h1_h2_probs))
+    if title == 'before':
+        maintitle = "Reliability plot before calibration"
+    elif title == 'after':
+        maintitle = "Reliability after calibration"
+    elif title == 'train':
+        maintitle = "Reliability train data"
+    elif title == 'mixture':
+        maintitle = "Reliability mixture data"
 
     plt.subplots(2, 5, figsize=(18, 9))
-    plt.suptitle(maintitle, size=12, y=0.8)
+    plt.suptitle(maintitle, size=16)
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         h1h2_probs = np.append(h1_h2_probs[celltype][0], h1_h2_probs[celltype][1])
         y_true = sorted(y_matrix[:, idx], reverse=True)
@@ -73,9 +75,12 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10):
                  marker='o',
                  linestyle='-',
                  label=celltype)
+        plt.xlabel("Log LR with n_bins {}".format(bins))
         plt.ylabel("Empirical probability")
-        plt.legend(loc=0)
-    plt.show()
+        plt.legend(loc=9)
+    #plt.show()
+    plottitle = maintitle.replace(" ", "_").lower()
+    plt.savefig(plottitle)
 
 
 def perform_calibration(h1_h2_probs):

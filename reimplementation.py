@@ -978,7 +978,7 @@ if __name__ == '__main__':
     MAX_LR = 10
     from_penile = False
     retrain = True
-    type_train_data = 'calibration' #or 'train'
+    type_train_data = 'train' #or 'calibration'
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -1033,7 +1033,6 @@ if __name__ == '__main__':
 
             model.fit(X_augmented_train, y_augmented_train)
 
-            # TODO: HERE
             X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
                 X_test, y_test,
                 n_single_cell_types,
@@ -1085,19 +1084,34 @@ if __name__ == '__main__':
                         MAX_LR
                     )
 
-                    plot_histograms_of_probabilities(h1_h2_probs_calibration)
+                    plot_histograms_of_probabilities(h1_h2_probs_calibration, 30)
 
-                    plot_histogram_log_lr(h1_h2_probs_calibration)
+                    plot_histogram_log_lr(h1_h2_probs_calibration, 30)
 
                     # Plot reliability plot before calibration
                     h1_h2_before_calibration = h1_h2_probs_calibration
-                    plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix)
+                    plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix, bins=20)
 
                     # TODO: perform calibration for all classes
                     h1_h2_after_calibration = perform_calibration(h1_h2_before_calibration)
 
                     # TODO: make reliability plot after KDE calibration
-                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix, bins=20)
+                    plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix,
+                                          bins=20, title='after')
+                else:
+                    h1_h2_probs_train = evaluate_model(
+                        model,
+                        'fold {}'.format(n),
+                        X_augmented_test,
+                        y_augmented_test,
+                        y_augmented_matrix,
+                        mixture_classes_in_single_cell_type,
+                        classes_map,
+                        MAX_LR
+                    )
+
+                    plot_reliability_plot(h1_h2_probs_train, y_augmented_matrix, bins=20, title='train')
+
 
         # train on the full set and test on independent mixtures set
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
@@ -1171,9 +1185,7 @@ if __name__ == '__main__':
             y_mixtures_matrix
     )
 
-    pickle.dump(mixture_classes_in_classes_to_evaluate, open('mixture_classes_in_classes_to_evaluate', 'wb'))
-
-    h1_h2_probs_calibration = evaluate_model(
+    h1_h2_probs_mixture = evaluate_model(
         model,
         'test mixtures',
         combine_samples(X_mixtures, n_features),
@@ -1183,6 +1195,10 @@ if __name__ == '__main__':
         classes_map_updated,
         MAX_LR
     )
+
+    if type_train_data == 'train':
+        plot_reliability_plot(h1_h2_probs_mixture, y_mixtures_classes_to_evaluate_n_hot,
+                              title='mixture')
 
     plot_for_experimental_mixture_data(
         combine_samples(X_mixtures, n_features),
@@ -1195,6 +1211,4 @@ if __name__ == '__main__':
         dists_from_xmixtures_to_closest_augmented
     )
 
-    plot_calibration(h1_h2_probs_calibration, classes_to_evaluate)
-
-    plt.close('all')
+    #plot_calibration(h1_h2_probs_mixture, classes_to_evaluate)
