@@ -102,7 +102,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
 
     # Set the second dimension to rv_max so know for sure all measurements per
     # sample will fit and get no dimension errors.
-    X_raw = np.zeros([0, rv_max, n_features])
+    #X_raw = np.zeros([0, rv_max, n_features])
+    X_raw = []
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in clas:
@@ -117,9 +118,9 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
-                #TODO variabel aantal samples toestaan? --> wordt nu opgelost
-                # in 'combine_samples'.
-                data_for_class = np.zeros((n_full_samples, rv_max, n_features))
+                #TODO variabel aantal samples toestaan
+                #data_for_class = np.zeros((n_full_samples, rv_max, n_features))
+                #data_for_class = []
                 n_discarded = 0
 
                 end_replicate.append(len(rv_set_per_class))
@@ -127,29 +128,32 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                     if i == 0:
                         candidate_samples = data_for_this_label[:end_replicate[i], :]
                         numerator = candidate_samples.shape[0]
-                        candidate_samples = np.vstack(
-                            [candidate_samples,
-                             np.zeros([rv_max - candidate_samples.shape[0],
-                                       n_features], dtype='int')])
+
+                        #candidate_samples = np.vstack(
+                        #    [candidate_samples,
+                        #     np.zeros([rv_max - candidate_samples.shape[0],
+                        #               n_features], dtype='int')])
                     else:
                         candidate_samples = data_for_this_label[
                                             end_replicate[i-1]:end_replicate[i], :
                                             ]
                         numerator = candidate_samples.shape[0]
-                        candidate_samples = np.vstack(
-                            [candidate_samples,
-                             np.zeros([rv_max - candidate_samples.shape[0],
-                                       n_features], dtype='int')])
+
+                        #candidate_samples = np.vstack(
+                        #    [candidate_samples,
+                        #     np.zeros([rv_max - candidate_samples.shape[0],
+                        #               n_features], dtype='int')])
                     # Treshold is set depending on the number of replicates per sample.
                     # TODO is make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
                             np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
                             and 'Blank' not in clas:
                         n_full_samples -= 1
-                        data_for_class = data_for_class[:n_full_samples, :, :]
+                        #data_for_class = data_for_class[:n_full_samples, :, :]
                         n_discarded += 1
                     else:
-                        data_for_class[i - n_discarded, :, :] = candidate_samples
+                        #data_for_class[i - n_discarded, :, :] = candidate_samples
+                        X_raw.append(candidate_samples)
 
                 print('{} has {} samples (after discarding {} due to QC on '
                       'structural markers)'.format(
@@ -158,9 +162,11 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                     n_discarded
                 ))
                 n_per_class[classes_map[clas]] = n_full_samples
-                X_raw = np.append(X_raw, data_for_class, axis=0)
+                #X_raw = np.append(X_raw, data_for_class, axis=0)
+                #X_raw.append(data_for_class)
                 y += [classes_map[clas]] * n_full_samples
 
+    X_raw = np.array(X_raw)
     n_single_cell_types = len(classes_map)
 
     return X_raw, y, n_single_cell_types, n_features, classes_map, \
@@ -258,6 +264,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
             sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
             # shuffle them
             for i in range(n):
+                # TODO: random permutation should be changed
                 sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
         except:
             raise ValueError("The number classes '{}' present in 'y', namely {}, is "
