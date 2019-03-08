@@ -1,9 +1,7 @@
 import math
 import pickle
-import csv
-import os
 import random
-from collections import Counter, defaultdict, OrderedDict
+from collections import Counter, defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -173,38 +171,17 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
            inv_classes_map, n_per_class
 
 
-def combine_samples(data_for_class, n_features):
+def combine_samples(data_for_class):
     """
-    Takes a n_samples x rv_max x n_features matrix and returns the
-    n_samples x n_markers matrix. The rows including solely zeros are not
-    taken into account when combining the samples.
+    Combines the repeated measurements for each sample.
 
-    Note that the latter assumes that there exist no samples in which none of
-    the marker values is on. This makes sense as the marker values ACTB and
-    18S-rRNA always should be present for the sample to be relevant and is/may
-    be deleted if not present.
-
-    :param data_for_class: a n_samples x : x n_features numpy array
-    :return: n_samples x N_markers numpy array
+    :param data_for_class: N_samples x N_observations_per_sample x N_markers measurements numpy array
+    :return: N_samples x N_markers measurements numpy array
     """
-    null = np.zeros([n_features])
-    data_for_class_mean = np.zeros([data_for_class.shape[0], n_features])
-    for i in range(data_for_class.shape[0]):
-        delete_rows = []
-        if null in data_for_class[i, :, :]:
-            for j in range(data_for_class.shape[1]):
-                if np.array_equal(data_for_class[i, j, :], null):
-                    # Want to delete row j.
-                    delete_rows.append(j)
-        if len(delete_rows) > 0:
-            data_for_class_mean[i, :] = np.mean(
-                data_for_class[i, :-1*len(delete_rows), :], axis=0
-            )
-        else:
-            data_for_class_mean[i, :] = np.mean(
-                data_for_class[i, :, :], axis=0
-            )
-
+    data_for_class_mean = np.array([np.mean(data_for_class[i], axis=0)
+                                    for i in range(data_for_class.shape[0])])
+    # TODO: Keep this in?
+    np.reshape(data_for_class_mean, (data_for_class_mean.shape[0], data_for_class_mean[0].shape[0]))
     return data_for_class_mean
 
 
@@ -214,7 +191,7 @@ def classify_single(X, y, inv_classes_map):
     preliminary test.
     """
     # classify single classes
-    single_samples = combine_samples(X, n_features)
+    single_samples = combine_samples(X)
     print('fitting on {} samples, {} features, {} classes'.format(
         len(y),
         single_samples.shape[1],
@@ -254,25 +231,21 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     """
     if len(classes_to_include) == 0:
         return np.zeros((n, n_features))
-    sampled = np.zeros((len(classes_to_include), n, 6, n_features))
+    super_sampled = []
     for j, clas in enumerate(classes_to_include):
+        sampled = []
         n_in_class = sum(np.array(y) == clas)
-        data_for_class = np.array([
-            X[i, :, :] for i in range(len(X)) if y[i] == clas
-        ])
-        try:
-            sampled[j, :, :, :] = data_for_class[np.random.randint(n_in_class, size=n), :, :]
-            # shuffle them
-            for i in range(n):
-                # TODO: random permutation should be changed
-                sampled[j, i, :, :] = sampled[j, i, np.random.permutation(6), :]
-        except:
-            raise ValueError("The number classes '{}' present in 'y', namely {}, is "
-                             "greater/smaller than the number of samples per combination {}".format(
-                clas, n_in_class, n))
-    combined = np.max(sampled, axis=0)
+        data_for_class = X[np.argwhere(np.array(y) == clas).flatten()]
+        sampled_data = data_for_class[np.random.randint(n_in_class, size=n)]
 
-    return combine_samples(combined, n_features)
+        # shuffle them
+        for i in range(n):
+            sampled.append(sampled_data[i][np.random.permutation(sampled_data[i].shape[0]), :])
+        super_sampled.append(sampled)
+
+    combined = super_sampled[-1]
+
+    return combine_samples(np.array(combined))
 
 
 def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
@@ -631,7 +604,7 @@ def plot_data(X):
 
     :param X: N_samples x N_observations_per_sample x N_markers measurements
     """
-    plt.matshow(combine_samples(X, n_features))
+    plt.matshow(combine_samples(X))
     plt.savefig('single_cell_type_measurements_after_QC')
 
 
@@ -789,203 +762,82 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
-def getNumeric(prompt):
-    while True:
-        response = input(prompt)
-        try:
-            return int(response)
-        except ValueError:
-            print("Please enter a number.")
+def split_data(X, y, size=(0.4, 0.4)):
+
+    def indices_per_class(y):
+        index_classes = list(np.unique(y, return_index=True)[1])[1:]
+        index_classes1 = index_classes.copy()
+        index_classes1.insert(0, 0)
+        index_classes2 = index_classes.copy()
+        index_classes2.append(len(y))
+        index_classes = zip(index_classes1, index_classes2)
+
+        indices_classes = [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
+        return indices_classes
 
 
-def manually_refactor_indices():
-    """
-    Takes the single cell type dataset with two sheets of which one is metadata.
-    From the information the replicate numbers are retrieved and an extra column
-    is added to the dataframe. If it is not clear to which replicate  sample
-    belongs, in a python shell an integer can be set manually.
+    def define_random_indices(indices, size):
+        train_size = size[0]
+        calibration_size = size[1]
 
-    :return: excel file with a column "replicate_values" added
-    """
+        train_index = random.sample(indices, int(train_size * len(indices)))
+        indices_no_train = [idx for idx in indices if idx not in train_index]
+        calibration_index = random.sample(indices_no_train, int(calibration_size * len(indices)))
+        test_index = [idx for idx in indices if idx not in calibration_index
+                      if idx not in train_index]
 
-    xls = pd.ExcelFile('Datasets/Dataset_NFI_adj.xlsx')
-    sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
-    relevant_column = list(zip(*list(sheet_to_df_map['Samples + details'].index)))[3]
-    shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
-    replicate_values = OrderedDict([])
-    indexes_to_be_checked = []
-    for i in range(len(shortened_names)):
-        try:
-            replicate_values[i] = int(shortened_names[i][-1])
-        except ValueError:
-            indexes_to_be_checked.append(i)
-            replicate_values[i] = shortened_names[i]
-        if shortened_names[i] in ['0.3', '.75', '0.5', 'a_1', 'n_1', 'n_4']:
-            indexes_to_be_checked.append(i)
-            replicate_values[i] = shortened_names[i]
-        if shortened_names[i][-1] in ['0', '6', '7']:
-            indexes_to_be_checked.append(i)
-            replicate_values[i] = shortened_names[i]
+        return train_index, calibration_index, test_index
 
-    # Iterate over the index and manually adjust
-    replace_replicate = []
-    for i in range(len(indexes_to_be_checked)):
-        print("The middle rowname of the following rownames should get assigned a replicate number:",
-              relevant_column[indexes_to_be_checked[i] - 1:indexes_to_be_checked[i] + 2])
-        replace_replicate.append(getNumeric("Give the replicate number"))
-    for i in range(len(indexes_to_be_checked)):
-        replicate_values[indexes_to_be_checked[i]] = replace_replicate[i]
-    replicates = list(replicate_values.values())
-    replicates.insert(0, "replicate_value")
-    csvfile = "Datasets/replicate_numbers_single.csv"
-    with open(csvfile, "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        for val in replicates:
-            writer.writerow([val])
+    # TODO: invoegen try-catch
+    if sum(size) > 1.0:
+        print("The sum of the sizes for the train and calibration"
+              "data must be must be equal to or below 1.0.")
 
-    sheet_to_df_map['Samples + details'].to_csv('Datasets/Dataset_NFI_meta.csv', encoding='utf-8')
-    sheet_to_df_map['Data uitgekleed'].to_csv('Datasets/Dataset_NFI_adj.csv', encoding='utf-8')
-    a = pd.read_csv("Datasets/Dataset_NFI_meta.csv", delimiter=',')
-    b = pd.read_csv("Datasets/Dataset_NFI_adj.csv", delimiter=',')
-    c = pd.read_csv("Datasets/replicate_numbers_single.csv")
-    mergedac = pd.concat([a, c], axis=1)
-    for i in range(len(mergedac.columns.values)):
-        if 'Unnamed' in mergedac.columns.values[i]:
-            mergedac.columns.values[i] = None
-    mergedbc = pd.concat([b, c], axis=1)
-    for i in range(len(mergedbc.columns.values)):
-        if 'Unnamed' in mergedbc.columns.values[i]:
-            mergedbc.columns.values[i] = None
-    mergedac.to_excel("Datasets/Dataset_NFI_meta_rv.xlsx", index=False)
-    mergedbc.to_excel("Datasets/Dataset_NFI_rv.xlsx", index=False)
-    os.remove("Datasets/Dataset_NFI_meta.csv")
-    os.remove("Datasets/Dataset_NFI_adj.csv")
-    os.remove("Datasets/replicate_numbers_single.csv")
+    indices_classes = indices_per_class(y)
 
+    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate,\
+        y_raw_singles_calibrate, X_raw_singles_test, y_raw_singles_test = ([] for i in range(6))
 
-def manually_refactor_indices_mixtures():
-    """
-    Takes the mixture cell type dataset with two sheets of which one is metadata.
-    From the information the replicate numbers are retrieved and an extra column
-    is added to the dataframe. If it is not clear to which replicate  sample
-    belongs, in a python shell an integer can be set manually.
+    for indices_class in indices_classes:
+        indices = [i for i in range(len(indices_class))]
+        train_index, calibration_index, test_index = define_random_indices(indices, size)
 
-    :return: excel file with a column "replicate_values" added
-    """
-    xls = pd.ExcelFile('Datasets/Dataset_mixtures_adj.xlsx')
-    sheet_to_df_map = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
-    relevant_column = list(zip(*list(sheet_to_df_map['Mix + details'].index)))[3]
-    shortened_names = [relevant_column[i][-3:] for i in range(len(relevant_column))]
-    replicate_values = OrderedDict([])
-    indexes_to_be_checked = []
+        X_for_class = X[indices_class]
+        y_for_class = [y[index_class] for index_class in indices_class]
 
-    for i in range(len(shortened_names)):
-        try:
-            replicate_values[i] = int(shortened_names[i][-1])
-        except ValueError:
-            print("Some samples do not have clear replicate numbers")
-    replicates = list(replicate_values.values())
-    replicates.insert(0, "replicate_value")
-    csvfile = "Datasets/replicate_numbers_mixture.csv"
+        X_raw_singles_train.extend(X_for_class[train_index])
+        y_raw_singles_train.extend([y_for_class[k] for k in train_index])
+        X_raw_singles_calibrate.extend(X_for_class[calibration_index])
+        y_raw_singles_calibrate.extend([y_for_class[k] for k in calibration_index])
+        X_raw_singles_test.extend(X_for_class[test_index])
+        y_raw_singles_test.extend([y_for_class[k] for k in test_index])
 
-    with open(csvfile, "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        for val in replicates:
-            writer.writerow([val])
+    print("The actual distribution (train, calibration, test) is ({}, {}, {})".format(
+        len(X_raw_singles_train)/X.shape[0],
+        len(X_raw_singles_calibrate)/X.shape[0],
+        len(X_raw_singles_test)/X.shape[0]
+    ))
 
-    sheet_to_df_map['Mix + details'].to_csv('Datasets/Dataset_mixture_meta.csv', encoding='utf-8')
-    sheet_to_df_map['Mix data uitgekleed'].to_csv('Datasets/Dataset_mixture_adj.csv', encoding='utf-8')
-    a = pd.read_csv("Datasets/Dataset_mixture_meta.csv", delimiter=',')
-    b = pd.read_csv("Datasets/Dataset_mixture_adj.csv", delimiter=',')
-    c = pd.read_csv("Datasets/replicate_numbers_mixture.csv")
-    mergedac = pd.concat([a, c], axis=1)
-    for i in range(len(mergedac.columns.values)):
-        if 'Unnamed' in mergedac.columns.values[i]:
-            mergedac.columns.values[i] = None
-    mergedbc = pd.concat([b, c], axis=1)
-    for i in range(len(mergedbc.columns.values)):
-        if 'Unnamed' in mergedbc.columns.values[i]:
-            mergedbc.columns.values[i] = None
-    mergedac.to_excel("Datasets/Dataset_mixtures_meta_rv.xlsx", index=False)
-    mergedbc.to_excel("Datasets/Dataset_mixtures_rv.xlsx", index=False)
-    os.remove("Datasets/Dataset_mixture_meta.csv")
-    os.remove("Datasets/Dataset_mixture_adj.csv")
-    os.remove("Datasets/replicate_numbers_mixture.csv")
+    X_raw_singles_train = np.array(X_raw_singles_train)
+    X_raw_singles_calibrate = np.array(X_raw_singles_calibrate)
+    X_raw_singles_test = np.array(X_raw_singles_test)
 
-
-def split_data(X, y):
-    '''
-    Splits the data more or less in half per cell type and assigns to either one of
-    two datasets.
-
-    :param X: numpy array containing single cell type samples
-    :param y: numpy array containing labels of cell types
-    :return: two datasets containg splitted X into train and calibration set and same
-        holds for y.
-    '''
-    # index where new cell type data starts
-    index_classes = list(np.unique(y, return_index=True)[1])[1:]
-    index_classes.append(len(y))
-
-    # initialize
-    X_raw_singles_train = np.zeros([0, X.shape[1], X.shape[2]])
-    y_raw_singles_train = []
-    X_raw_singles_calibrate = np.zeros([0, X.shape[1], X.shape[2]])
-    y_raw_singles_calibrate = []
-
-    for i, idx in enumerate(index_classes):
-        if i == 0:
-            mylist = list(np.linspace(0, idx - 1, idx, dtype=int))
-            # pick random half of the samples per class and use for train sample
-            train_index = random.sample(mylist, int(idx / 2))
-            # use other half for calibration data
-            calibration_index = [x for x in mylist if x not in train_index]
-
-            X_raw_singles_train = np.append(X_raw_singles_train, X[:idx][train_index], axis=0)
-            y_raw_singles_train.extend([y[:idx][k] for k in train_index])
-            X_raw_singles_calibrate = np.append(X_raw_singles_calibrate, X[:idx][calibration_index], axis=0)
-            y_raw_singles_calibrate.extend([y[:idx][k] for k in calibration_index])
-        else:
-            j = index_classes[i] - index_classes[i - 1]
-            mylist = list(np.linspace(0, j - 1, j, dtype=int))
-            # pick random half of the samples per class and use for train sample
-            train_index = random.sample(mylist, int(j / 2))
-            # use other half for calibration data
-            calibration_index = [x for x in mylist if x not in train_index]
-
-            X_raw_singles_train = np.append(
-                X_raw_singles_train, X[index_classes[i-1]:index_classes[i]][train_index], axis=0)
-            y_raw_singles_train.extend([y[index_classes[i-1]:index_classes[i]][k] for k in train_index])
-            X_raw_singles_calibrate = np.append(
-                X_raw_singles_calibrate, X[index_classes[i-1]:index_classes[i]][calibration_index], axis=0)
-            y_raw_singles_calibrate.extend([y[index_classes[i-1]:index_classes[i]][k] for k in calibration_index])
-
-    return X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate
+    return X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate, \
+            X_raw_singles_test, y_raw_singles_test
 
 
 if __name__ == '__main__':
     developing = False
     include_blank = False
-    unknown_replicatenumbers_single = False
-    unknown_replicatenumbers_mixture = False
-
-    # Assign the correct replicates to the same sample for the single cell types.
-    if unknown_replicatenumbers_single:
-        manually_refactor_indices()
-
-    # Assign the correct replicates to the same sample for the mixture cell types.
-    if unknown_replicatenumbers_mixture:
-        manually_refactor_indices_mixtures()
-
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
-    plot_data(X_raw_singles)
+    # TODO: Make this function work
+    #plot_data(X_raw_singles)
     n_folds = 2
     N_SAMPLES_PER_COMBINATION = 50
     MAX_LR = 10
     from_penile = False
     retrain = True
-    type_train_data = 'calibration' # or 'train'
     model_file_name = 'mlpmodel'
     if from_penile:
         model_file_name+='_penile'
@@ -997,8 +849,8 @@ if __name__ == '__main__':
     classes_to_evaluate = single_cell_classes + [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
 
     # Split the data in two equal parts: for training and calibration
-    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate = \
-        split_data(X_raw_singles, y_raw_singles)
+    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate,\
+        X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.45, 0.45))
 
     if retrain:
         # NB penile skin treated like all others for classify_single
@@ -1008,17 +860,17 @@ if __name__ == '__main__':
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_calibrate_train, X_calibrate_test, y_calibrate_train, y_calibrate_test = train_test_split(
-                X_raw_singles_calibrate, y_raw_singles_calibrate)
-            while len(set(y_calibrate_test)) != len(set(y_calibrate_train)):
+            X_train_train, X_train_test, y_train_train, y_train_test = train_test_split(
+                X_raw_singles_train, y_raw_singles_train)
+            while len(set(y_train_test)) != len(set(y_train_test)):
                 # make sure we have all labels in both sets
-                X_calibrate_train, X_calibrate_test, y_calibrate_train, y_calibrate_test = train_test_split(
-                    X_raw_singles_calibrate, y_raw_singles_calibrate)
+                X_train_train, X_train_test, y_train_train, y_train_test = train_test_split(
+                    X_raw_singles_train, y_raw_singles_train)
 
-            # augment data to train the MLP model on
+            # augment the train part of the data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = augment_data(
-                X_raw_singles_train,
-                y_raw_singles_train,
+                X_train_train,
+                y_train_train,
                 n_single_cell_types,
                 n_features,
                 N_SAMPLES_PER_COMBINATION,
