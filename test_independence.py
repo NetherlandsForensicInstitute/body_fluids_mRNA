@@ -12,33 +12,12 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 
 from operator import itemgetter
-from tabulate import tabulate
 from collections import Counter, OrderedDict
 
-from reimplementation import get_data_per_cell_type, read_df, \
-    combine_samples, read_mixture_data
+from reimplementation import *
 
-def visualize_distribution(df):
-    """
-    Makes a stacked barplot from the mixture dataset, showing
-    the distribution of the markers per mixture sample.
 
-    :param df: Pandas DataFrame
-    :return: stacked barplot
-    """
-    df_count = df.groupby(level=0).sum()
-    all_colors = list(matplotlib.colors.get_named_colors_mapping().keys())
-    idx = np.random.randint(0, len(all_colors), 19)
-    idx = idx.tolist()
-    colors = [all_colors[i] for i in idx]
-    xticks=np.linspace(0, 750, 11, dtype=int)
-    df_count.plot.barh(stacked=True, xticks=xticks,
-                 color=colors)
-    plt.legend(frameon=False)
-    plt.tight_layout()
-    plt.savefig('count_distribution')
-
-def make_contingency_table(X, y, single, names, count):
+def make_contingency_table(X, y, single, count):
     """
     Calculates the mean of the occurences for each sample marker combination and puts
     these values in a numpy array.
@@ -47,14 +26,13 @@ def make_contingency_table(X, y, single, names, count):
     :param y: numpy array containing the labels
     :param single: boolean if True calculates the contingency table for the single sample
                    otherwise calculates the contingency table for the mixture sample.
-    :param names: boolean if True includes an column including the types of body fluid.
     :return: a contingency table, either for single or mixed cell types.
     """
     if single:
         data_single = np.concatenate((y.T, X), axis=1)
 
         # split the single samples in groups
-        unique_groups = np.unique(data_single[:, 0]).astype(int)
+        unique_groups = np.unique(y).astype(int)
         splitted_data = np.array([np.array(data_single[data_single[:, 0] == i, :]) for i in unique_groups])
 
         if count:
@@ -62,17 +40,12 @@ def make_contingency_table(X, y, single, names, count):
         else:
             contingency_table_single = np.array([np.mean(splitted_data[i][:, 1::], axis=0) for i in unique_groups])
 
-        if names:
-            sorted_classes_map = OrderedDict(sorted(classes_map.items(), key=itemgetter(1)))
-            names = np.array([list(sorted_classes_map.keys())])
-            contingency_table_single = np.concatenate((names.T, contingency_table_single), axis=1)
-
         return contingency_table_single
     else:
         data_mixture = np.concatenate((y.T, X), axis=1)
 
         # split the single samples in groups
-        unique_groups_mixt, indices = np.unique(data_mixture[:, 0], return_index=True)
+        unique_groups_mixt, indices = np.unique(y, return_index=True)
         unique_groups_mixt = unique_groups_mixt[np.argsort(indices)]
         splitted_data_mixt = np.array([np.array(data_mixture[data_mixture[:, 0] == i, :]) for i in unique_groups_mixt])
 
@@ -82,12 +55,6 @@ def make_contingency_table(X, y, single, names, count):
         else:
             contingency_table_mixt = np.array(
                 [np.mean(splitted_data_mixt[i][:, 1::], axis=0) for i in range(len(unique_groups_mixt))])
-
-        if names:
-            sorted_test_map = OrderedDict(sorted(inv_test_map.items()))
-            names = np.array([list(sorted_test_map.values())]).flatten()[np.argsort(indices)]
-            names = np.reshape(names, (7, 1))
-            contingency_table_mixt = np.concatenate((names, contingency_table_mixt), axis=1)
 
         return contingency_table_mixt
 
@@ -147,6 +114,7 @@ def plot_proportions(names):
         n_observations_single[7] + n_observations_single[0]
     ]
     sorted_test_map = OrderedDict(sorted(n_per_mixture_class.items()))
+    # correct order
     n_observations_mixt = np.array([list(sorted_test_map.values())]).flatten()[np.argsort(indices)]
 
     for idx, name in enumerate(names):
@@ -174,10 +142,10 @@ def plot_proportions(names):
                                 yerr=errors[idx, :, :], capsize=4,
                                 color=['mediumblue', 'orange'])
         ax.set_xticklabels(list(df.columns))
-        ax.set_title(name, fontsize=15)
-        plt.ylabel('Proportion')
-        plt.xlabel('Marker values')
-        plt.xticks(fontsize=6, rotation=0)
+        ax.set_title(name, fontsize=17)
+        plt.ylabel("Proportion")
+        plt.xlabel("Markers")
+        plt.xticks(fontsize=7, rotation=0)
         plt.yticks(fontsize=10)
     #plt.show()
     plt.savefig("proportions")
@@ -199,36 +167,34 @@ def plot_difference_in_proportions(names):
         df_proportions.plot.bar(width=0.8, ax=ax, legend=plot_legend[idx],
                                 color=color)
         ax.set_xticklabels(list(df.columns))
-        ax.set_title(name, fontsize=15)
+        ax.set_title(name, fontsize=17)
         plt.yticks(np.array([-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0]))
-        plt.ylabel('Absolute difference in proportions')
-        plt.xlabel('Marker values')
-        plt.xticks(fontsize=6, rotation=0)
+        plt.ylabel("Absolute difference in proportions")
+        plt.xlabel("Markers")
+        plt.xticks(fontsize=7, rotation=0)
         plt.yticks(fontsize=10)
     #plt.show()
     plt.savefig('difference_proportions')
 
-if __name__ == '__main__':
-    latex = False #print latex tables
 
+if __name__ == '__main__':
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
-        get_data_per_cell_type(filename='Datasets/Modified_Dataset_NFI_rv.xlsx')
-    n_per_class = Counter(y_raw_singles)
+        get_data_per_cell_type(filename='Datasets/Dataset_NFI_removed_saturated_rv.xlsx')
     X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map = read_mixture_data(
         n_single_cell_types-1, n_features, classes_map)
     n_per_mixture_class = Counter(y_mixtures)
 
     # Create contingency table for single samples
-    single_samples = combine_samples(X_raw_singles, n_features)
+    single_samples = combine_samples(X_raw_singles)
     y_raw_singles = (np.array([y_raw_singles]))
     contingency_table_single = make_contingency_table(
-        single_samples, y_raw_singles, single=True, names=False, count=False)
+        single_samples, y_raw_singles, single=True, count=False)
 
     # Create contingency table for mixture samples
-    mixture_samples = combine_samples(X_mixtures, n_features)
+    mixture_samples = combine_samples(X_mixtures)
     y_mixtures = (np.array([y_mixtures]))
     contingency_table_mixt = make_contingency_table(
-        mixture_samples, y_mixtures, single=False, names=False, count=False)
+        mixture_samples, y_mixtures, single=False, count=False)
 
     # Check for each mixture combination and marker whether the following equation holds
     # P_{sample1} + P_{sample2} - P_{sample1}*P_{sample2} = P_{sample1+sample2}
@@ -243,12 +209,3 @@ if __name__ == '__main__':
     # Plot the differences between P_{sample1} + P_{sample2} - P_{sample1}*P_{sample2} and P_{sample1+sample2}
     # i.e. abs(P_{sample1} + P_{sample2} - P_{sample1}*P_{sample2} - P_{sample1+sample2})
     plot_difference_in_proportions(names)
-
-    # Retrieve the actual values from the differences and put them in a (latex) table
-    if latex:
-        table = np.array([np.subtract(
-            np.array([equation_values_per_marker(contingency_table_single, contingency_table_mixt, i, name)
-                      for i in range(n_features)])[:, 0],
-            np.array([equation_values_per_marker(contingency_table_single, contingency_table_mixt, i, name)
-                      for i in range(n_features)])[:, 1]) for name in names])
-        print(tabulate(table, tablefmt="latex", floatfmt=".4f"))
