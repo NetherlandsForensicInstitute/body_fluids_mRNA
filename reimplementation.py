@@ -236,14 +236,23 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         sampled = []
         n_in_class = sum(np.array(y) == clas)
         data_for_class = X[np.argwhere(np.array(y) == clas).flatten()]
-        sampled_data = data_for_class[np.random.randint(n_in_class, size=n)]
+        try:
+            sampling = np.random.randint(n_in_class, size=n)
+            sampled_data = data_for_class[sampling]
 
-        # shuffle them
-        for i in range(n):
-            sampled.append(sampled_data[i][np.random.permutation(sampled_data[i].shape[0]), :])
-        super_sampled.append(sampled)
+            # shuffle them
+            for i in range(n):
+                sampled.append(sampled_data[i][np.random.permutation(sampled_data[i].shape[0]), :])
+            super_sampled.append(sampled)
 
-    combined = super_sampled[-1]
+        except ValueError:
+            # TODO: What if none exist in particular clas?
+            pass
+
+    try:
+        combined = super_sampled[-1]
+    except IndexError:
+        return np.zeros((n, n_features))
 
     return combine_samples(np.array(combined))
 
@@ -868,25 +877,15 @@ if __name__ == '__main__':
                     X_raw_singles_train, y_raw_singles_train)
 
             # augment the train part of the data to train the MLP model on
-            X_augmented_train, y_augmented_train, _, _ = augment_data(
-                X_train_train,
-                y_train_train,
-                n_single_cell_types,
-                n_features,
-                N_SAMPLES_PER_COMBINATION,
-                classes_map,
-                from_penile=from_penile
-            )
-
-            # augment data to calibrate the model with and test the calibrated model on.
-            X_augmented_calibrated_train, y_augmented_calibrated_train, _, _ = augment_data(
-                X_calibrate_train,
-                y_calibrate_train,
-                n_single_cell_types,
-                n_features,
-                N_SAMPLES_PER_COMBINATION,
-                classes_map,
-                from_penile=from_penile
+            X_augmented_train, y_augmented_train, _, _ = \
+                augment_data(
+                    X_train_train,
+                    y_train_train,
+                    n_single_cell_types,
+                    n_features,
+                    N_SAMPLES_PER_COMBINATION,
+                    classes_map,
+                    from_penile=from_penile
             )
 
             print(
@@ -900,10 +899,11 @@ if __name__ == '__main__':
 
             model.fit(X_augmented_train, y_augmented_train)
 
-            # augment data to calibrate the model with
-            X_augmented_calibration_test, y_augmented_calibration_test, y_augmented_matrix, \
-                mixture_classes_in_single_cell_type = augment_data(
-                    X_calibrate_test, y_calibrate_test,
+            # augment test data to evaluate the model with
+            X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = \
+                augment_data(
+                    X_train_test,
+                    y_train_test,
                     n_single_cell_types,
                     n_features,
                     N_SAMPLES_PER_COMBINATION,
@@ -915,14 +915,15 @@ if __name__ == '__main__':
             h1_h2_probs_train = evaluate_model(
                 model,
                 'fold {}'.format(n),
-                X_augmented_calibration_test,
-                y_augmented_calibration_test,
+                X_augmented_test,
+                y_augmented_test,
                 y_augmented_matrix,
                 mixture_classes_in_single_cell_type,
                 classes_map,
                 MAX_LR
             )
 
+            # TODO: Check if correct input
             mixture_classes_in_classes_to_evaluate, classes_map_updated, _ = create_information_on_classes_to_evaluate(
                 mixture_classes_in_single_cell_type,
                 classes_map,
@@ -931,43 +932,25 @@ if __name__ == '__main__':
                 y_augmented_matrix
             )
 
+
             if n == 0:
                 # only plot single class performance once
+                # TODO: Check if correct input
                 boxplot_per_single_class_category(
-                    X_augmented_calibration_test,
+                    X_augmented_test,
                     y_augmented_matrix,
                     classes_to_evaluate,
                     mixture_classes_in_classes_to_evaluate,
                     class_combinations_to_evaluate
                 )
 
-                # TODO: check if want to keep this
-                #plot_histograms_of_probabilities(h1_h2_probs_calibration, 30)
-
-                # plot histogram of log LRs from probabilities for model trained on
-                # training data and tested on calibration test data.
-                plot_histogram_log_lr(h1_h2_probs_train, n_bins=30, )
-
-                # Plot reliability plot before calibration
-                h1_h2_before_calibration = h1_h2_probs_train
-                plot_reliability_plot(h1_h2_before_calibration, y_augmented_matrix, bins=20)
-
-                # TODO: Alter this function
-                h1_h2_after_calibration = perform_calibration(
-                    X_augmented_calibrated_train,
-                    y_augmented_calibrated_train,
-                    X_augmented_calibration_test
-                )
-
-                # TODO: make reliability plot after KDE calibration
-                plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix,
-                                          bins=20, title='after')
+                plot_reliability_plot(h1_h2_probs_train, y_augmented_matrix)
 
         # train on the full set and test on independent mixtures set
         # TODO: Check what to do with this?
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            train_X,
-            train_y,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -981,8 +964,8 @@ if __name__ == '__main__':
     else:
         model = pickle.load(open(model_file_name, 'rb'))
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            train_X,
-            train_y,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -990,6 +973,7 @@ if __name__ == '__main__':
             from_penile=from_penile
         )
 
+    # calculate the probs from test data with the MLP model trained on train data
     evaluate_model(
         model,
         'train',
@@ -1010,8 +994,8 @@ if __name__ == '__main__':
 
     if retrain:
         X_augmented, y_augmented, _, _ = augment_data(
-            train_X,
-            train_y,
+            X_raw_singles_train,
+            y_raw_singles_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -1039,17 +1023,13 @@ if __name__ == '__main__':
     h1_h2_probs_mixture = evaluate_model(
         model,
         'test mixtures',
-        combine_samples(X_mixtures, n_features),
+        combine_samples(X_mixtures),
         y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
         mixture_classes_in_classes_to_evaluate,
         classes_map_updated,
         MAX_LR
     )
-
-    if type_train_data == 'train':
-        plot_reliability_plot(h1_h2_probs_mixture, y_mixtures_classes_to_evaluate_n_hot,
-                              title='mixture')
 
     plot_for_experimental_mixture_data(
         combine_samples(X_mixtures, n_features),
