@@ -143,8 +143,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                         #               n_features], dtype='int')])
                     # Treshold is set depending on the number of replicates per sample.
                     # TODO is make this at least one okay?
-                    if np.sum(candidate_samples[:, -1]) < (3*(numerator/4)) or \
-                            np.sum(candidate_samples[:, -2]) < (3*(numerator/4)) \
+                    if np.sum(candidate_samples[:, -1]) < 1 or \
+                            np.sum(candidate_samples[:, -2]) < 1 \
                             and 'Blank' not in clas:
                         n_full_samples -= 1
                         #data_for_class = data_for_class[:n_full_samples, :, :]
@@ -181,7 +181,7 @@ def combine_samples(data_for_class):
     data_for_class_mean = np.array([np.mean(data_for_class[i], axis=0)
                                     for i in range(data_for_class.shape[0])])
     # TODO: Keep this in?
-    np.reshape(data_for_class_mean, (data_for_class_mean.shape[0], data_for_class_mean[0].shape[0]))
+    #np.reshape(data_for_class_mean, (data_for_class_mean.shape[0], data_for_class_mean[0].shape[0]))
     return data_for_class_mean
 
 
@@ -236,23 +236,16 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         sampled = []
         n_in_class = sum(np.array(y) == clas)
         data_for_class = X[np.argwhere(np.array(y) == clas).flatten()]
-        try:
-            sampling = np.random.randint(n_in_class, size=n)
-            sampled_data = data_for_class[sampling]
 
-            # shuffle them
-            for i in range(n):
-                sampled.append(sampled_data[i][np.random.permutation(sampled_data[i].shape[0]), :])
-            super_sampled.append(sampled)
+        sampling = np.random.randint(n_in_class, size=n)
+        sampled_data = data_for_class[sampling]
 
-        except ValueError:
-            # TODO: What if none exist in particular clas?
-            pass
+        # shuffle them
+        for i in range(n):
+            sampled.append(sampled_data[i][np.random.permutation(sampled_data[i].shape[0]), :])
+        super_sampled.append(sampled)
 
-    try:
-        combined = super_sampled[-1]
-    except IndexError:
-        return np.zeros((n, n_features))
+    combined = super_sampled[-1]
 
     return combine_samples(np.array(combined))
 
@@ -292,7 +285,6 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
         n_single_cell_types
     ), dtype=int)
     mixtures_containing_single_cell_type = {celltype: [] for celltype in classes_map}
-    #mixtures_containing_single_cell_type_before = [[] for _ in range(n_single_cell_types_not_penile)]
 
     for i in range(2 ** n_single_cell_types_not_penile):
         binary = bin(i)[2:]
@@ -592,7 +584,7 @@ def calculate_scores(X, model, mixtures_in_classes_of_interest, n_features, MAX_
     :return: the log likelihood ratios for all samples and makers
     """
     if len(X.shape) > 2:
-        X = combine_samples(X, n_features)
+        X = combine_samples(X)
 
     y_prob = model.predict_proba(X)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
@@ -859,7 +851,7 @@ if __name__ == '__main__':
 
     # Split the data in two equal parts: for training and calibration
     X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate,\
-        X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.45, 0.45))
+        X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
 
     if retrain:
         # NB penile skin treated like all others for classify_single
@@ -869,18 +861,14 @@ if __name__ == '__main__':
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_train_train, X_train_test, y_train_train, y_train_test = train_test_split(
-                X_raw_singles_train, y_raw_singles_train)
-            while len(set(y_train_test)) != len(set(y_train_test)):
-                # make sure we have all labels in both sets
-                X_train_train, X_train_test, y_train_train, y_train_test = train_test_split(
-                    X_raw_singles_train, y_raw_singles_train)
+            X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate, \
+                X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
 
             # augment the train part of the data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = \
                 augment_data(
-                    X_train_train,
-                    y_train_train,
+                    X_raw_singles_train,
+                    y_raw_singles_train,
                     n_single_cell_types,
                     n_features,
                     N_SAMPLES_PER_COMBINATION,
@@ -902,8 +890,8 @@ if __name__ == '__main__':
             # augment test data to evaluate the model with
             X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = \
                 augment_data(
-                    X_train_test,
-                    y_train_test,
+                    X_raw_singles_test,
+                    y_raw_singles_test,
                     n_single_cell_types,
                     n_features,
                     N_SAMPLES_PER_COMBINATION,
@@ -923,7 +911,6 @@ if __name__ == '__main__':
                 MAX_LR
             )
 
-            # TODO: Check if correct input
             mixture_classes_in_classes_to_evaluate, classes_map_updated, _ = create_information_on_classes_to_evaluate(
                 mixture_classes_in_single_cell_type,
                 classes_map,
@@ -932,10 +919,25 @@ if __name__ == '__main__':
                 y_augmented_matrix
             )
 
+            # augment calibration data to calibrate the model with
+            X_calibrate, y_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
+                augment_data(
+                    X_raw_singles_calibrate,
+                    y_raw_singles_calibrate,
+                    n_single_cell_types,
+                    n_features,
+                    N_SAMPLES_PER_COMBINATION,
+                    classes_map,
+                    from_penile=from_penile
+                )
+
+            # calibrate the scores
+            h1_h2_after_calibration = perform_calibration(model, X_calibrate, y_calibrate,
+                                      X_augmented_test, y_augmented_test, classes_map)
+            print(h1_h2_after_calibration)
 
             if n == 0:
                 # only plot single class performance once
-                # TODO: Check if correct input
                 boxplot_per_single_class_category(
                     X_augmented_test,
                     y_augmented_matrix,
@@ -944,10 +946,17 @@ if __name__ == '__main__':
                     class_combinations_to_evaluate
                 )
 
+                # plots before calibration
+                plot_histograms_of_probabilities(h1_h2_probs_train)
+                plot_histogram_log_lr(h1_h2_probs_train)
                 plot_reliability_plot(h1_h2_probs_train, y_augmented_matrix)
 
-        # train on the full set and test on independent mixtures set
-        # TODO: Check what to do with this?
+                # plots after calibration
+                plot_histograms_of_probabilities(h1_h2_after_calibration)
+                plot_histogram_log_lr(h1_h2_after_calibration)
+                plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix)
+
+        # train on the full train set once
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             X_raw_singles_train,
             y_raw_singles_train,
@@ -985,6 +994,20 @@ if __name__ == '__main__':
         MAX_LR
     )
 
+    # TODO: Calibrate the model on the calibration data
+    X_calibrate, y_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
+        augment_data(
+            X_raw_singles_calibrate,
+            y_raw_singles_calibrate,
+            n_single_cell_types,
+            n_features,
+            N_SAMPLES_PER_COMBINATION,
+            classes_map,
+            from_penile=from_penile
+    )
+
+
+    # TODO: Test all on mixture data --> use the calibrated model to calculate the scores.
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(
         n_single_cell_types - 1,
         n_features,

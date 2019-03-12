@@ -14,7 +14,7 @@ from lir.pav import plot
 from lir.util import Xn_to_Xy, Xy_to_Xn
 
 
-def plot_histograms_of_probabilities(h1_h2_probs, n_bins=10):
+def plot_histograms_of_probabilities(h1_h2_probs, n_bins=100):
     plt.subplots(2, 5, figsize=(18, 9))
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         plt.subplot(2, 5, idx + 1)
@@ -28,7 +28,7 @@ def plot_histograms_of_probabilities(h1_h2_probs, n_bins=10):
 
 
 def plot_histogram_log_lr(h1_h2_probs, n_bins=10, title='before'):
-    maintitle = 'Histogram of log LRs title calibration'.format(title)
+    maintitle = 'Histogram of log LRs {} calibration'.format(title)
 
     bins = np.linspace(-10, 10, n_bins)
     plt.subplots(2, 5, figsize=(18, 9))
@@ -78,7 +78,7 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10, title='before'):
                  marker='o',
                  linestyle='-',
                  label=celltype)
-        plt.xlabel("Probabilities with n_bins {}".format(bins))
+        plt.xlabel("Probabilities with n_bins {}".format(len(empirical_prob_pos)))
         plt.ylabel("Empirical probability")
         plt.legend(loc=9)
     plt.show()
@@ -87,9 +87,11 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, bins=10, title='before'):
 
 
 # TODO: Make this function for all cell types
-def perform_calibration(X_train, y_train, X_test, classes_map, Calibrator=KDECalibrator()):
+# TODO: Make sure scores as input calibration
+def perform_calibration(model, X_calibrate, y_calibrate,
+                        X_test, y_test, classes_map, Calibrator=KDECalibrator):
 
-    def transform_scores(X_test, calibrator):
+    def transform_scores(X_test, calibrator, celltype):
         lr1, lr2 = Xy_to_Xn(calibrator.transform(X_test))
         # make probabilities
         probs1 = lr1 / (1 + lr1)
@@ -100,12 +102,30 @@ def perform_calibration(X_train, y_train, X_test, classes_map, Calibrator=KDECal
 
     h1_h2_after_calibration = {}
     for j, celltype in enumerate(sorted(classes_map)):
-        calibrator = Calibrator
+        i_celltype = classes_map[celltype]
+
+        # select correct data to perform calibration
+        all_indices = np.linspace(0, len(y_calibrate)-1, len(y_calibrate), dtype=int)
+        indices_h1 = np.argwhere(np.array(y_calibrate) == i_celltype).flatten()
+        X_h1 = X_calibrate[indices_h1, :]
+        X_h2 = np.array([X_calibrate[i, :] for i in all_indices if i not in indices_h1])
+        X = np.append(X_h1, X_h2, axis=0)
+        y = sum([[1] * X_h1.shape[0], [0] * X_h2.shape[0]], [])
+
+        # select correct data to transform the data with
+        all_indices = np.linspace(0, len(y_test)-1, len(y_test), dtype=int)
+        indices_test_h1 = np.argwhere(np.array(y_test) == i_celltype).flatten()
+        X_test_h1 = X_test[indices_test_h1, :]
+        X_test_h2 = np.array([X_test[i, :] for i in all_indices if i not in indices_test_h1])
+        X_test = np.append(X_test_h1, X_test_h2, axis=0)
+        y_test = sum([[1] * X_test_h1.shape[0], [0] * X_test_h2.shape[0]], [])
+
+        calibrator = Calibrator(model)
         calibrator.fit(X, y)
 
-        transform_scores(X_test, calibrator)
+        h1_h2_after_calibration[celltype] = transform_scores(X_test, calibrator, i_celltype)
 
-    return calibration_scores
+    return h1_h2_after_calibration
 
 
 
