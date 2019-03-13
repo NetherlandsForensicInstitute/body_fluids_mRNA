@@ -142,12 +142,13 @@ def plot_proportions(names):
                                 yerr=errors[idx, :, :], capsize=4,
                                 color=['mediumblue', 'orange'])
         ax.set_xticklabels(list(df.columns))
-        ax.set_title(name, fontsize=17)
+        ax.set_title(name, fontsize=25)
         plt.ylabel("Proportion")
         plt.xlabel("Markers")
-        plt.xticks(fontsize=7, rotation=0)
+        plt.xticks(fontsize=8, rotation=0)
         plt.yticks(fontsize=10)
     #plt.show()
+    plt.tight_layout()
     plt.savefig("proportions")
     
     return errors
@@ -167,19 +168,20 @@ def plot_difference_in_proportions(names):
         df_proportions.plot.bar(width=0.8, ax=ax, legend=plot_legend[idx],
                                 color=color)
         ax.set_xticklabels(list(df.columns))
-        ax.set_title(name, fontsize=17)
+        ax.set_title(name, fontsize=25)
         plt.yticks(np.array([-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0]))
         plt.ylabel("Absolute difference in proportions")
         plt.xlabel("Markers")
-        plt.xticks(fontsize=7, rotation=0)
+        plt.xticks(fontsize=8, rotation=0)
         plt.yticks(fontsize=10)
     #plt.show()
+    plt.tight_layout()
     plt.savefig('difference_proportions')
 
 
 if __name__ == '__main__':
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
-        get_data_per_cell_type(filename='Datasets/Dataset_NFI_removed_saturated_rv.xlsx')
+        get_data_per_cell_type(filename='Datasets/Dataset_NFI_removed_degraded_rv.xlsx')
     X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map = read_mixture_data(
         n_single_cell_types-1, n_features, classes_map)
     n_per_mixture_class = Counter(y_mixtures)
