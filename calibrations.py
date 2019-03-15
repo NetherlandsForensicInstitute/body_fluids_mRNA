@@ -10,8 +10,7 @@ import numpy as np
 from sklearn.calibration import calibration_curve
 
 from lir.calibration import KDECalibrator
-from lir.util import Xn_to_Xy, Xy_to_Xn
-
+from lir.util import *
 
 def plot_histograms_of_probabilities(h1_h2_probs, n_bins=100):
     plt.subplots(4, 2, figsize=(18, 36))
@@ -27,16 +26,15 @@ def plot_histograms_of_probabilities(h1_h2_probs, n_bins=100):
 
 
 def plot_histogram_log_lr(h1_h2_probs, n_bins=30, title='before'):
-    maintitle = 'Histogram of log LRs {} calibration'.format(title)
 
     bins = np.linspace(-10, 10, n_bins)
-    plt.subplots(4, 2, figsize=(18, 36))
-    plt.suptitle(maintitle, size=16)
+    plt.subplots(5, 2, figsize=(18, 36))
+    plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         log_likrats1 = np.log10(h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0]))
         log_likrats2 = np.log10(h1_h2_probs[celltype][1] / (1 - h1_h2_probs[celltype][1]))
 
-        plt.subplot(4, 2, idx + 1)
+        plt.subplot(5, 2, idx + 1)
         plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
                  label=["h1", "h2"])
         plt.axvline(x=0, color='k', linestyle='-')
@@ -50,7 +48,7 @@ def plot_histogram_log_lr(h1_h2_probs, n_bins=30, title='before'):
 
 def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
 
-    plt.subplots(4, 2, figsize=(18, 36))
+    plt.subplots(5, 2, figsize=(18, 36))
     plt.suptitle("Reliability plot {} calibration".format(title), size=16)
     for idx, celltype in enumerate((h1_h2_probs.keys())):
         h1h2_probs = np.append(h1_h2_probs[celltype][0], h1_h2_probs[celltype][1])
@@ -59,7 +57,7 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
         empirical_prob_pos, y_score_bin_mean = calibration_curve(
             y_true, h1h2_probs, n_bins=bins)
 
-        plt.subplot(4, 2, idx + 1)
+        plt.subplot(5, 2, idx + 1)
         plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
         scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
         plt.plot(y_score_bin_mean[scores_not_nan],

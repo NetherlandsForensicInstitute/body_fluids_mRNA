@@ -1,5 +1,4 @@
 from sklearn.neural_network import MLPClassifier
-from sklearn.calibration import CalibratedClassifierCV
 
 from reimplementation import *
 
@@ -16,7 +15,7 @@ class ScoresMLP():
         return self
 
 
-    def predict_proba(self, Xtest, y_n_hot, labels_in_class, classes_map, MAX_LR):
+    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, MAX_LR):
         """
         Predicts probabilties per class.
         """
