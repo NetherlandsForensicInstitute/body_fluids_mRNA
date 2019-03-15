@@ -16,6 +16,8 @@ from tqdm import tqdm
 
 from metrics import get_lr_metrics
 from calibrations import *
+from lir.calibration import IsotonicCalibrator
+from scores import *
 
 
 def read_df(filename, binarize):
@@ -98,9 +100,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                                    # Samples can be discarded later on.
     n_features = len(df.columns)
 
-    # Set the second dimension to rv_max so know for sure all measurements per
-    # sample will fit and get no dimension errors.
-    #X_raw = np.zeros([0, rv_max, n_features])
     X_raw = []
     y = []
     for clas in sorted(classes_set) + ['Skin.penile']:
@@ -116,41 +115,23 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
-                #TODO variabel aantal samples toestaan
-                #data_for_class = np.zeros((n_full_samples, rv_max, n_features))
-                #data_for_class = []
                 n_discarded = 0
 
                 end_replicate.append(len(rv_set_per_class))
                 for i in range(n_full_samples):
                     if i == 0:
                         candidate_samples = data_for_this_label[:end_replicate[i], :]
-                        numerator = candidate_samples.shape[0]
-
-                        #candidate_samples = np.vstack(
-                        #    [candidate_samples,
-                        #     np.zeros([rv_max - candidate_samples.shape[0],
-                        #               n_features], dtype='int')])
                     else:
                         candidate_samples = data_for_this_label[
                                             end_replicate[i-1]:end_replicate[i], :
                                             ]
-                        numerator = candidate_samples.shape[0]
-
-                        #candidate_samples = np.vstack(
-                        #    [candidate_samples,
-                        #     np.zeros([rv_max - candidate_samples.shape[0],
-                        #               n_features], dtype='int')])
-                    # Treshold is set depending on the number of replicates per sample.
                     # TODO is make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < 1 or \
                             np.sum(candidate_samples[:, -2]) < 1 \
                             and 'Blank' not in clas:
                         n_full_samples -= 1
-                        #data_for_class = data_for_class[:n_full_samples, :, :]
                         n_discarded += 1
                     else:
-                        #data_for_class[i - n_discarded, :, :] = candidate_samples
                         X_raw.append(candidate_samples)
 
                 print('{} has {} samples (after discarding {} due to QC on '
@@ -160,8 +141,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                     n_discarded
                 ))
                 n_per_class[classes_map[clas]] = n_full_samples
-                #X_raw = np.append(X_raw, data_for_class, axis=0)
-                #X_raw.append(data_for_class)
                 y += [classes_map[clas]] * n_full_samples
 
     X_raw = np.array(X_raw)
@@ -180,8 +159,6 @@ def combine_samples(data_for_class):
     """
     data_for_class_mean = np.array([np.mean(data_for_class[i], axis=0)
                                     for i in range(data_for_class.shape[0])])
-    # TODO: Keep this in?
-    #np.reshape(data_for_class_mean, (data_for_class_mean.shape[0], data_for_class_mean[0].shape[0]))
     return data_for_class_mean
 
 
@@ -762,6 +739,7 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
         mixture_classes_in_classes_to_evaluate[str_combination] = (list(set(labels)))
         classes_map_updated[str_combination] = len(classes_map_updated)
         for i in set(labels):
+            # TODO: Does it have to be y_mixtures rather than y_test
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
 
     return mixture_classes_in_classes_to_evaluate, classes_map_updated, \
@@ -801,8 +779,7 @@ def split_data(X, y, size=(0.4, 0.4)):
 
     indices_classes = indices_per_class(y)
 
-    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate,\
-        y_raw_singles_calibrate, X_raw_singles_test, y_raw_singles_test = ([] for i in range(6))
+    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = ([] for i in range(6))
 
     for indices_class in indices_classes:
         indices = [i for i in range(len(indices_class))]
@@ -811,25 +788,24 @@ def split_data(X, y, size=(0.4, 0.4)):
         X_for_class = X[indices_class]
         y_for_class = [y[index_class] for index_class in indices_class]
 
-        X_raw_singles_train.extend(X_for_class[train_index])
-        y_raw_singles_train.extend([y_for_class[k] for k in train_index])
-        X_raw_singles_calibrate.extend(X_for_class[calibration_index])
-        y_raw_singles_calibrate.extend([y_for_class[k] for k in calibration_index])
-        X_raw_singles_test.extend(X_for_class[test_index])
-        y_raw_singles_test.extend([y_for_class[k] for k in test_index])
+        X_train.extend(X_for_class[train_index])
+        y_train.extend([y_for_class[k] for k in train_index])
+        X_calibrate.extend(X_for_class[calibration_index])
+        y_calibrate.extend([y_for_class[k] for k in calibration_index])
+        X_test.extend(X_for_class[test_index])
+        y_test.extend([y_for_class[k] for k in test_index])
 
     print("The actual distribution (train, calibration, test) is ({}, {}, {})".format(
-        len(X_raw_singles_train)/X.shape[0],
-        len(X_raw_singles_calibrate)/X.shape[0],
-        len(X_raw_singles_test)/X.shape[0]
+        len(X_train)/X.shape[0],
+        len(X_calibrate)/X.shape[0],
+        len(X_test)/X.shape[0]
     ))
 
-    X_raw_singles_train = np.array(X_raw_singles_train)
-    X_raw_singles_calibrate = np.array(X_raw_singles_calibrate)
-    X_raw_singles_test = np.array(X_raw_singles_test)
+    X_train = np.array(X_train)
+    X_calibrate = np.array(X_calibrate)
+    X_test = np.array(X_test)
 
-    return X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate, \
-            X_raw_singles_test, y_raw_singles_test
+    return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
 if __name__ == '__main__':
@@ -855,25 +831,26 @@ if __name__ == '__main__':
     classes_to_evaluate = single_cell_classes + [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
 
     # Split the data in two equal parts: for training and calibration
-    X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate,\
-        X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
+    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
+        split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
 
     if retrain:
         # NB penile skin treated like all others for classify_single
-        classify_single(X_raw_singles_train, y_raw_singles_train, inv_classes_map)
+        classify_single(X_train, y_train, inv_classes_map)
 
-        model = MLPClassifier(random_state=0)
+        model_scores = ScoresMLP()
+        # model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
-            X_raw_singles_train, y_raw_singles_train, X_raw_singles_calibrate, y_raw_singles_calibrate, \
-                X_raw_singles_test, y_raw_singles_test = split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
+            X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
+                split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
 
             # augment the train part of the data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = \
                 augment_data(
-                    X_raw_singles_train,
-                    y_raw_singles_train,
+                    X_train,
+                    y_train,
                     n_single_cell_types,
                     n_features,
                     N_SAMPLES_PER_COMBINATION,
@@ -889,46 +866,54 @@ if __name__ == '__main__':
             )
 
             # TODO get the mixture data from dorum
-
-            model.fit(X_augmented_train, y_augmented_train)
+            model_scores.fit(X_augmented_train, y_augmented_train)
 
             # augment test data to evaluate the model with
             X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = \
                 augment_data(
-                    X_raw_singles_test,
-                    y_raw_singles_test,
+                    X_test,
+                    y_test,
                     n_single_cell_types,
                     n_features,
-                    N_SAMPLES_PER_COMBINATION,
+                    25,
                     classes_map,
                     from_penile=from_penile
             )
 
-            # create probabilities from MLP on test data
-            h1_h2_probs_train = evaluate_model(
-                model,
-                'fold {}'.format(n),
+            # TODO: Is this way of making probabilities from calibration data correct?
+            h1_h2_probs_test = model_scores.predict_proba(
                 X_augmented_test,
-                y_augmented_test,
                 y_augmented_matrix,
                 mixture_classes_in_single_cell_type,
                 classes_map,
                 MAX_LR
             )
 
+            # create probabilities from MLP on test data
+            # h1_h2_probs_train = evaluate_model(
+            #     model,
+            #     'fold {}'.format(n),
+            #     X_augmented_test,
+            #     y_augmented_test,
+            #     y_augmented_matrix,
+            #     mixture_classes_in_single_cell_type,
+            #     classes_map,
+            #     MAX_LR
+            # )
+
             mixture_classes_in_classes_to_evaluate, classes_map_updated, _ = create_information_on_classes_to_evaluate(
                 mixture_classes_in_single_cell_type,
                 classes_map,
                 class_combinations_to_evaluate,
-                y_augmented_train,
+                y_augmented_test,
                 y_augmented_matrix
             )
 
             # augment calibration data to calibrate the model with
-            X_calibrate, y_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
+            X_calibrate_augmented, y_calibrate_augmented, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
                 augment_data(
-                    X_raw_singles_calibrate,
-                    y_raw_singles_calibrate,
+                    X_calibrate,
+                    y_calibrate,
                     n_single_cell_types,
                     n_features,
                     N_SAMPLES_PER_COMBINATION,
@@ -936,35 +921,45 @@ if __name__ == '__main__':
                     from_penile=from_penile
                 )
 
-            # calibrate the scores
-            #h1_h2_after_calibration = perform_calibration(model, X_calibrate, y_calibrate,
-            #                          X_augmented_test, y_augmented_test, classes_map)
-            #print(h1_h2_after_calibration)
+            h1_h2_probs_calibration = model_scores.predict_proba(
+                X_calibrate_augmented,
+                y_augmented_matrix_calibrate,
+                mixture_classes_in_single_cell_type,
+                classes_map,
+                MAX_LR
+            )
+
+            # fit calibrated models
+            calibrators_per_class = calibration_fit(h1_h2_probs_calibration, classes_map)
+
+            # transform the test scores
+            h1_h2_after_calibration = calibration_transform(h1_h2_probs_test, calibrators_per_class, classes_map)
 
             if n == 0:
                 # only plot single class performance once
-                boxplot_per_single_class_category(
-                    X_augmented_test,
-                    y_augmented_matrix,
-                    classes_to_evaluate,
-                    mixture_classes_in_classes_to_evaluate,
-                    class_combinations_to_evaluate
-                )
+                # TODO: Make this function work
+                # boxplot_per_single_class_category(
+                #     X_augmented_test,
+                #     y_augmented_matrix,
+                #     classes_to_evaluate,
+                #     mixture_classes_in_classes_to_evaluate,
+                #     class_combinations_to_evaluate
+                # )
 
                 # plots before calibration
-                plot_histograms_of_probabilities(h1_h2_probs_train)
-                plot_histogram_log_lr(h1_h2_probs_train)
-                plot_reliability_plot(h1_h2_probs_train, y_augmented_matrix)
+                plot_histograms_of_probabilities(h1_h2_probs_test)
+                plot_histogram_log_lr(h1_h2_probs_test)
+                plot_reliability_plot(h1_h2_probs_test, y_augmented_matrix, title='before')
 
                 # plots after calibration
                 plot_histograms_of_probabilities(h1_h2_after_calibration)
                 plot_histogram_log_lr(h1_h2_after_calibration)
-                plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix)
+                plot_reliability_plot(h1_h2_after_calibration, y_augmented_matrix, title='after')
 
-        # train on the full train set once
-        X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+
+        X_augmented_train, y_augmented_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
+            X_train,
+            y_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -972,14 +967,49 @@ if __name__ == '__main__':
             from_penile=from_penile
         )
 
-        model.fit(X_train, y_train)
+        X_augmented_calibrate, y_augmented_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
+            augment_data(
+                X_calibrate,
+                y_calibrate,
+                n_single_cell_types,
+                n_features,
+                N_SAMPLES_PER_COMBINATION,
+                classes_map,
+                from_penile=from_penile
+            )
 
-        pickle.dump(model, open(model_file_name, 'wb'))
+        X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = \
+            augment_data(
+                X_test,
+                y_test,
+                n_single_cell_types,
+                n_features,
+                25,
+                classes_map,
+                from_penile=from_penile
+            )
+
+        model_scores.fit(X_augmented_train, y_augmented_train)
+
+        h1_h2_probs_test = model_scores.predict_proba(
+            X_augmented_test,
+            y_augmented_matrix,
+            mixture_classes_in_single_cell_type,
+            classes_map,
+            MAX_LR
+        )
+
+        calibrators_per_class = calibration_fit(h1_h2_probs_test, classes_map)
+
+        pickle.dump(model_scores, open(model_file_name, 'wb'))
+        pickle.dump(calibrators_per_class, open('calibrators_per_class', 'wb'))
     else:
-        model = pickle.load(open(model_file_name, 'rb'))
+        model_scores = pickle.load(open(model_file_name, 'rb'))
+        calibrators_per_class = pickle.load(open('calibrators_per_class', 'rb'))
+
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+            X_train,
+            y_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -988,42 +1018,27 @@ if __name__ == '__main__':
         )
 
     # calculate the probs from test data with the MLP model trained on train data
-    evaluate_model(
-        model,
-        'train',
-        X_train,
-        y_train,
-        y_augmented_matrix,
-        mixture_classes_in_single_cell_type,
-        classes_map,
-        MAX_LR
-    )
+    # evaluate_model(
+    #     model_scores,
+    #     'train',
+    #     X_train,
+    #     y_train,
+    #     y_augmented_matrix,
+    #     mixture_classes_in_single_cell_type,
+    #     classes_map,
+    #     MAX_LR
+    # )å
 
-    # TODO: Calibrate the model on the calibration data
-    X_calibrate, y_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
-        augment_data(
-            X_raw_singles_calibrate,
-            y_raw_singles_calibrate,
-            n_single_cell_types,
-            n_features,
-            N_SAMPLES_PER_COMBINATION,
-            classes_map,
-            from_penile=from_penile
-    )
-
-
-    # TODO: Test all on mixture data --> use the calibrated model to calculate the scores.
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(
         n_single_cell_types - 1,
         n_features,
         classes_map
     )
 
-
     if retrain:
         X_augmented, y_augmented, _, _ = augment_data(
-            X_raw_singles_train,
-            y_raw_singles_train,
+            X_train,
+            y_train,
             n_single_cell_types,
             n_features,
             N_SAMPLES_PER_COMBINATION,
@@ -1048,19 +1063,20 @@ if __name__ == '__main__':
             y_mixtures_matrix
     )
 
-    h1_h2_probs_mixture = evaluate_model(
-        model,
-        'test mixtures',
+    h1_h2_probs_mixture = model_scores.predict_proba(
         combine_samples(X_mixtures),
-        y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
         mixture_classes_in_classes_to_evaluate,
         classes_map_updated,
         MAX_LR
     )
 
+    # transform the probabilities with the calibrated models
+    # TODO: How to take into account the combined classes (e.g. vaginal + menstrual)?
+    h1_h2_after_calibration_mixture = calibration_transform(h1_h2_probs_mixture, classes_map_updated)
+
     plot_for_experimental_mixture_data(
-        combine_samples(X_mixtures, n_features),
+        combine_samples(X_mixtures),
         y_mixtures,
         y_mixtures_classes_to_evaluate_n_hot,
         inv_test_map,
@@ -1070,4 +1086,4 @@ if __name__ == '__main__':
         dists_from_xmixtures_to_closest_augmented
     )
 
-    #plot_calibration(h1_h2_probs_mixture, classes_to_evaluate)
+    plot_calibration(h1_h2_probs_mixture, classes_to_evaluate)

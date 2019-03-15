@@ -1,36 +1,31 @@
-import numpy as np
-import pickle
-
 from sklearn.neural_network import MLPClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
 from reimplementation import *
 
 class ScoresMLP():
 
-    def __init__(self):
-        self._mlp = MLPClassifier()
+    def __init__(self, random_state=0):
+        self._mlp = MLPClassifier(random_state=random_state)
 
     def fit(self, X, y):
         """
-        Fit train data with MLP
+        Train MLP model.
         """
-        results = self._mlp.fit(X, y)
-        return results
+        self._mlp.fit(X, y)
+        return self
 
-    def predict(self, X):
-        """
-        Predict scores
-        """
-        y_pred = self._mlp.predict(X)
-        return y_pred
 
-    def predict_proba(self, X, labels_in_class, y_n_hot):
-        y_prob = self._mlp.predict_proba(X)
+    def predict_proba(self, Xtest, y_n_hot, labels_in_class, classes_map, MAX_LR):
+        """
+        Predicts probabilties per class.
+        """
+        ypred_proba = self._mlp.predict_proba(Xtest)
 
         h1_h2_probs_per_class = {}
         # marginal for each single class sample
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-            y_prob, labels_in_class, classes_map, MAX_LR)
+            ypred_proba, labels_in_class, classes_map, MAX_LR)
         for j in range(y_n_hot.shape[1]):
             cell_type = list(classes_map.keys())[list(classes_map.values()).index(j)]
             # get the probability per single class sample
@@ -41,14 +36,3 @@ class ScoresMLP():
                 h1_h2_probs_per_class[cell_type] = (probas_with_cell_type, probas_without_cell_type)
 
         return h1_h2_probs_per_class
-
-
-if __name__ == '__main__':
-    model = ScoresMLP()
-    X_augmented_train = pickle.load(open('X_augmented_train', 'rb'))
-    y_augmented_train = pickle.load(open('y_augmented_train', 'rb'))
-    X_augmented_test = pickle.load(open('X_augmented_test', 'rb'))
-
-    model.fit(X_augmented_train, y_augmented_train)
-    test = model.predict(X_augmented_test)
-
