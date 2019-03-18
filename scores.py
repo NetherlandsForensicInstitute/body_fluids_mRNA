@@ -25,13 +25,14 @@ class ScoresMLP():
         # marginal for each single class sample
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
             ypred_proba, labels_in_class, classes_map, MAX_LR)
-        for j in range(y_n_hot.shape[1]):
-            cell_type = list(classes_map.keys())[list(classes_map.values()).index(j)]
+        for idx, celltype in enumerate(sorted((classes_map))):
+            print(celltype)
+            i_celltype = classes_map[celltype]
             # get the probability per single class sample
-            total_proba = prob_per_class[:, j]
+            total_proba = prob_per_class[:, idx]
             if sum(total_proba) > 0:
-                probas_without_cell_type = total_proba[y_n_hot[:, j] == 0]
-                probas_with_cell_type = total_proba[y_n_hot[:, j] == 1]
-                h1_h2_probs_per_class[cell_type] = (probas_with_cell_type, probas_without_cell_type)
+                probas_without_cell_type = total_proba[y_n_hot[:, i_celltype] == 0]
+                probas_with_cell_type = total_proba[y_n_hot[:, i_celltype] == 1]
+                h1_h2_probs_per_class[celltype] = (probas_with_cell_type, probas_without_cell_type)
 
         return h1_h2_probs_per_class
