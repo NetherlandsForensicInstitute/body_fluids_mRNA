@@ -77,7 +77,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
 
     """
     df, rv = read_df(filename, binarize)
-    rv_max = rv['replicate_value'].max()
     class_labels = np.array(df.index)
     # penile skin should be treated separately
     classes_set = set(class_labels)
@@ -98,7 +97,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                (not developing or ('Skin' not in clas and 'Blank' not in clas))
                and (include_blank or 'Blank' not in clas)]
     n_per_class = Counter(classes) # This is not the final number per class!
-                                   # Samples can be discarded later on.
+                                   # Samples may be discarded later on.
     n_features = len(df.columns)
 
     X_raw = []
@@ -109,10 +108,10 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                 # Implement which make pairs of replicates
                 data_for_this_label = np.array(df.loc[clas])
                 rv_set_per_class = np.array(rv.loc[clas]).flatten()
-                # Save the index when a 'new sample' starts and save in
-                # end_replicate. This is when the next integer is lower or equal
-                # than the current integer. (e.g. 4 > 1 or 2 == 2).
-                end_replicate = [ i for i in range(1, len(rv_set_per_class)) if
+                # Save the index when a 'new sample' starts in end_replicate.
+                # This is when the next integer is lower or equal
+                # than the current integer (e.g. 4 > 1 or 2 == 2).
+                end_replicate = [i for i in range(1, len(rv_set_per_class)) if
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
                 n_full_samples = len(end_replicate)+1
@@ -269,6 +268,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
     ), dtype=int)
     mixtures_containing_single_cell_type = {celltype: [] for celltype in classes_map}
 
+    # for each possible combination augment N_SAMPLES_PER_COMBINATION
     for i in range(2 ** n_single_cell_types_not_penile):
         binary = bin(i)[2:]
         while len(binary) < n_single_cell_types_not_penile:
@@ -341,15 +341,13 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classe
     """
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
     for idx, celltype in enumerate(sorted(classes_map)):
-        print(celltype)
-        #i_celltype = classes_map[celltype]
+        i_celltype = classes_map[celltype]
         if len(labels_in_class[celltype]) > 0:
-            res_prob[:, idx] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
+            res_prob[:, i_celltype] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
     epsilon = 10 ** -MAX_LR
     res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
     res_prob = np.where(res_prob < epsilon, epsilon, res_prob)
 
-    # TODO: res_prob order of columns not sequential when single cell types removed
     return res_prob
 
 
@@ -708,24 +706,27 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
         if celltype not in classes_map:
             del mixture_classes_in_classes_to_evaluate[celltype]
 
+    # change the classes map integers
+    classes_map_to_evaluate = classes_map.copy()
+    for idx, celltype in enumerate(sorted(classes_map_to_evaluate)):
+        classes_map_to_evaluate[celltype] = idx
+
     y_combi = np.zeros((len(y_mixtures), len(class_combinations_to_evaluate)))
-    classes_map_updated = classes_map.copy()
     for i_combination, combination in enumerate(class_combinations_to_evaluate):
         labels = []
         str_combination = ''
         for k, cell_type in enumerate(combination):
             labels += mixture_classes_in_single_cell_type[cell_type]
-            if k == 0:
+            if k < len(combination)-1:
                 str_combination += cell_type + ' and/or '
             else:
                 str_combination += cell_type
         mixture_classes_in_classes_to_evaluate[str_combination] = (list(set(labels)))
-        classes_map_updated[str_combination] = len(classes_map_updated) + i_combination + 1
+        classes_map_to_evaluate[str_combination] = len(classes_map_to_evaluate) + i_combination
         for i in set(labels):
-            # TODO: Does it have to be y_mixtures rather than y_test
             y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
 
-    return mixture_classes_in_classes_to_evaluate, classes_map_updated, \
+    return mixture_classes_in_classes_to_evaluate, classes_map_to_evaluate, \
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
@@ -762,7 +763,7 @@ def split_data(X, y, size=(0.4, 0.4)):
 
     indices_classes = indices_per_class(y)
 
-    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = ([] for i in range(6))
+    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = ([] for _ in range(6))
 
     for indices_class in indices_classes:
         indices = [i for i in range(len(indices_class))]
@@ -779,10 +780,10 @@ def split_data(X, y, size=(0.4, 0.4)):
         y_test.extend([y_for_class[k] for k in test_index])
 
     print("The actual distribution (train, calibration, test) is ({}, {}, {})".format(
-        len(X_train)/X.shape[0],
-        len(X_calibrate)/X.shape[0],
-        len(X_test)/X.shape[0]
-    ))
+        round(len(X_train)/X.shape[0], 3),
+        round(len(X_calibrate)/X.shape[0], 3),
+        round(len(X_test)/X.shape[0], 3))
+    )
 
     X_train = np.array(X_train)
     X_calibrate = np.array(X_calibrate)
@@ -799,7 +800,7 @@ if __name__ == '__main__':
     # TODO: Make this function work
     #plot_data(X_raw_singles)
     n_folds = 1
-    N_SAMPLES_PER_COMBINATION = 26
+    N_SAMPLES_PER_COMBINATION = 50
     MAX_LR = 10
     from_penile = False
     retrain = True
@@ -810,14 +811,25 @@ if __name__ == '__main__':
     # which classes should we compute marginals for? all single cell types and a 'contains vaginal' class?
     # '-1' to avoid the penile skin
     single_cell_classes = [inv_classes_map[j] for j in range(n_single_cell_types - 1)]
-    # example when Saliva is removed
-    classes_excluded = ['Semen.fertile', 'Semen.sterile', 'Blood']
+    classes_included = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa']
+    classes_excluded = [clas for clas in single_cell_classes if clas not in classes_included]
     for class_excluded in classes_excluded:
         single_cell_classes.remove(class_excluded)
     class_combinations_to_evaluate = [['Vaginal.mucosa', 'Menstrual.secretion']]
-    classes_to_evaluate = single_cell_classes + [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
+    class_combinations_to_evaluate_combined = [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
+    classes_to_evaluate = single_cell_classes + class_combinations_to_evaluate_combined
 
-    # adjust classes map
+    # extend original classes map with new combined classes
+    classes_map_full = classes_map.copy()
+    if from_penile:
+        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
+            classes_map_full[combination] = len(classes_map) + idx
+    else:
+        del classes_map_full['Skin.penile']
+        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
+            classes_map_full[combination] = len(classes_map)-1 + idx
+
+    # adjust classes map for evaluation
     classes_map_to_evaluate = classes_map.copy()
     for key in list(classes_map_to_evaluate):
         if key not in classes_to_evaluate:
@@ -825,7 +837,7 @@ if __name__ == '__main__':
 
     # Split the data in two equal parts: for training and calibration
     X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
-        split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
+        split_data(X_raw_singles, y_raw_singles)
 
     if retrain:
         # NB penile skin treated like all others for classify_single
@@ -837,7 +849,7 @@ if __name__ == '__main__':
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
             X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
-                split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
+                split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.2))
 
             # augment the train part of the data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = \
@@ -859,6 +871,7 @@ if __name__ == '__main__':
             )
 
             # TODO get the mixture data from dorum
+
             model_scores.fit(X_augmented_train, y_augmented_train)
 
             # augment calibration data to calibrate the model with
@@ -869,18 +882,19 @@ if __name__ == '__main__':
                         y_calibrate,
                         n_single_cell_types,
                         n_features,
-                        N_SAMPLES_PER_COMBINATION,
+                        3,
                         classes_map,
                         from_penile=from_penile
                     )
 
-            mixture_classes_in_classes_to_evaluate_calibration, classes_map_updated, y_augmented_calibration_updated = \
-                create_information_on_classes_to_evaluate(
-                    mixture_classes_in_single_cell_type_calibration,
-                    classes_map_to_evaluate,
-                    class_combinations_to_evaluate,
-                    y_calibrate_augmented,
-                    y_augmented_matrix_calibrate
+            # create information depending on the cell types of interest
+            mixture_classes_in_classes_to_evaluate_calibration, classes_map_updated, \
+                y_augmented_calibration_updated = create_information_on_classes_to_evaluate(
+                mixture_classes_in_single_cell_type_calibration,
+                classes_map_to_evaluate,
+                class_combinations_to_evaluate,
+                y_calibrate_augmented,
+                y_augmented_matrix_calibrate
             )
 
             h1_h2_probs_calibration = model_scores.predict_proba_per_class(
@@ -888,6 +902,7 @@ if __name__ == '__main__':
                 y_augmented_calibration_updated,
                 mixture_classes_in_classes_to_evaluate_calibration,
                 classes_map_updated,
+                classes_map_full,
                 MAX_LR
             )
 
@@ -898,11 +913,12 @@ if __name__ == '__main__':
                     y_test,
                     n_single_cell_types,
                     n_features,
-                    25,
+                    N_SAMPLES_PER_COMBINATION,
                     classes_map,
                     from_penile=from_penile
             )
 
+            # create information depending on the cell types of interest
             mixture_classes_in_classes_to_evaluate, _, y_augmented_test_updated = \
                 create_information_on_classes_to_evaluate(
                     mixture_classes_in_single_cell_type,
@@ -917,8 +933,24 @@ if __name__ == '__main__':
                 y_augmented_test_updated,
                 mixture_classes_in_classes_to_evaluate,
                 classes_map_updated,
+                classes_map_full,
                 MAX_LR
             )
+
+            # check correlation between vag, menstr and vag+menstr
+            # h1_h2_vag = np.append(h1_h2_probs_test['Vaginal.mucosa'][0], h1_h2_probs_test['Vaginal.mucosa'][1])
+            # h1_h2_menstr = np.append(h1_h2_probs_test['Menstrual.secretion'][0], h1_h2_probs_test['Menstrual.secretion'][1])
+            # h1_h2_vagmenstr = np.append(h1_h2_probs_test['Vaginal.mucosa and/or Menstrual.secretion'][0],
+            #                             h1_h2_probs_test['Vaginal.mucosa and/or Menstrual.secretion'][1])
+            # h1_h2_saliva = np.append(h1_h2_probs_test['Saliva'][0], h1_h2_probs_test['Saliva'][1])
+            # h1_h2_skin = np.append(h1_h2_probs_test['Skin'][0], h1_h2_probs_test['Skin'][1])
+            # h1_h2_nas = np.append(h1_h2_probs_test['Nasal.mucosa'][0], h1_h2_probs_test['Nasal.mucosa'][1])
+            #
+            # print(np.corrcoef([h1_h2_vagmenstr, h1_h2_vag, h1_h2_menstr]))
+            # print(np.corrcoef(h1_h2_menstr, h1_h2_vagmenstr))
+            # print(np.corrcoef(h1_h2_saliva, h1_h2_vagmenstr))
+            # print(np.corrcoef(h1_h2_skin, h1_h2_vagmenstr))
+            # print(np.corrcoef(h1_h2_nas, h1_h2_vagmenstr))
 
             # fit calibrated models
             calibrators_per_class = calibration_fit(h1_h2_probs_calibration, classes_map_updated)
@@ -937,13 +969,17 @@ if __name__ == '__main__':
                 #     class_combinations_to_evaluate
                 # )
 
+                idxs = []
+                for celltype in sorted(classes_map_updated):
+                    idxs.append(classes_map_full[celltype])
+
                 # plots before calibration making use of probabilities
                 plot_histogram_log_lr(h1_h2_probs_test, title='before')
-                plot_reliability_plot(h1_h2_probs_test, y_augmented_test_updated, title='before')
+                plot_reliability_plot(h1_h2_probs_test, y_augmented_test_updated[:, idxs], title='before')
 
                 # plots after calibration making use of probabilities
                 plot_histogram_log_lr(h1_h2_after_calibration, title='after')
-                plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_updated, title='after')
+                plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_updated[:, idxs], title='after')
 
                 # make pav plots before and after calibration making use of loglrs]
                 h1_h2_lrs_test = {}
@@ -958,9 +994,8 @@ if __name__ == '__main__':
                     h1_h2_lrs_after_calibration[celltype] = [h1_h2_celltype_calib[i] / (1 - h1_h2_celltype_calib[i]) for i in
                                                 range(len(h1_h2_celltype_calib))]
 
-                y = np.sort(y_augmented_matrix, axis=0)[::-1]
-                pav.plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, on_screen=True)
-
+                y = np.sort(y_augmented_test_updated[:, idxs], axis=0)[::-1]
+                pav.plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=True)
 
         X_augmented_train, y_augmented_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             X_train,

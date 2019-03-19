@@ -15,7 +15,7 @@ class ScoresMLP():
         return self
 
 
-    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, MAX_LR):
+    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, classes_map_full, MAX_LR):
         """
         Predicts probabilties per class.
         """
@@ -26,13 +26,13 @@ class ScoresMLP():
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
             ypred_proba, labels_in_class, classes_map, MAX_LR)
         for idx, celltype in enumerate(sorted((classes_map))):
-            print(celltype)
             i_celltype = classes_map[celltype]
+            i_celltype_full = classes_map_full[celltype]
             # get the probability per single class sample
-            total_proba = prob_per_class[:, idx]
+            total_proba = prob_per_class[:, i_celltype]
             if sum(total_proba) > 0:
-                probas_without_cell_type = total_proba[y_n_hot[:, i_celltype] == 0]
-                probas_with_cell_type = total_proba[y_n_hot[:, i_celltype] == 1]
+                probas_without_cell_type = total_proba[y_n_hot[:, i_celltype_full] == 0]
+                probas_with_cell_type = total_proba[y_n_hot[:, i_celltype_full] == 1]
                 h1_h2_probs_per_class[celltype] = (probas_with_cell_type, probas_without_cell_type)
 
         return h1_h2_probs_per_class
