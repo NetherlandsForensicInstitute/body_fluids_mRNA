@@ -16,8 +16,6 @@ from tqdm import tqdm
 
 from metrics import get_lr_metrics
 from calibrations import *
-from lir.calibration import IsotonicCalibrator
-from lir import pav
 from scores import *
 
 
@@ -431,11 +429,10 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
     return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
 
 
-def boxplot_per_single_class_category(X_augmented_test,
+def boxplot_per_single_class_category(y_prob_per_class,
                                       y_augmented_matrix,
                                       classes_to_evaluate,
-                                      mixtures_in_classes_of_interest,
-                                      class_combinations_to_evaluate):
+                                      classes_combinations_to_evaluate):
     """
     for single cell type, plot the distribution of marginal LRs for each cell type,
     as well as for specified combinations of classes.
@@ -451,30 +448,45 @@ def boxplot_per_single_class_category(X_augmented_test,
         combinations of single cell types to consider
     :return: None
     """
-    # TODO: Change the calculation of y_prob
+
+    classes_only_single = classes_to_evaluate.copy()
+    for celltype, i_celltype in classes_to_evaluate.items():
+        if 'and/or' in celltype:
+            del classes_only_single[celltype]
+
     n_single_classes_to_draw = y_augmented_matrix.shape[1]
-    y_prob = model.predict_proba(X_augmented_test)
-    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
+    # y_prob = model.predict_proba(X_augmented_test)
+    # y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+    #     y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-    plt.subplots(2, 5, figsize=(18, 9))
-    for i in range(n_single_classes_to_draw):
+    plt.subplots(2, int(n_single_classes_to_draw/2), figsize=(18, 9))
+    for i, celltype in enumerate(classes_to_evaluate):
+        i_celltype = classes_to_evaluate[celltype]
         indices = [j for j in range(y_augmented_matrix.shape[0]) if
-                   y_augmented_matrix[j, i] == 1 and sum(y_augmented_matrix[j, :]) == 1]
-        plt.subplot(2, 5, i + 1)
+                   y_augmented_matrix[j, i_celltype] == 1
+                   and sum(y_augmented_matrix[j, :]) == 1]
+        plt.subplot(2, int(n_single_classes_to_draw/2), i + 1)
         plt.xlim([-MAX_LR -.5, MAX_LR+.5])
         bplot = plt.boxplot(log_lrs_per_class[indices, :], vert=False,
                             labels=classes_to_evaluate, patch_artist=True)
         colors = ['white'] * (n_single_classes_to_draw + 1)
-        colors[i] = 'black'
-        for j, comb in enumerate(class_combinations_to_evaluate):
-            if inv_classes_map[i] in comb:
+        colors[i_celltype] = 'black'
+        for j, comb in enumerate(classes_combinations_to_evaluate):
+            if celltype in comb:
                 colors[n_single_classes_to_draw + j] = 'black'
         for patch, color in zip(bplot['boxes'], colors):
             patch.set_facecolor(color)
+        plt.title(celltype)
+    plt.show()
 
-        plt.title(inv_classes_map[i])
-    plt.savefig('singles boxplot')
+    #     for j, comb in enumerate(class_combinations_to_evaluate):
+    #         if inv_classes_map[i] in comb:
+    #             colors[n_single_classes_to_draw + j] = 'black'
+    #     for patch, color in zip(bplot['boxes'], colors):
+    #         patch.set_facecolor(color)
+    #
+    #     plt.title(inv_classes_map[i])
+    # plt.savefig('singles boxplot')
 
 
 def plot_for_experimental_mixture_data(X_mixtures,
@@ -792,6 +804,15 @@ def split_data(X, y, size=(0.4, 0.4)):
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
+def probs_to_lrs(h1_h2_probs, classes_map):
+    h1_h2_lrs_test = {}
+    for celltype in sorted(classes_map):
+        h1_h2_celltype = h1_h2_probs[celltype]
+        h1_h2_lrs_test[celltype] = [h1_h2_celltype[i] / (1 - h1_h2_celltype[i]) for i in
+                                    range(len(h1_h2_celltype))]
+    return h1_h2_lrs_test
+
+
 if __name__ == '__main__':
     developing = False
     include_blank = False
@@ -800,7 +821,7 @@ if __name__ == '__main__':
     # TODO: Make this function work
     #plot_data(X_raw_singles)
     n_folds = 1
-    N_SAMPLES_PER_COMBINATION = 50
+    N_SAMPLES_PER_COMBINATION = 4
     MAX_LR = 10
     from_penile = False
     retrain = True
@@ -849,7 +870,7 @@ if __name__ == '__main__':
         for n in range(n_folds):
             # TODO this is not nfold, but independently random
             X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
-                split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.2))
+                split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
 
             # augment the train part of the data to train the MLP model on
             X_augmented_train, y_augmented_train, _, _ = \
@@ -882,7 +903,7 @@ if __name__ == '__main__':
                         y_calibrate,
                         n_single_cell_types,
                         n_features,
-                        3,
+                        N_SAMPLES_PER_COMBINATION,
                         classes_map,
                         from_penile=from_penile
                     )
@@ -937,21 +958,6 @@ if __name__ == '__main__':
                 MAX_LR
             )
 
-            # check correlation between vag, menstr and vag+menstr
-            # h1_h2_vag = np.append(h1_h2_probs_test['Vaginal.mucosa'][0], h1_h2_probs_test['Vaginal.mucosa'][1])
-            # h1_h2_menstr = np.append(h1_h2_probs_test['Menstrual.secretion'][0], h1_h2_probs_test['Menstrual.secretion'][1])
-            # h1_h2_vagmenstr = np.append(h1_h2_probs_test['Vaginal.mucosa and/or Menstrual.secretion'][0],
-            #                             h1_h2_probs_test['Vaginal.mucosa and/or Menstrual.secretion'][1])
-            # h1_h2_saliva = np.append(h1_h2_probs_test['Saliva'][0], h1_h2_probs_test['Saliva'][1])
-            # h1_h2_skin = np.append(h1_h2_probs_test['Skin'][0], h1_h2_probs_test['Skin'][1])
-            # h1_h2_nas = np.append(h1_h2_probs_test['Nasal.mucosa'][0], h1_h2_probs_test['Nasal.mucosa'][1])
-            #
-            # print(np.corrcoef([h1_h2_vagmenstr, h1_h2_vag, h1_h2_menstr]))
-            # print(np.corrcoef(h1_h2_menstr, h1_h2_vagmenstr))
-            # print(np.corrcoef(h1_h2_saliva, h1_h2_vagmenstr))
-            # print(np.corrcoef(h1_h2_skin, h1_h2_vagmenstr))
-            # print(np.corrcoef(h1_h2_nas, h1_h2_vagmenstr))
-
             # fit calibrated models
             calibrators_per_class = calibration_fit(h1_h2_probs_calibration, classes_map_updated)
 
@@ -961,42 +967,49 @@ if __name__ == '__main__':
             if n == 0:
                 # only plot single class performance once
                 # TODO: Make this function work
-                # boxplot_per_single_class_category(
-                #     X_augmented_test,
-                #     y_augmented_matrix,
-                #     classes_to_evaluate,
-                #     mixture_classes_in_classes_to_evaluate,
-                #     class_combinations_to_evaluate
-                # )
+                prob_per_class_test = model_scores.predict_proba(
+                    X_calibrate_augmented,
+                    mixture_classes_in_classes_to_evaluate_calibration,
+                    classes_map_updated,
+                    MAX_LR
+                )
+
+                # Check correlation
+                print('Cor(Vag, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 4], prob_per_class_test[:, 5]))
+                print('Cor(Menstr, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 0], prob_per_class_test[:, 5]))
+                print('Cor(Vag+Menstr, VagMenstr):\n',
+                      np.corrcoef(np.sum([prob_per_class_test[:, 0], prob_per_class_test[:, 4]], axis=0), prob_per_class_test[:, 5]))
 
                 idxs = []
                 for celltype in sorted(classes_map_updated):
                     idxs.append(classes_map_full[celltype])
+                y_augmented_test_relevant = y_augmented_test_updated[:, idxs]
+
+                # TODO: Make this plot work
+                boxplot_per_single_class_category(
+                    prob_per_class_test,
+                    y_augmented_test_relevant,
+                    classes_map_updated,
+                    class_combinations_to_evaluate
+                )
 
                 # plots before calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_probs_test, title='before')
-                plot_reliability_plot(h1_h2_probs_test, y_augmented_test_updated[:, idxs], title='before')
+                plot_histogram_log_lr(h1_h2_probs_test, title='before', density=True)
+                plot_reliability_plot(h1_h2_probs_test, y_augmented_test_relevant, title='before')
 
                 # plots after calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_after_calibration, title='after')
-                plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_updated[:, idxs], title='after')
+                plot_histogram_log_lr(h1_h2_after_calibration, title='after', density=True)
+                plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_relevant, title='after')
 
-                # make pav plots before and after calibration making use of loglrs]
-                h1_h2_lrs_test = {}
-                for celltype in sorted(classes_map_updated):
-                    h1_h2_celltype = h1_h2_probs_test[celltype]
-                    h1_h2_lrs_test[celltype] = [h1_h2_celltype[i] / (1 - h1_h2_celltype[i]) for i in
-                                                range(len(h1_h2_celltype))]
+                # make pav plots before and after calibration making use of loglrs
+                h1_h2_lrs_test = probs_to_lrs(h1_h2_probs_test, classes_map_updated)
+                h1_h2_lrs_after_calibration = probs_to_lrs(h1_h2_after_calibration, classes_map_updated)
 
-                h1_h2_lrs_after_calibration = {}
-                for celltype in sorted(classes_map_updated):
-                    h1_h2_celltype_calib = h1_h2_after_calibration[celltype]
-                    h1_h2_lrs_after_calibration[celltype] = [h1_h2_celltype_calib[i] / (1 - h1_h2_celltype_calib[i]) for i in
-                                                range(len(h1_h2_celltype_calib))]
+                y = np.sort(y_augmented_test_relevant, axis=0)[::-1]
+                pav.plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=False,
+                                       path='pav_plot_lowcalibN')
 
-                y = np.sort(y_augmented_test_updated[:, idxs], axis=0)[::-1]
-                pav.plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=True)
-
+                # plt.show()
         X_augmented_train, y_augmented_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             X_train,
             y_train,
@@ -1024,7 +1037,7 @@ if __name__ == '__main__':
                 y_test,
                 n_single_cell_types,
                 n_features,
-                25,
+                4,
                 classes_map,
                 from_penile=from_penile
             )

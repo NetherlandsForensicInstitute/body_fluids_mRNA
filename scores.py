@@ -1,7 +1,7 @@
 from sklearn.neural_network import MLPClassifier
 
 from reimplementation import *
-
+import numpy as np
 class ScoresMLP():
 
     def __init__(self, random_state=0):
@@ -25,6 +25,7 @@ class ScoresMLP():
         # marginal for each single class sample
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
             ypred_proba, labels_in_class, classes_map, MAX_LR)
+
         for idx, celltype in enumerate(sorted((classes_map))):
             i_celltype = classes_map[celltype]
             i_celltype_full = classes_map_full[celltype]
@@ -36,3 +37,15 @@ class ScoresMLP():
                 h1_h2_probs_per_class[celltype] = (probas_with_cell_type, probas_without_cell_type)
 
         return h1_h2_probs_per_class
+
+    def predict_proba(self, Xtest, labels_in_class, classes_map, MAX_LR):
+        """
+        Predicts probabilties per class.
+        """
+        ypred_proba = self._mlp.predict_proba(Xtest)
+
+        # marginal for each single class sample
+        prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+            ypred_proba, labels_in_class, classes_map, MAX_LR)
+
+        return prob_per_class
