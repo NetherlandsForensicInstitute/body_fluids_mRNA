@@ -14,28 +14,37 @@ from lir.util import *
 from lir.pav import *
 
 
-def plot_histogram_log_lr(h1_h2_probs, n_bins=30, title='before', density=None):
+def plot_histogram_log_lr(h1_h2_lrs, n_bins=30, title='before', density=None):
 
-    celltypes = list(h1_h2_probs.keys())
+    celltypes = list(h1_h2_lrs.keys())
     bins = np.linspace(-10, 10, n_bins)
-    plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9/4*len(celltypes)))
-    plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
+    plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9/4*len(celltypes)), sharey='row')
+    # plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
+
+    minimum_lik = np.min([min(np.append(h1_h2_lrs[celltype][0], h1_h2_lrs[celltype][1])) for celltype in celltypes])
+    maximum_lik = np.max([max(np.append(h1_h2_lrs[celltype][0], h1_h2_lrs[celltype][1])) for celltype in celltypes])
+    outer_lik = max(abs(minimum_lik), abs(maximum_lik))
+
     for idx, celltype in enumerate(celltypes):
-        log_likrats1 = np.log10(h1_h2_probs[celltype][0] / (1 - h1_h2_probs[celltype][0]))
-        log_likrats2 = np.log10(h1_h2_probs[celltype][1] / (1 - h1_h2_probs[celltype][1]))
+        log_likrats1 = h1_h2_lrs[celltype][0]
+        log_likrats2 = h1_h2_lrs[celltype][1]
 
         ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
         plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
                  label=["h1", "h2"], density=density)
-        plt.axvline(x=0, color='k', linestyle='-')
+        # plt.axvline(x=0, color='k', linestyle='-') # plots vertical line at x=0
         plt.legend(loc='upper right')
+        # plt.ylim(0, 1.5)
+        if title == 'after':
+            plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
         plt.ylabel("Frequency")
         plt.xlabel("log LR with n_bins {}".format(n_bins))
-        plt.title(celltype)
-        plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
-                 ha='center', va='center', transform=ax.transAxes)
+        plt.title(celltype, fontsize=16)
+        # plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
+        #          ha='center', va='center', transform=ax.transAxes)
     # plt.show()
-    plt.savefig('histogram_log_lr_lowcalibN_{}'.format(title))
+    plt.tight_layout()
+    plt.savefig('histogram_log_lr_report_{}'.format(title))
 
 
 def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
@@ -61,11 +70,12 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
                  label=celltype)
         plt.xlabel("Probabilities with n_bins {}".format(len(empirical_prob_pos)))
         plt.ylabel("Empirical probability")
-        plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
-                 ha='center', va='center', transform=ax.transAxes)
+        # plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
+        #          ha='center', va='center', transform=ax.transAxes)
         plt.legend(loc=9)
     # plt.show()
-    plottitle = "Reliability plot {} calibration lowcalibN".format(title).replace(" ", "_").lower()
+    plottitle = "Reliability plot {} calibration report".format(title).replace(" ", "_").lower()
+    plt.tight_layout()
     plt.savefig(plottitle)
 
 
@@ -131,7 +141,7 @@ def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True,
     """
 
     celltypes = lrs_before.keys()
-    fig, axs = plt.subplots(len(list(celltypes)), 2, figsize=(9, int(9 / 4 * len(list(celltypes)))))
+    fig, axs = plt.subplots(len(list(celltypes)), 2, figsize=(9, int(9 / 2 * len(list(celltypes)))))
     for idx, celltype in enumerate(sorted(celltypes)):
         i_celltype = classes_map[celltype]
         lrs_celltype_before = np.append(lrs_before[celltype][0], lrs_before[celltype][1])
@@ -149,11 +159,12 @@ def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True,
         all_llrs[all_llrs == np.inf] = 0
         xrange = [all_llrs.min() - .5, all_llrs.max() + .5]
 
+        axs[i_celltype, 0].axis('equal')
         axs[i_celltype, 0].axis(xrange + xrange)
         axs[i_celltype, 0].plot(xrange, xrange)  # rechte lijn door de oorsprong
 
         pav_x = np.arange(*xrange, .01)
-        axs[i_celltype, 0].set_title(celltype + "\n" + " before calibration")
+        axs[i_celltype, 0].set_title(celltype + "\n" + " before calibration", fontsize=12)
         axs[i_celltype, 0].plot(pav_x, pav_before.transform(pav_x))  # pre-/post-calibrated lr fit
         axs[i_celltype, 0].grid(True, linestyle=':')
         if show_scatter:
@@ -163,18 +174,19 @@ def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True,
         pav_after = PavLogLR()
         pav_llrs_after = pav_after.fit_transform(llrs_celltype_after, y[:, i_celltype])
 
+        axs[i_celltype, 1].axis('equal')
         axs[i_celltype, 1].axis(xrange + xrange)
         axs[i_celltype, 1].plot(xrange, xrange)  # rechte lijn door de oorsprong
 
         pav_x = np.arange(*xrange, .01)
-        axs[i_celltype, 1].set_title(celltype + "\n" + "after calibration")
+        axs[i_celltype, 1].set_title(celltype + "\n" + "after calibration", fontsize=12)
         axs[i_celltype, 1].plot(pav_x, pav_after.transform(pav_x))  # pre-/post-calibrated lr fit
         axs[i_celltype, 1].grid(True, linestyle=':')
         if show_scatter:
             axs[i_celltype, 1].scatter(llrs_celltype_after, pav_llrs_after)  # scatter plot of measured lrs
 
-    fig.text(0.5, 0.001, 'pre-calibrated 10log(lr)', ha='center', fontsize=14)
-    fig.text(0.01, 0.5, 'post-calibrated 10log(lr)', va='center', rotation='vertical', fontsize=14)
+    fig.text(0.5, 0.001, 'pre-PAVcalibrated 10log(lr)', ha='center', fontsize=14)
+    fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical', fontsize=14)
 
     if on_screen:
         plt.figure()
@@ -183,7 +195,6 @@ def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True,
         plt.savefig(path)
 
     # plt.close(fig)
-        
 
 
 

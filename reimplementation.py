@@ -804,13 +804,20 @@ def split_data(X, y, size=(0.4, 0.4)):
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
-def probs_to_lrs(h1_h2_probs, classes_map):
-    h1_h2_lrs_test = {}
+def probs_to_lrs(h1_h2_probs, classes_map, log=False):
+    h1_h2_lrs = {}
     for celltype in sorted(classes_map):
-        h1_h2_celltype = h1_h2_probs[celltype]
-        h1_h2_lrs_test[celltype] = [h1_h2_celltype[i] / (1 - h1_h2_celltype[i]) for i in
-                                    range(len(h1_h2_celltype))]
-    return h1_h2_lrs_test
+        if log:
+            h1_h2_celltype = h1_h2_probs[celltype]
+            h1_h2_lrs[celltype] = [np.log10(h1_h2_celltype[i] / (1 - h1_h2_celltype[i])) for i in
+                                        range(len(h1_h2_celltype))]
+
+        else:
+            h1_h2_celltype = h1_h2_probs[celltype]
+            h1_h2_lrs[celltype] = [h1_h2_celltype[i] / (1 - h1_h2_celltype[i]) for i in
+                                        range(len(h1_h2_celltype))]
+
+    return h1_h2_lrs
 
 
 if __name__ == '__main__':
@@ -821,7 +828,7 @@ if __name__ == '__main__':
     # TODO: Make this function work
     #plot_data(X_raw_singles)
     n_folds = 1
-    N_SAMPLES_PER_COMBINATION = 4
+    N_SAMPLES_PER_COMBINATION = 100
     MAX_LR = 10
     from_penile = False
     retrain = True
@@ -934,7 +941,7 @@ if __name__ == '__main__':
                     y_test,
                     n_single_cell_types,
                     n_features,
-                    N_SAMPLES_PER_COMBINATION,
+                    50,
                     classes_map,
                     from_penile=from_penile
             )
@@ -986,28 +993,30 @@ if __name__ == '__main__':
                 y_augmented_test_relevant = y_augmented_test_updated[:, idxs]
 
                 # TODO: Make this plot work
-                boxplot_per_single_class_category(
-                    prob_per_class_test,
-                    y_augmented_test_relevant,
-                    classes_map_updated,
-                    class_combinations_to_evaluate
-                )
+                # boxplot_per_single_class_category(
+                #     prob_per_class_test,
+                #     y_augmented_test_relevant,
+                #     classes_map_updated,
+                #     class_combinations_to_evaluate
+                # )
+
+                h1_h2_lrs_test_log = probs_to_lrs(h1_h2_probs_test, classes_map_updated, log=True)
+                h1_h2_lrs_after_calibration_log = probs_to_lrs(h1_h2_after_calibration, classes_map_updated, log=True)
 
                 # plots before calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_probs_test, title='before', density=True)
+                plot_histogram_log_lr(h1_h2_lrs_test_log, title='before')
                 plot_reliability_plot(h1_h2_probs_test, y_augmented_test_relevant, title='before')
 
                 # plots after calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_after_calibration, title='after', density=True)
+                plot_histogram_log_lr(h1_h2_lrs_after_calibration_log, n_bins=60, title='after')
                 plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_relevant, title='after')
 
-                # make pav plots before and after calibration making use of loglrs
                 h1_h2_lrs_test = probs_to_lrs(h1_h2_probs_test, classes_map_updated)
                 h1_h2_lrs_after_calibration = probs_to_lrs(h1_h2_after_calibration, classes_map_updated)
 
                 y = np.sort(y_augmented_test_relevant, axis=0)[::-1]
-                pav.plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=False,
-                                       path='pav_plot_lowcalibN')
+                plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=False,
+                                       path='pav_plot_report')
 
                 # plt.show()
         X_augmented_train, y_augmented_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
