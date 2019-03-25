@@ -99,7 +99,7 @@ def calculate_standard_error(proportion, nobs, alpha):
 
 
 def plot_proportions(names):
-    fig = plt.figure(figsize=(25, 21))
+    fig = plt.figure(figsize=(50, 45))
     plot_legend = [True, False, False, False, False, False, False]
 
     errors = np.zeros((7, 2, 19))
@@ -121,7 +121,7 @@ def plot_proportions(names):
         # get proportions for all marker values
         proportions = np.array([equation_values_per_marker(
             contingency_table_single, contingency_table_mixt, i, name) for i in range(n_features)])
-        df_proportions = pd.DataFrame({'combination': proportions[:, 0], 'mixed': proportions[:, 1]})
+        df_proportions = pd.DataFrame({'expected': proportions[:, 0], 'empirical': proportions[:, 1]})
 
         # calculate the standard errors so confidence intervals can be plotted
         for mv in range(contingency_table_mixt.shape[1]):
@@ -137,16 +137,19 @@ def plot_proportions(names):
                 alpha=0.05
             )
 
-        ax = plt.subplot(421+idx)
-        df_proportions.plot.bar(width=0.8, ax=ax, legend=plot_legend[idx],
+        ax = plt.subplot(241+idx)
+        df_proportions.plot.bar(width=0.8, ax=ax, legend=None,
                                 yerr=errors[idx, :, :], capsize=4,
-                                color=['mediumblue', 'orange'])
+                                color=['orange', 'mediumblue'],
+                                figsize=(34, 12))
         ax.set_xticklabels(list(df.columns))
-        ax.set_title(name, fontsize=25)
-        plt.ylabel("Proportion")
-        plt.xlabel("Markers")
-        plt.xticks(fontsize=8, rotation=0)
+        ax.set_title(name, fontsize=24)
+        plt.ylabel("Proportion", fontsize=18)
+        plt.xlabel("Markers", fontsize=18)
+        plt.xticks(fontsize=14, rotation=45)
         plt.yticks(fontsize=10)
+        if idx == len(names)-1:
+            plt.legend(loc=9, fontsize=16, bbox_to_anchor=(1.2, 1))
     #plt.show()
     plt.tight_layout()
     plt.savefig("proportions")
@@ -170,6 +173,7 @@ def plot_difference_in_proportions(names):
         ax.set_xticklabels(list(df.columns))
         ax.set_title(name, fontsize=25)
         plt.yticks(np.array([-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0]))
+        plt.legend(fontsize=14)
         plt.ylabel("Absolute difference in proportions")
         plt.xlabel("Markers")
         plt.xticks(fontsize=8, rotation=0)
