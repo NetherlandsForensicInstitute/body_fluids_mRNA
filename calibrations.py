@@ -14,50 +14,50 @@ from lir.util import *
 from lir.pav import *
 
 
-def plot_histogram_log_lr(h1_h2_lrs, n_bins=30, title='before', density=None):
+def plot_histogram_log_lr(h0_h1_lrs, n_bins=30, title='before', density=None, savefig=None, show=None):
 
-    celltypes = list(h1_h2_lrs.keys())
-    bins = np.linspace(-10, 10, n_bins)
+    celltypes = list(h0_h1_lrs.keys())
     plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9/4*len(celltypes)), sharey='row')
     # plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
 
-    minimum_lik = np.min([min(np.append(h1_h2_lrs[celltype][0], h1_h2_lrs[celltype][1])) for celltype in celltypes])
-    maximum_lik = np.max([max(np.append(h1_h2_lrs[celltype][0], h1_h2_lrs[celltype][1])) for celltype in celltypes])
+    minimum_lik = np.min([min(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
+    maximum_lik = np.max([max(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
     outer_lik = max(abs(minimum_lik), abs(maximum_lik))
 
-    for idx, celltype in enumerate(celltypes):
-        log_likrats1 = h1_h2_lrs[celltype][0]
-        log_likrats2 = h1_h2_lrs[celltype][1]
+    for idx, celltype in enumerate(sorted(celltypes)):
+        log_likrats0 = h0_h1_lrs[celltype][0]
+        log_likrats1 = h0_h1_lrs[celltype][1]
 
-        ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
-        plt.hist([log_likrats1, log_likrats2], bins=bins, color=['pink', 'blue'],
-                 label=["h1", "h2"], density=density)
-        # plt.axvline(x=0, color='k', linestyle='-') # plots vertical line at x=0
+        plt.subplot(int(len(celltypes)/2), 2, idx + 1)
+        plt.hist(log_likrats0, density=density, color='orange', label='h0', bins=n_bins, alpha=0.5)
+        plt.hist(log_likrats1, density=density, color='blue', label='h1', bins=n_bins, alpha=0.5)
         plt.legend(loc='upper right')
-        # plt.ylim(0, 1.5)
         if title == 'after':
             plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
-        plt.ylabel("Frequency")
-        plt.xlabel("log LR with n_bins {}".format(n_bins))
+        plt.ylabel("Density")
+        plt.xlabel("10logLR")
         plt.title(celltype, fontsize=16)
         # plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
         #          ha='center', va='center', transform=ax.transAxes)
-    # plt.show()
-    plt.tight_layout()
-    plt.savefig('histogram_log_lr_report_{}'.format(title))
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+    if show or savefig is None:
+        plt.show()
 
 
-def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
+def plot_reliability_plot(h0_h1_probs, y_matrix, title, bins=10, savefig=None, show=None):
 
-    celltypes = list(h1_h2_probs.keys())
+    celltypes = list(h0_h1_probs.keys())
     plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9 / 4 * len(celltypes)))
     plt.suptitle("Reliability plot {} calibration".format(title), size=16)
     for idx, celltype in enumerate(celltypes):
-        h1h2_probs = np.append(h1_h2_probs[celltype][0], h1_h2_probs[celltype][1])
+        h0h1_probs = np.append(h0_h1_probs[celltype][0], h0_h1_probs[celltype][1])
         y_true = sorted(y_matrix[:, idx], reverse=True)
 
         empirical_prob_pos, y_score_bin_mean = calibration_curve(
-            y_true, h1h2_probs, n_bins=bins)
+            y_true, h0h1_probs, n_bins=bins)
 
         ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
         plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
@@ -68,33 +68,35 @@ def plot_reliability_plot(h1_h2_probs, y_matrix, title, bins=10):
                  marker='o',
                  linestyle='-',
                  label=celltype)
-        plt.xlabel("Probabilities with n_bins {}".format(len(empirical_prob_pos)))
+        plt.xlabel("Probability".format(len(empirical_prob_pos)))
         plt.ylabel("Empirical probability")
         # plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
         #          ha='center', va='center', transform=ax.transAxes)
         plt.legend(loc=9)
-    # plt.show()
-    plottitle = "Reliability plot {} calibration report".format(title).replace(" ", "_").lower()
-    plt.tight_layout()
-    plt.savefig(plottitle)
+
+    if savefig is not None:
+        plottitle = "Reliability plot {} calibration lowcalib".format(title).replace(" ", "_").lower()
+        plt.tight_layout()
+        plt.savefig(savefig)
+    if show or savefig is None:
+        plt.show()
 
 
-def calibration_fit(h1_h2_probs, classes_map, Calibrator=KDECalibrator):
+def calibration_fit(h0_h1_probs, classes_map, Calibrator=KDECalibrator):
     """
     Get a calibrated model for each class based on one vs. all.
 
-    :param h1_h2_probs:
+    :param h0_h1_probs:
     :param classes_map:
     :param Calibrator:
     :return:
     """
     calibrators_per_class = {}
     for j, celltype in enumerate(sorted(classes_map)):
-        h1_h2_probs_celltype = h1_h2_probs[celltype]
+        h0_h1_probs_celltype = h0_h1_probs[celltype]
 
-        # TODO: Why does it seem like labels are switched?
-        X, y = Xn_to_Xy(h1_h2_probs_celltype[0],
-                        h1_h2_probs_celltype[1])
+        X, y = Xn_to_Xy(h0_h1_probs_celltype[0],
+                        h0_h1_probs_celltype[1])
 
         calibrator = Calibrator()
         calibrators_per_class[celltype] = calibrator.fit(X, y)
@@ -102,32 +104,32 @@ def calibration_fit(h1_h2_probs, classes_map, Calibrator=KDECalibrator):
     return calibrators_per_class
 
 
-def calibration_transform(h1_h2_probs_test, calibrators_per_class, classes_map):
+def calibration_transform(h0_h1_probs_test, calibrators_per_class, classes_map):
     """
     Transforms the scores with the calibrated model for the correct class.
 
-    :param h1_h2_probs_test:
+    :param h0_h1_probs_test:
     :param calibrators_per_class:
     :param classes_map:
     :return:
     """
-    h1_h2_after_calibration = {}
+    h0_h1_after_calibration = {}
     for celltype in sorted(classes_map):
-        h1_h2_probs_celltype_test = h1_h2_probs_test[celltype]
+        h0_h1_probs_celltype_test = h0_h1_probs_test[celltype]
         calibrator = calibrators_per_class[celltype]
-        Xtest, ytest = Xn_to_Xy(h1_h2_probs_celltype_test[0],
-                                h1_h2_probs_celltype_test[1])
+        Xtest, ytest = Xn_to_Xy(h0_h1_probs_celltype_test[0],
+                                h0_h1_probs_celltype_test[1])
         
-        lr1, lr2 = Xy_to_Xn(calibrator.transform(Xtest), ytest)
+        lr0, lr1 = Xy_to_Xn(calibrator.transform(Xtest), ytest)
+        probs0 = lr0 / (1 + lr0)
         probs1 = lr1 / (1 + lr1)
-        probs2 = lr2 / (1 + lr2)
 
-        h1_h2_after_calibration[celltype] = (probs2, probs1)
+        h0_h1_after_calibration[celltype] = (probs0, probs1)
 
-    return h1_h2_after_calibration
+    return h0_h1_after_calibration
 
 
-def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):
+def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):
     """
     Plots pav plots for all cell types before and after calibration.
 
@@ -189,12 +191,12 @@ def plot_all_celltypes(lrs_before, lrs_after, y, classes_map, show_scatter=True,
     fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical', fontsize=14)
 
     if on_screen:
-        plt.figure()
+        plt.show()
     if path is not None:
         plt.tight_layout()
         plt.savefig(path)
 
-    # plt.close(fig)
+    plt.close(fig)
 
 
 

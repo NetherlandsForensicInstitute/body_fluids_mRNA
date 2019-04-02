@@ -18,6 +18,7 @@ def getNumeric(prompt):
         except ValueError:
             print("Please enter a number.")
 
+
 def manually_refactor_indices():
     """
     Takes the single cell type dataset with two sheets of which one is metadata.
@@ -83,6 +84,7 @@ def manually_refactor_indices():
     os.remove("Datasets/Dataset_NFI_adj.csv")
     os.remove("Datasets/replicate_numbers_single.csv")
 
+
 def manually_refactor_indices_mixtures():
     """
     Takes the mixture cell type dataset with two sheets of which one is metadata.
@@ -131,3 +133,24 @@ def manually_refactor_indices_mixtures():
     os.remove("Datasets/Dataset_mixture_meta.csv")
     os.remove("Datasets/Dataset_mixture_adj.csv")
     os.remove("Datasets/replicate_numbers_mixture.csv")
+
+
+def refactor_classes_map(classes_map, classes_to_evaluate, class_combinations_to_evaluate_combined,
+                         from_penile):
+
+    classes_map_full = classes_map.copy()
+    if from_penile:
+        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
+            classes_map_full[combination] = len(classes_map) + idx
+    else:
+        del classes_map_full['Skin.penile']
+        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
+            classes_map_full[combination] = len(classes_map) - 1 + idx
+
+    # adjust classes map for evaluation
+    classes_map_to_evaluate = classes_map.copy()
+    for key in list(classes_map_to_evaluate):
+        if key not in classes_to_evaluate:
+            del classes_map_to_evaluate[key]
+
+    return classes_map_full, classes_map_to_evaluate

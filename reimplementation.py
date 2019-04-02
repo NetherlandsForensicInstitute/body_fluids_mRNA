@@ -14,9 +14,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from tqdm import tqdm
 
-from metrics import get_lr_metrics
 from calibrations import *
-from scores import *
+from lr_system import *
+from refactor_data import *
+from lir.plotting import makeplot_hist_density, makeplot_hist_density_avg, \
+    makeplot_density_avg
 
 
 def read_df(filename, binarize):
@@ -74,6 +76,22 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                 dict: cell type index -> N_measurements for cell type
 
     """
+
+    def indices_per_replicate(end_replicate, last_index):
+        """
+        Put all indices from replicates that belong to one sample
+        in a list and returns one list filled with these lists.
+        """
+        end_replicate1 = end_replicate.copy()
+        end_replicate2 = end_replicate.copy()
+
+        end_replicate1.insert(0, 0)
+        end_replicate2.append(last_index)
+        all_ends = zip(end_replicate1, end_replicate2)
+        all_ends = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
+
+        return all_ends
+
     df, rv = read_df(filename, binarize)
     class_labels = np.array(df.index)
     # penile skin should be treated separately
@@ -106,23 +124,18 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                 # Implement which make pairs of replicates
                 data_for_this_label = np.array(df.loc[clas])
                 rv_set_per_class = np.array(rv.loc[clas]).flatten()
-                # Save the index when a 'new sample' starts in end_replicate.
-                # This is when the next integer is lower or equal
-                # than the current integer (e.g. 4 > 1 or 2 == 2).
+
                 end_replicate = [i for i in range(1, len(rv_set_per_class)) if
                                   rv_set_per_class[i-1] > rv_set_per_class[i] or
                                   rv_set_per_class[i-1] == rv_set_per_class[i]]
-                n_full_samples = len(end_replicate)+1
+                replicate_indices = indices_per_replicate(end_replicate, len(rv_set_per_class))
+
+                n_full_samples = len(replicate_indices)
                 n_discarded = 0
 
-                end_replicate.append(len(rv_set_per_class))
-                for i in range(n_full_samples):
-                    if i == 0:
-                        candidate_samples = data_for_this_label[:end_replicate[i], :]
-                    else:
-                        candidate_samples = data_for_this_label[
-                                            end_replicate[i-1]:end_replicate[i], :
-                                            ]
+                for idxs in replicate_indices:
+                    candidate_samples = data_for_this_label[idxs, :]
+
                     # TODO is make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < 1 or \
                             np.sum(candidate_samples[:, -2]) < 1 \
@@ -288,41 +301,22 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
            mixtures_containing_single_cell_type
 
 
-def evaluate_model(model, dataset_label, X, y, y_n_hot, labels_in_class, classes_map, MAX_LR):
+def evaluate_model(model, dataset_label, X, y):
     """
     Computes metrics for performance of the model on dataset X, y
+    and prints this.
 
-    :param model: sklearn-like model to evaluate
+    :param model:
     :param dataset_label:
     :param X:
     :param y:
-    :param y_n_hot:
-    :param labels_in_class:
-    :return: iterable with for each class a list of len 2, with scores for all
-        h1 and h2 scenarios
+    :return:
     """
+
     print(X.shape)
     y_pred = model.predict(X)
     print('{} accuracy for mixtures: {}'.format(
         dataset_label, accuracy_score(y, y_pred)))
-
-    y_prob = model.predict_proba(X)
-    h1_h2_probs_per_class = {}
-    # marginal for each single class sample
-    prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, labels_in_class, classes_map, MAX_LR)
-    for j in range(y_n_hot.shape[1]):
-        cell_type = list(classes_map.keys())[list(classes_map.values()).index(j)]
-        # get the probability per single class sample
-        total_proba = prob_per_class[:, j]
-        if sum(total_proba) > 0:
-            probas_without_cell_type = total_proba[y_n_hot[:, j] == 0]
-            probas_with_cell_type = total_proba[y_n_hot[:, j] == 1]
-            # print(inv_classes_map[j], np.quantile(probas_without_cell_type, [0.05, .25, .5, .75, .95]),
-            #       np.quantile(probas_with_cell_type, [0.05, .25, .5, .75, .95]))
-            h1_h2_probs_per_class[cell_type] = (probas_with_cell_type, probas_without_cell_type)
-
-    return h1_h2_probs_per_class
 
 
 def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classes_map, MAX_LR):
@@ -338,8 +332,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classe
     :return: n_samples x n_classes_of_interest matrix of probabilities
     """
     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
-    for idx, celltype in enumerate(sorted(classes_map)):
-        i_celltype = classes_map[celltype]
+    for idx, (celltype, i_celltype) in enumerate(sorted(classes_map.items())):
         if len(labels_in_class[celltype]) > 0:
             res_prob[:, i_celltype] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
     epsilon = 10 ** -MAX_LR
@@ -349,7 +342,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classe
     return res_prob
 
 
-def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
+def read_mixture_data(n_single_cell_types_no_penile, classes_map,
                       binarize=True):
     """
     Reads in the experimental mixture data that is used as test data.
@@ -371,17 +364,32 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
                 dict: mixture name -> list of int single cell type labels
                 dict: mixture class label -> mixture name
     """
-    # read test data
+
+    def indices_per_replicate(end_replicate, last_index):
+        """
+        Put all indices from replicates that belong to one sample
+        in a list and returns one list filled with these lists.
+        """
+        end_replicate1 = end_replicate.copy()
+        end_replicate2 = end_replicate.copy()
+
+        end_replicate1.insert(0, 0)
+        end_replicate2.append(last_index)
+        all_ends = zip(end_replicate1, end_replicate2)
+        all_ends = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
+
+        return all_ends
+
     df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
-    rv_max = rv['replicate_value'].max()
 
     # initialize
     class_labels = np.array(df.index)
     test_map = defaultdict(list)
-    X_mixtures = np.zeros((0, rv_max, n_features))
+    X_mixtures = []
     y_mixtures = []
     inv_test_map = {}
 
+    # TODO: Check if can do this differently
     rvs = np.array(rv).flatten()
     N_full_samples = len([i for i in range(1, len(rvs)) if rvs[i-1] > rvs[i] or
                           rvs[i-1] == rvs[i]])+1
@@ -399,23 +407,12 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
         end_replicate = [i for i in range(1, len(rv_set_per_class)) if
                          rv_set_per_class[i-1] > rv_set_per_class[i] or
                          rv_set_per_class[i-1] == rv_set_per_class[i]]
-        n_full_samples = len(end_replicate)+1
+        replicate_indices = indices_per_replicate(end_replicate, len(rv_set_per_class))
 
-        data_for_mixt_class = np.zeros((n_full_samples, rv_max, n_features))
-        end_replicate.append(len(rv_set_per_class))
-        for i in range(n_full_samples):
-            if i == 0:
-                sample = data_for_this_label[:end_replicate[i], :]
-                data_for_mixt_class[i, :, :] = np.vstack([
-                    sample,
-                    np.zeros([rv_max - sample.shape[0], n_features],
-                    dtype='int')])
-            else:
-                sample = data_for_this_label[end_replicate[i-1]:end_replicate[i], :]
-                data_for_mixt_class[i, :, :] = np.vstack([
-                    sample,
-                    np.zeros([rv_max - sample.shape[0], n_features],
-                    dtype='int')])
+        n_full_samples = len(replicate_indices)
+
+        for idxs in replicate_indices:
+            X_mixtures.append(data_for_this_label[idxs, :])
 
         for cell_type in cell_types:
             test_map[clas].append(classes_map[cell_type])
@@ -423,8 +420,9 @@ def read_mixture_data(n_single_cell_types_no_penile, n_features, classes_map,
             y_mixtures_n_hot[n_total:n_total + n_full_samples, classes_map[cell_type]] = 1
         inv_test_map[class_label] = clas
         n_total += n_full_samples
-        X_mixtures = np.append(X_mixtures, data_for_mixt_class, axis=0)
-        y_mixtures += [class_label] * data_for_mixt_class.shape[0]
+
+        y_mixtures += [class_label] * n_full_samples
+    X_mixtures = np.array(X_mixtures)
 
     return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
 
@@ -460,12 +458,13 @@ def boxplot_per_single_class_category(y_prob_per_class,
     #     y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
     plt.subplots(2, int(n_single_classes_to_draw/2), figsize=(18, 9))
-    for i, celltype in enumerate(classes_to_evaluate):
+    for idx, (celltype, i_celltype) in enumerate(sorted(classes_to_evaluate.items())):
+    # for i, celltype in enumerate(classes_to_evaluate):
         i_celltype = classes_to_evaluate[celltype]
         indices = [j for j in range(y_augmented_matrix.shape[0]) if
                    y_augmented_matrix[j, i_celltype] == 1
                    and sum(y_augmented_matrix[j, :]) == 1]
-        plt.subplot(2, int(n_single_classes_to_draw/2), i + 1)
+        plt.subplot(2, int(n_single_classes_to_draw/2), idx + 1)
         plt.xlim([-MAX_LR -.5, MAX_LR+.5])
         bplot = plt.boxplot(log_lrs_per_class[indices, :], vert=False,
                             labels=classes_to_evaluate, patch_artist=True)
@@ -579,98 +578,99 @@ def plot_data(X):
     plt.savefig('single_cell_type_measurements_after_QC')
 
 
-def plot_calibration(h1_h2_scores, classes_to_evaluate):
+# TODO: Remove this function?
+# def plot_calibration(h1_h2_scores, classes_to_evaluate):
+#     """
+#     Print metrics on and generate plots on calibration NB the confidence
+#     intervals appear to still have issues
+#
+#     :param h1_h2_scores: iterable with for each class to evaluate a list of len
+#         two, containing scores for h1 and h2
+#     :param classes_to_evaluate: list of str classes to evaluate
+#     """
+#     plt.subplots(2, 5, figsize=(18, 9))
+#     all_bins0 = defaultdict(int)
+#     all_bins1 = defaultdict(int)
+#     for j, (h1_scores, h2_scores) in h1_h2_scores.items():
+#         plt.subplot(2, 5, j + 1)
+#         h1_lrs = h1_scores / (1 - h1_scores)
+#         h2_lrs = h2_scores / (1 - h2_scores)
+#         if len(h1_scores) > 0:
+#             m = get_lr_metrics(h1_scores=h1_scores,
+#                                h2_scores=h2_scores,
+#                                h1_lrs=h1_lrs,
+#                                h2_lrs=h2_lrs,
+#                                hp_prior=0.5
+#                                )
+#             print(classes_to_evaluate[j], ['{}: {}'.format(
+#                 a[0], round(a[1], 2)) for a in m])
+#         scale = 10
+#         bins0 = defaultdict(float)
+#         for v in h2_lrs:
+#             v = max(v, 10**-MAX_LR)
+#             v = min(v, 10**MAX_LR)
+#             bins0[int(round(math.log(v, scale)))] += 1.0
+#         for k, b in bins0.items():
+#             all_bins0[k] += b
+#         bins1 = defaultdict(float)
+#         for v in h1_lrs:
+#             v = max(v, 10**-MAX_LR)
+#             v = min(v, 10**MAX_LR)
+#             bins1[int(round(math.log(v, scale)))] += 1.0
+#         for k, b in bins1.items():
+#             all_bins1[k] += b
+#
+#         std_err0, bins0 = transform_counts(bins0, len(h2_lrs), scale, True)
+#         std_err1, bins1 = transform_counts(bins1, len(h1_lrs), scale, False)
+#
+#         bins0_x, bins0_y = zip(*sorted(bins0.items()))
+#         if len(std_err0) > 0:
+#             bins_se0_x, vals = zip(*sorted(std_err0.items()))
+#             bins_se0_y, y0 = zip(*vals)
+#             plt.errorbar(np.array(bins_se0_x) + .15, bins_se0_y, yerr=y0)
+#         plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
+#         if len(bins1) > 0:
+#             bins1_x, bins1_y = zip(*sorted(bins1.items()))
+#             plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
+#             if len(std_err1) > 0:
+#                 bins_se1_x, vals = zip(*sorted(std_err1.items()))
+#                 bins_se1_y, y1 = zip(*vals)
+#                 plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
+#         # plt.legend()
+#         plt.title(classes_to_evaluate[j])
+#     plt.savefig('calibration separate')
+#
+#     plt.figure()
+#     all_std_err0, all_bins0 = transform_counts(
+#         all_bins0, sum([len(b[1]) for a, b in h1_h2_scores.items()]),
+#         scale, True
+#     )
+#
+#     all_std_err1, all_bins1 = transform_counts(
+#         all_bins1, sum([len(b[0]) for a, b in h1_h2_scores.items()]),
+#         scale, False)
+#
+#     bins0_x, bins0_y = zip(*sorted(all_bins0.items()))
+#     plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
+#     if len(all_std_err0) > 0:
+#         bins_se1_x, vals = zip(*sorted(all_std_err0.items()))
+#         bins_se1_y, y1 = zip(*vals)
+#         plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y)
+#     bins1_x, bins1_y = zip(*sorted(all_bins1.items()))
+#     plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
+#     if len(all_std_err1) > 0:
+#         bins_se1_x, vals = zip(*sorted(all_std_err1.items()))
+#         bins_se1_y, y1 = zip(*vals)
+#         plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
+#     plt.legend()
+#     plt.title('all')
+#     plt.savefig('calibration all')
+
+
+def transform_counts(bins, n_obs, scale, is_h1):
     """
-    Print metrics on and generate plots on calibration NB the confidence
-    intervals appear to still have issues
-
-    :param h1_h2_scores: iterable with for each class to evaluate a list of len
-        two, containing scores for h1 and h2
-    :param classes_to_evaluate: list of str classes to evaluate
-    """
-    plt.subplots(2, 5, figsize=(18, 9))
-    all_bins0 = defaultdict(int)
-    all_bins1 = defaultdict(int)
-    for j, (h1_scores, h2_scores) in h1_h2_scores.items():
-        plt.subplot(2, 5, j + 1)
-        h1_lrs = h1_scores / (1 - h1_scores)
-        h2_lrs = h2_scores / (1 - h2_scores)
-        if len(h1_scores) > 0:
-            m = get_lr_metrics(h1_scores=h1_scores,
-                               h2_scores=h2_scores,
-                               h1_lrs=h1_lrs,
-                               h2_lrs=h2_lrs,
-                               hp_prior=0.5
-                               )
-            print(classes_to_evaluate[j], ['{}: {}'.format(
-                a[0], round(a[1], 2)) for a in m])
-        scale = 10
-        bins0 = defaultdict(float)
-        for v in h2_lrs:
-            v = max(v, 10**-MAX_LR)
-            v = min(v, 10**MAX_LR)
-            bins0[int(round(math.log(v, scale)))] += 1.0
-        for k, b in bins0.items():
-            all_bins0[k] += b
-        bins1 = defaultdict(float)
-        for v in h1_lrs:
-            v = max(v, 10**-MAX_LR)
-            v = min(v, 10**MAX_LR)
-            bins1[int(round(math.log(v, scale)))] += 1.0
-        for k, b in bins1.items():
-            all_bins1[k] += b
-
-        std_err0, bins0 = transform_counts(bins0, len(h2_lrs), scale, True)
-        std_err1, bins1 = transform_counts(bins1, len(h1_lrs), scale, False)
-
-        bins0_x, bins0_y = zip(*sorted(bins0.items()))
-        if len(std_err0) > 0:
-            bins_se0_x, vals = zip(*sorted(std_err0.items()))
-            bins_se0_y, y0 = zip(*vals)
-            plt.errorbar(np.array(bins_se0_x) + .15, bins_se0_y, yerr=y0)
-        plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
-        if len(bins1) > 0:
-            bins1_x, bins1_y = zip(*sorted(bins1.items()))
-            plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
-            if len(std_err1) > 0:
-                bins_se1_x, vals = zip(*sorted(std_err1.items()))
-                bins_se1_y, y1 = zip(*vals)
-                plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
-        # plt.legend()
-        plt.title(classes_to_evaluate[j])
-    plt.savefig('calibration separate')
-
-    plt.figure()
-    all_std_err0, all_bins0 = transform_counts(
-        all_bins0, sum([len(b[1]) for a, b in h1_h2_scores.items()]),
-        scale, True
-    )
-
-    all_std_err1, all_bins1 = transform_counts(
-        all_bins1, sum([len(b[0]) for a, b in h1_h2_scores.items()]),
-        scale, False)
-
-    bins0_x, bins0_y = zip(*sorted(all_bins0.items()))
-    plt.bar(np.array(bins0_x) - .15, bins0_y, label='h2 (0)', width=.3)
-    if len(all_std_err0) > 0:
-        bins_se1_x, vals = zip(*sorted(all_std_err0.items()))
-        bins_se1_y, y1 = zip(*vals)
-        plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y)
-    bins1_x, bins1_y = zip(*sorted(all_bins1.items()))
-    plt.bar(np.array(bins1_x) + .15, bins1_y, label='h1 (1)', width=.3, color='r')
-    if len(all_std_err1) > 0:
-        bins_se1_x, vals = zip(*sorted(all_std_err1.items()))
-        bins_se1_y, y1 = zip(*vals)
-        plt.errorbar(np.array(bins_se1_x) + .15, y1, yerr=bins_se1_y, color='r')
-    plt.legend()
-    plt.title('all')
-    plt.savefig('calibration all')
-
-
-def transform_counts(bins, n_obs, scale, is_h2):
-    """
-    Transform counts so h1 and h2 fractions can be visually compared
-    if the score is 'correct' (ie log > 0 for h1 and < 0 for h2), just take the
+    Transform counts so h0 and h1 fractions can be visually compared
+    if the score is 'correct' (ie log > 0 for h0 and < 0 for h2), just take the
     fraction if the score is 'incorrect', multiply by how much more often the
     score should occur in the 'correct' scenario, ie by 10**the value of the
     score also provides an (apparently incorrect) standard error for each bin
@@ -678,14 +678,14 @@ def transform_counts(bins, n_obs, scale, is_h2):
     :param bins: dict: rounded score -> count
     :param n_obs: int: total number of observations
     :param scale: logscale, eg 10
-    :param is_h2: whether these are the counts for h2 (ie False -> h1)
+    :param is_h1: whether these are the counts for h1 (ie False -> h0)
     :return: dict: rounded score -> (standard error * adjustment factor,
                     adjustment factor),
                 dict: rounded score -> (possibly adjusted) fraction
     """
     std_err = {}
     for x in bins:
-        if (is_h2 and x <= 0) or (not is_h2 and x >= 0):
+        if (is_h1 and x <= 0) or (not is_h1 and x >= 0):
             bins[x] *= 1 / n_obs
         else:
             p = bins[x] / n_obs
@@ -741,10 +741,24 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, classes_map_to_evaluate, \
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
-
+# TODO: Add documentation
 def split_data(X, y, size=(0.4, 0.4)):
+    """
+    Splits the originial dataset in three parts. All parts consist of samples from all
+    cell types and there is no overlap between samples within the parts.
+
+    :param X:
+    :param y:
+    :param size: tuple containing the relative size of the train and calibration data
+        with which the size of the test data is calculated.
+    :return:
+    """
 
     def indices_per_class(y):
+        """
+        Stores the indices beloging to one class in a list and
+        returns a list filled with these lists.
+        """
         index_classes = list(np.unique(y, return_index=True)[1])[1:]
         index_classes1 = index_classes.copy()
         index_classes1.insert(0, 0)
@@ -757,6 +771,9 @@ def split_data(X, y, size=(0.4, 0.4)):
 
 
     def define_random_indices(indices, size):
+        """
+        Randomly draws indices and assigns these
+        """
         train_size = size[0]
         calibration_size = size[1]
 
@@ -768,7 +785,7 @@ def split_data(X, y, size=(0.4, 0.4)):
 
         return train_index, calibration_index, test_index
 
-    # TODO: invoegen try-catch
+    # TODO: invoegen try-catch or assert
     if sum(size) > 1.0:
         print("The sum of the sizes for the train and calibration"
               "data must be must be equal to or below 1.0.")
@@ -804,20 +821,73 @@ def split_data(X, y, size=(0.4, 0.4)):
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
-def probs_to_lrs(h1_h2_probs, classes_map, log=False):
-    h1_h2_lrs = {}
+def probs_to_lrs(h0_h1_probs, classes_map, log=False):
+    """
+    Converts probabilities to (log) likelihood ratios.
+
+    :param h0_h1_probs: dictionary with for each cell type two lists with probabilities for h0 and h1
+    :param classes_map: dictionary with for each cell type the accompanied indexnumber
+    :param log: boolean if True the 10logLRs are calculated
+    :return: dictionary with for each cell type two lists with (10log)LRs for h0 and h1
+    """
+    h0_h1_lrs = {}
     for celltype in sorted(classes_map):
         if log:
-            h1_h2_celltype = h1_h2_probs[celltype]
-            h1_h2_lrs[celltype] = [np.log10(h1_h2_celltype[i] / (1 - h1_h2_celltype[i])) for i in
-                                        range(len(h1_h2_celltype))]
+            h0_h1_celltype = h0_h1_probs[celltype]
+            h0_h1_lrs[celltype] = [np.log10(h0_h1_celltype[i] / (1 - h0_h1_celltype[i])) for i in
+                                        range(len(h0_h1_celltype))]
 
         else:
-            h1_h2_celltype = h1_h2_probs[celltype]
-            h1_h2_lrs[celltype] = [h1_h2_celltype[i] / (1 - h1_h2_celltype[i]) for i in
-                                        range(len(h1_h2_celltype))]
+            h0_h1_celltype = h0_h1_probs[celltype]
+            h0_h1_lrs[celltype] = [h0_h1_celltype[i] / (1 - h0_h1_celltype[i]) for i in
+                                        range(len(h0_h1_celltype))]
 
-    return h1_h2_lrs
+    return h0_h1_lrs
+
+
+def average_per_celltype(h0_h1):
+    """
+    Calculates the average for all values per cell type per class within celltype.
+
+    :param h0_h1: list filled with dictionaries with for each cell type two lists with values for h0 and h1
+    :return: dictionary with for each cell type two lists with the average value for h0 and h1
+    """
+
+    celltypes = list(h0_h1[0].keys())
+
+    combined0 = {celltype : [] for celltype in celltypes}
+    combined1 = {celltype : [] for celltype in celltypes}
+
+    for values in h0_h1:
+        celltypes_test = list(values.keys())
+        assert len(celltypes) == len(celltypes_test), 'Number of celltypes compared is different'
+        assert False in [celltype in celltypes for celltype in celltypes_test], 'Different celltypes are compared'
+
+        for celltype in celltypes:
+            combined0[celltype].append(values[celltype][0].reshape(-1, 1))
+            combined1[celltype].append(values[celltype][1].reshape(-1, 1))
+
+    h0_h1_avg_lrs = {}
+    for i in range(len(combined0)):
+        h0_h1_avg_lrs[celltypes[i]] = (np.mean(combined0[celltypes[i]], axis=0),
+                                       np.mean(combined1[celltypes[i]], axis=0))
+
+    return h0_h1_avg_lrs
+
+
+def sort_calibrators(all_calibrators):
+    """
+
+    :param all_calibrators:
+    :return:
+    """
+    celltypes = list(all_calibrators[0].keys())
+    sorted_calibrators = {celltype : [] for celltype in celltypes}
+    for calibrators in all_calibrators:
+        for celltype in celltypes:
+            sorted_calibrators[celltype].append(calibrators[celltype])
+
+    return sorted_calibrators
 
 
 if __name__ == '__main__':
@@ -827,8 +897,8 @@ if __name__ == '__main__':
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
     # TODO: Make this function work
     #plot_data(X_raw_singles)
-    n_folds = 1
-    N_SAMPLES_PER_COMBINATION = 100
+    n_folds = 2
+    N_SAMPLES_PER_COMBINATION = 4
     MAX_LR = 10
     from_penile = False
     retrain = True
@@ -840,28 +910,17 @@ if __name__ == '__main__':
     # '-1' to avoid the penile skin
     single_cell_classes = [inv_classes_map[j] for j in range(n_single_cell_types - 1)]
     classes_included = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa']
-    classes_excluded = [clas for clas in single_cell_classes if clas not in classes_included]
-    for class_excluded in classes_excluded:
-        single_cell_classes.remove(class_excluded)
     class_combinations_to_evaluate = [['Vaginal.mucosa', 'Menstrual.secretion']]
     class_combinations_to_evaluate_combined = [' and/or '.join(comb) for comb in class_combinations_to_evaluate]
-    classes_to_evaluate = single_cell_classes + class_combinations_to_evaluate_combined
+    classes_to_evaluate = classes_included + class_combinations_to_evaluate_combined
 
     # extend original classes map with new combined classes
-    classes_map_full = classes_map.copy()
-    if from_penile:
-        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
-            classes_map_full[combination] = len(classes_map) + idx
-    else:
-        del classes_map_full['Skin.penile']
-        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
-            classes_map_full[combination] = len(classes_map)-1 + idx
-
-    # adjust classes map for evaluation
-    classes_map_to_evaluate = classes_map.copy()
-    for key in list(classes_map_to_evaluate):
-        if key not in classes_to_evaluate:
-                del classes_map_to_evaluate[key]
+    classes_map_full, classes_map_to_evaluate = refactor_classes_map(
+        classes_map,
+        classes_to_evaluate,
+        class_combinations_to_evaluate_combined,
+        from_penile
+    )
 
     # Split the data in two equal parts: for training and calibration
     X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
@@ -871,10 +930,21 @@ if __name__ == '__main__':
         # NB penile skin treated like all others for classify_single
         classify_single(X_train, y_train, inv_classes_map)
 
-        model_scores = ScoresMLP()
+        model = MLPClassifierMarginal()
         # model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
+
+        h0_h1_lrs_all_log = []
+        h0_h1_lrs_all = []
+        h0_h1_lrs_all_after_log = []
+        h0_h1_lrs_all_after = []
+
+        h0_h1_probs_all_calibration = []
+        all_calibrators_per_class = []
+
         for n in range(n_folds):
+            print("Fold {}".format(n))
+
             # TODO this is not nfold, but independently random
             X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
                 split_data(X_raw_singles, y_raw_singles, size=(0.4, 0.4))
@@ -900,7 +970,7 @@ if __name__ == '__main__':
 
             # TODO get the mixture data from dorum
 
-            model_scores.fit(X_augmented_train, y_augmented_train)
+            model.fit(X_augmented_train, y_augmented_train)
 
             # augment calibration data to calibrate the model with
             X_calibrate_augmented, y_calibrate_augmented, y_augmented_matrix_calibrate, \
@@ -925,7 +995,7 @@ if __name__ == '__main__':
                 y_augmented_matrix_calibrate
             )
 
-            h1_h2_probs_calibration = model_scores.predict_proba_per_class(
+            h0_h1_probs_calibration = model.predict_proba_per_class(
                 X_calibrate_augmented,
                 y_augmented_calibration_updated,
                 mixture_classes_in_classes_to_evaluate_calibration,
@@ -941,10 +1011,12 @@ if __name__ == '__main__':
                     y_test,
                     n_single_cell_types,
                     n_features,
-                    50,
+                    4,
                     classes_map,
                     from_penile=from_penile
             )
+
+            evaluate_model(model, 'test', X_augmented_test, y_augmented_test)
 
             # create information depending on the cell types of interest
             mixture_classes_in_classes_to_evaluate, _, y_augmented_test_updated = \
@@ -956,7 +1028,7 @@ if __name__ == '__main__':
                     y_augmented_matrix
             )
 
-            h1_h2_probs_test = model_scores.predict_proba_per_class(
+            h0_h1_probs_test = model.predict_proba_per_class(
                 X_augmented_test,
                 y_augmented_test_updated,
                 mixture_classes_in_classes_to_evaluate,
@@ -966,109 +1038,78 @@ if __name__ == '__main__':
             )
 
             # fit calibrated models
-            calibrators_per_class = calibration_fit(h1_h2_probs_calibration, classes_map_updated)
+            calibrators_per_class = calibration_fit(h0_h1_probs_calibration, classes_map_updated)
 
             # transform the test scores
-            h1_h2_after_calibration = calibration_transform(h1_h2_probs_test, calibrators_per_class, classes_map_updated)
+            h0_h1_after_calibration = calibration_transform(h0_h1_probs_test, calibrators_per_class, classes_map_updated)
 
-            if n == 0:
-                # only plot single class performance once
-                # TODO: Make this function work
-                prob_per_class_test = model_scores.predict_proba(
-                    X_calibrate_augmented,
-                    mixture_classes_in_classes_to_evaluate_calibration,
-                    classes_map_updated,
-                    MAX_LR
-                )
+            # if n == 0:
+            #     # only plot single class performance once
+            #     # TODO: Make this function work
+            #     # prob_per_class_test = model.predict_proba(
+            #     #     X_calibrate_augmented,
+            #     #     mixture_classes_in_classes_to_evaluate_calibration,
+            #     #     classes_map_updated,
+            #     #     MAX_LR
+            #     # )
+            #
+            #     # Check correlation
+            #     # print('Cor(Vag, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 4], prob_per_class_test[:, 5]))
+            #     # print('Cor(Menstr, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 0], prob_per_class_test[:, 5]))
+            #     # print('Cor(Vag+Menstr, VagMenstr):\n',
+            #     #       np.corrcoef(np.sum([prob_per_class_test[:, 0], prob_per_class_test[:, 4]], axis=0), prob_per_class_test[:, 5]))
+            #
+            #     idxs = []
+            #     for celltype in sorted(classes_map_updated):
+            #         idxs.append(classes_map_full[celltype])
+            #     y_augmented_test_relevant = y_augmented_test_updated[:, idxs]
+            #
+            #     # TODO: Make this plot work
+            #     # boxplot_per_single_class_category(
+            #     #     prob_per_class_test,
+            #     #     y_augmented_test_relevant,
+            #     #     classes_map_updated,
+            #     #     class_combinations_to_evaluate
+            #     # )
 
-                # Check correlation
-                print('Cor(Vag, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 4], prob_per_class_test[:, 5]))
-                print('Cor(Menstr, VagMenstr):\n', np.corrcoef(prob_per_class_test[:, 0], prob_per_class_test[:, 5]))
-                print('Cor(Vag+Menstr, VagMenstr):\n',
-                      np.corrcoef(np.sum([prob_per_class_test[:, 0], prob_per_class_test[:, 4]], axis=0), prob_per_class_test[:, 5]))
+            h0_h1_lrs_all_log.append(probs_to_lrs(h0_h1_probs_test, classes_map_updated, log=True))
+            h0_h1_lrs_all.append(probs_to_lrs(h0_h1_probs_test, classes_map_updated))
+            h0_h1_lrs_all_after_log.append(probs_to_lrs(h0_h1_after_calibration, classes_map_updated, log=True))
+            h0_h1_lrs_all_after.append(probs_to_lrs(h0_h1_after_calibration, classes_map_updated))
+            h0_h1_probs_all_calibration.append(h0_h1_probs_calibration)
+            all_calibrators_per_class.append(calibrators_per_class)
 
-                idxs = []
-                for celltype in sorted(classes_map_updated):
-                    idxs.append(classes_map_full[celltype])
-                y_augmented_test_relevant = y_augmented_test_updated[:, idxs]
+            # if n == 0:
+            #     makeplot_hist_density(h0_h1_probs_calibration, calibrators_per_class, show=True)
 
-                # TODO: Make this plot work
-                # boxplot_per_single_class_category(
-                #     prob_per_class_test,
-                #     y_augmented_test_relevant,
-                #     classes_map_updated,
-                #     class_combinations_to_evaluate
-                # )
+        idxs = []
+        for celltype in sorted(classes_map_updated):
+            idxs.append(classes_map_full[celltype])
+        y_augmented_test_relevant = y_augmented_test_updated[:, idxs]
+        y = np.sort(y_augmented_test_relevant, axis=0)[::-1]
 
-                h1_h2_lrs_test_log = probs_to_lrs(h1_h2_probs_test, classes_map_updated, log=True)
-                h1_h2_lrs_after_calibration_log = probs_to_lrs(h1_h2_after_calibration, classes_map_updated, log=True)
+        h0_h1_lrs_avg_log = average_per_celltype(h0_h1_lrs_all_log)
+        h0_h1_lrs_avg = average_per_celltype(h0_h1_lrs_all)
+        h0_h1_lrs_avg_after_log = average_per_celltype(h0_h1_lrs_all_after_log)
+        h0_h1_lrs_avg_after = average_per_celltype(h0_h1_lrs_all_after)
+        h0_h1_probs_avg_calibration = average_per_celltype(h0_h1_probs_all_calibration)
 
-                # plots before calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_lrs_test_log, title='before')
-                plot_reliability_plot(h1_h2_probs_test, y_augmented_test_relevant, title='before')
+        sorted_calibrators_per_class = sort_calibrators(all_calibrators_per_class)
+        makeplot_hist_density_avg(h0_h1_probs_avg_calibration, sorted_calibrators_per_class, show=True)
+        makeplot_density_avg(sorted_calibrators_per_class, show=True)
 
-                # plots after calibration making use of probabilities
-                plot_histogram_log_lr(h1_h2_lrs_after_calibration_log, n_bins=60, title='after')
-                plot_reliability_plot(h1_h2_after_calibration, y_augmented_test_relevant, title='after')
+        plot_histogram_log_lr(h0_h1_lrs_avg_log, title='before', density=True)
+        plot_histogram_log_lr(h0_h1_lrs_avg_after_log, n_bins=15, title='after', density=True)
+        plot_pav(h0_h1_lrs_avg, h0_h1_lrs_avg_after, y, classes_map_updated, on_screen=True)
 
-                h1_h2_lrs_test = probs_to_lrs(h1_h2_probs_test, classes_map_updated)
-                h1_h2_lrs_after_calibration = probs_to_lrs(h1_h2_after_calibration, classes_map_updated)
-
-                y = np.sort(y_augmented_test_relevant, axis=0)[::-1]
-                plot_all_celltypes(h1_h2_lrs_test, h1_h2_lrs_after_calibration, y, classes_map_updated, on_screen=False,
-                                       path='pav_plot_report')
-
-                # plt.show()
-        X_augmented_train, y_augmented_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
-            X_train,
-            y_train,
-            n_single_cell_types,
-            n_features,
-            N_SAMPLES_PER_COMBINATION,
-            classes_map,
-            from_penile=from_penile
-        )
-
-        X_augmented_calibrate, y_augmented_calibrate, y_augmented_matrix_calibrate, mixture_classes_in_single_cell_type = \
-            augment_data(
-                X_calibrate,
-                y_calibrate,
-                n_single_cell_types,
-                n_features,
-                N_SAMPLES_PER_COMBINATION,
-                classes_map,
-                from_penile=from_penile
-            )
-
-        X_augmented_test, y_augmented_test, y_augmented_matrix, mixture_classes_in_single_cell_type = \
-            augment_data(
-                X_test,
-                y_test,
-                n_single_cell_types,
-                n_features,
-                4,
-                classes_map,
-                from_penile=from_penile
-            )
-
-        model_scores.fit(X_augmented_train, y_augmented_train)
-
-        h1_h2_probs_test = model_scores.predict_proba_per_class(
-            X_augmented_test,
-            y_augmented_matrix,
-            mixture_classes_in_single_cell_type,
-            classes_map,
-            MAX_LR
-        )
-
-        calibrators_per_class = calibration_fit(h1_h2_probs_test, classes_map)
-
-        pickle.dump(model_scores, open(model_file_name, 'wb'))
+        pickle.dump(model, open(model_file_name, 'wb'))
         pickle.dump(calibrators_per_class, open('calibrators_per_class', 'wb'))
+
     else:
-        model_scores = pickle.load(open(model_file_name, 'rb'))
+        model = pickle.load(open(model_file_name, 'rb'))
         calibrators_per_class = pickle.load(open('calibrators_per_class', 'rb'))
 
+        # TODO: Why train data needed?
         X_train, y_train, y_augmented_matrix, mixture_classes_in_single_cell_type = augment_data(
             X_train,
             y_train,
@@ -1079,21 +1120,8 @@ if __name__ == '__main__':
             from_penile=from_penile
         )
 
-    # calculate the probs from test data with the MLP model trained on train data
-    # evaluate_model(
-    #     model_scores,
-    #     'train',
-    #     X_train,
-    #     y_train,
-    #     y_augmented_matrix,
-    #     mixture_classes_in_single_cell_type,
-    #     classes_map,
-    #     MAX_LR
-    # )
-
     X_mixtures, y_mixtures, y_mixtures_matrix, test_map, inv_test_map = read_mixture_data(
         n_single_cell_types - 1,
-        n_features,
         classes_map
     )
 
@@ -1125,7 +1153,7 @@ if __name__ == '__main__':
             y_mixtures_matrix
     )
 
-    h1_h2_probs_mixture = model_scores.predict_proba_per_class(
+    h0_h1_probs_mixture = model.predict_proba_per_class(
         combine_samples(X_mixtures),
         y_mixtures_classes_to_evaluate_n_hot,
         mixture_classes_in_classes_to_evaluate,
@@ -1134,8 +1162,7 @@ if __name__ == '__main__':
     )
 
     # transform the probabilities with the calibrated models
-    # TODO: How to take into account the combined classes (e.g. vaginal + menstrual)?
-    h1_h2_after_calibration_mixture = calibration_transform(h1_h2_probs_mixture, classes_map_updated)
+    h0_h1_after_calibration_mixture = calibration_transform(h0_h1_probs_mixture, classes_map_updated)
 
     plot_for_experimental_mixture_data(
         combine_samples(X_mixtures),
@@ -1148,4 +1175,4 @@ if __name__ == '__main__':
         dists_from_xmixtures_to_closest_augmented
     )
 
-    plot_calibration(h1_h2_after_calibration_mixture, classes_to_evaluate)
+    # plot_calibration(h1_h2_after_calibration_mixture, classes_to_evaluate)
