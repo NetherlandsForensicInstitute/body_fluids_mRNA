@@ -1,13 +1,16 @@
-from lr_system import *
-from plotting import plot_for_experimental_mixture_data
+from rna.lr_system import *
+from rna.plotting import plot_for_experimental_mixture_data
 from lir.plotting import makeplot_hist_density_avg, \
     makeplot_density_avg
-from utils import create_information_on_classes_to_evaluate, split_data, probs_to_lrs, average_per_celltype, \
+from rna.utils import create_information_on_classes_to_evaluate, split_data, probs_to_lrs, average_per_celltype, \
     sort_calibrators, refactor_classes_map
+from rna.analytics import *
+from rna.input_output import *
 
 if __name__ == '__main__':
     developing = False
     include_blank = False
+    # TODO: Change classes_map, inv_classes_map names --> string2vec and vec2string
     X_raw_singles, y_raw_singles, n_single_cell_types, n_features, classes_map, inv_classes_map, n_per_class = \
         get_data_per_cell_type(developing=developing, include_blank=include_blank)
     # TODO: Make this function work

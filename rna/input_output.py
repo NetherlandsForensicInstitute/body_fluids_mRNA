@@ -1,13 +1,14 @@
 """
 Reads and manipulates datasets.
 """
-
+# TODO: Rename classes
 from collections import Counter, defaultdict
 
 import numpy as np
 import pandas as pd
 
-
+# TODO: include else option when '_rv' not in filename
+# TODO: imports file that contains 4 rv per sample without rv's connected to
 def read_df(filename, binarize):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.
@@ -75,80 +76,85 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
         end_replicate1.insert(0, 0)
         end_replicate2.append(last_index)
         all_ends = zip(end_replicate1, end_replicate2)
-        all_ends = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
+        indices_per_replicate_set = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
 
-        return all_ends
+        return indices_per_replicate_set
 
     df, rv = read_df(filename, binarize)
-    class_labels = np.array(df.index)
+    all_celltypes = np.array(df.index)
     # penile skin should be treated separately
-    classes_set = set(class_labels)
-    classes_set.remove('Skin.penile')
+    celltypes_set = set(all_celltypes)
+    celltypes_set.remove('Skin.penile')
 
     # initialize
-    classes_map = {}
-    inv_classes_map = {}
+    string2index = {}
+    index2string = {}
     i = 0
 
-    for clas in sorted(classes_set) + ['Skin.penile']:
-        if include_blank or 'Blank' not in clas:
-            if not developing or ('Skin' not in clas and 'Blank' not in clas):
-                classes_map[clas] = i
-                inv_classes_map[i] = clas
+    for celltype in sorted(celltypes_set) + ['Skin.penile']:
+        if include_blank or 'Blank' not in celltype:
+            if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
+                string2index[celltype] = i
+                index2string[i] = celltype
                 i += 1
-    classes = [classes_map[clas] for clas in class_labels if
-               (not developing or ('Skin' not in clas and 'Blank' not in clas))
-               and (include_blank or 'Blank' not in clas)]
-    n_per_class = Counter(classes) # This is not the final number per class!
-                                   # Samples may be discarded later on.
+    n_per_celltype = Counter([celltype for celltype in all_celltypes if
+               (not developing or ('Skin' not in celltype and 'Blank' not in celltype))
+               and (include_blank or 'Blank' not in celltype)])
+
     n_features = len(df.columns)
 
-    X_raw = []
-    y = []
-    for clas in sorted(classes_set) + ['Skin.penile']:
-        if include_blank or 'Blank' not in clas:
-            if not developing or ('Skin' not in clas and 'Blank' not in clas):
-                # Implement which make pairs of replicates
-                data_for_this_label = np.array(df.loc[clas])
-                rv_set_per_class = np.array(rv.loc[clas]).flatten()
+    X_single = []
+    y_single = []
+    for celltype in sorted(celltypes_set) + ['Skin.penile']:
+        if include_blank or 'Blank' not in celltype:
+            if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
+                data_for_this_celltype = np.array(df.loc[celltype])
+                rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
 
-                end_replicate = [i for i in range(1, len(rv_set_per_class)) if
-                                  rv_set_per_class[i-1] > rv_set_per_class[i] or
-                                  rv_set_per_class[i-1] == rv_set_per_class[i]]
-                replicate_indices = indices_per_replicate(end_replicate, len(rv_set_per_class))
+                end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
+                                 rvset_for_this_celltype[i-1] > rvset_for_this_celltype[i] or
+                                 rvset_for_this_celltype[i-1] == rvset_for_this_celltype[i]]
+                indices_per_replicate_set = indices_per_replicate(end_replicate, len(rvset_for_this_celltype))
 
-                n_full_samples = len(replicate_indices)
+                n_full_samples = len(indices_per_replicate_set)
                 n_discarded = 0
 
-                for idxs in replicate_indices:
-                    candidate_samples = data_for_this_label[idxs, :]
+                for idxs in indices_per_replicate_set:
+                    candidate_samples = data_for_this_celltype[idxs, :]
 
                     # TODO is make this at least one okay?
                     if np.sum(candidate_samples[:, -1]) < 1 or \
                             np.sum(candidate_samples[:, -2]) < 1 \
-                            and 'Blank' not in clas:
+                            and 'Blank' not in celltype:
                         n_full_samples -= 1
                         n_discarded += 1
                     else:
-                        X_raw.append(candidate_samples)
+                        X_single.append(candidate_samples)
 
                 print('{} has {} samples (after discarding {} due to QC on '
                       'structural markers)'.format(
-                    clas,
+                    celltype,
                     n_full_samples,
                     n_discarded
                 ))
-                n_per_class[classes_map[clas]] = n_full_samples
-                y += [classes_map[clas]] * n_full_samples
+                n_per_celltype[celltype] = n_full_samples
+                y_single += [string2index[celltype]] * n_full_samples
 
-    X_raw = np.array(X_raw)
-    n_single_cell_types = len(classes_map)
+    X_single = np.array(X_single)
+    n_celltypes_with_penile = len(string2index)
 
-    return X_raw, y, n_single_cell_types, n_features, classes_map, \
-           inv_classes_map, n_per_class
+    y_nhot_single = np.zeros((X_single.shape[0], n_celltypes_with_penile))
+    end = 0
+    for n in range(n_celltypes_with_penile):
+        i_celltype = string2index[index2string[n]]
+        begin = end
+        end = end + n_per_celltype[index2string[i_celltype]]
+        y_nhot_single[begin:end, i_celltype] = 1
+
+    return X_single, y_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
 
 
-def read_mixture_data(n_single_cell_types_no_penile, classes_map,
+def read_mixture_data(filename, n_single_cell_types_no_penile, classes_map,
                       binarize=True):
     """
     Reads in the experimental mixture data that is used as test data.
@@ -186,7 +192,8 @@ def read_mixture_data(n_single_cell_types_no_penile, classes_map,
 
         return all_ends
 
-    df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
+    # df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
+    df, rv = read_df(filename, binarize)
 
     # initialize
     class_labels = np.array(df.index)
@@ -195,7 +202,6 @@ def read_mixture_data(n_single_cell_types_no_penile, classes_map,
     y_mixtures = []
     inv_test_map = {}
 
-    # TODO: Check if can do this differently
     rvs = np.array(rv).flatten()
     N_full_samples = len([i for i in range(1, len(rvs)) if rvs[i-1] > rvs[i] or
                           rvs[i-1] == rvs[i]])+1

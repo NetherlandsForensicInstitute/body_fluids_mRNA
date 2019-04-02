@@ -90,7 +90,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))
 
-
+# TODO: Change classes map (?)
 def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
                  N_SAMPLES_PER_COMBINATION, classes_map, from_penile=False):
     """
@@ -148,7 +148,7 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
     return X, y, y_n_hot[:, :n_single_cell_types_not_penile], \
            mixtures_containing_single_cell_type
 
-
+# TODO: Change labels_in_class/classes_map?
 def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classes_map, MAX_LR):
     """
     Converts n_samples x n_mixture_classes matrix of probabilities to a

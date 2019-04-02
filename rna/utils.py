@@ -5,6 +5,8 @@ General calculations.
 import random
 import numpy as np
 
+# TODO: include functions string2vec and vec2string.
+
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
                                               classes_map,
                                               class_combinations_to_evaluate,
@@ -50,7 +52,7 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, classes_map_to_evaluate, \
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
-
+# TODO: Make test split include same samples
 def split_data(X, y, size=(0.4, 0.4)):
     """
     Splits the originial dataset in three parts. All parts consist of samples from all
@@ -129,7 +131,7 @@ def split_data(X, y, size=(0.4, 0.4)):
 
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
-
+# TODO: Change h0_h1 to h1_h2
 def probs_to_lrs(h0_h1_probs, classes_map, log=False):
     """
     Converts probabilities to (log) likelihood ratios.
@@ -153,7 +155,7 @@ def probs_to_lrs(h0_h1_probs, classes_map, log=False):
 
     return h0_h1_lrs
 
-
+# TODO: Change h0_h1 to h1_h2
 def average_per_celltype(h0_h1):
     """
     Calculates the average for all values per cell type per class within celltype.
@@ -183,7 +185,7 @@ def average_per_celltype(h0_h1):
 
     return h0_h1_avg_lrs
 
-
+# TODO: Check if needed?
 def sort_calibrators(all_calibrators):
     """
 
@@ -198,7 +200,7 @@ def sort_calibrators(all_calibrators):
 
     return sorted_calibrators
 
-
+# TODO: Check if needed?
 def refactor_classes_map(classes_map, classes_to_evaluate, class_combinations_to_evaluate_combined,
                          from_penile):
 

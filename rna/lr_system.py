@@ -1,36 +1,39 @@
 from lir import KDECalibrator, Xn_to_Xy, Xy_to_Xn
-from reimplementation import *
+from sklearn.neural_network import MLPClassifier
 
-class MLPClassifierMarginal():
+class MarginalClassifier():
 
-    def __init__(self, random_state=0):
-        self._mlp = MLPClassifier(random_state=random_state)
+    def __init__(self, random_state=0, classifier=MLPClassifier,
+                 calibrator=KDECalibrator, MAX_LR=10):
+        self._classifier = classifier(random_state=random_state)
+        self._calibrator = calibrator()
+        self.MAX_LR = MAX_LR
 
     def fit(self, X, y):
-        """
-        Train MLP model.
-        """
-        self._mlp.fit(X, y)
+        self._classifier.fit(X, y)
         return self
 
+    # TODO: Include calibration
+    def fit_calibration(self, X):
+        pass
 
+
+    # TODO: predict + option to predict calibrated values or not
     def predict(self, X):
-        """
-        """
-        ypred = self._mlp.predict(X)
+        ypred = self._classifier.predict(X)
         return ypred
 
 
-    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, classes_map_full, MAX_LR):
+    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, classes_map_full):
         """
         Predicts probabilties per class and returns probabilities for one class and the other in separate lists.
         """
-        ypred_proba = self._mlp.predict_proba(Xtest)
+        ypred_proba = self._classifier.predict_proba(Xtest)
 
         h0_h1_probs_per_class = {}
         # marginal for each single class sample
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-            ypred_proba, labels_in_class, classes_map, MAX_LR)
+            ypred_proba, labels_in_class, classes_map, self.MAX_LR)
 
         for idx, (celltype, i_celltype) in enumerate(sorted(classes_map.items())):
             i_celltype_full = classes_map_full[celltype]
@@ -43,18 +46,18 @@ class MLPClassifierMarginal():
         return h0_h1_probs_per_class
 
 
-    def predict_proba(self, Xtest, labels_in_class, classes_map, MAX_LR):
+    def predict_proba(self, Xtest, labels_in_class, classes_map):
         """
         Predicts probabilties per class.
         """
-        ypred_proba = self._mlp.predict_proba(Xtest)
+        ypred_proba = self._classifier.predict_proba(Xtest)
 
         prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-            ypred_proba, labels_in_class, classes_map, MAX_LR)
+            ypred_proba, labels_in_class, classes_map, self.MAX_LR)
 
         return prob_per_class
 
-
+# TODO: Make everything h1_h2
 def calibration_fit(h0_h1_probs, classes_map, Calibrator=KDECalibrator):
     """
     Get a calibrated model for each class based on one vs. all.
@@ -76,7 +79,8 @@ def calibration_fit(h0_h1_probs, classes_map, Calibrator=KDECalibrator):
 
     return calibrators_per_class
 
-
+# TODO: In class
+# TODO: Make everything h1_h2
 def calibration_transform(h0_h1_probs_test, calibrators_per_class, classes_map):
     """
     Transforms the scores with the calibrated model for the correct class.

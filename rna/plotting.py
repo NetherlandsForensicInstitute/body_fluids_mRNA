@@ -2,11 +2,12 @@
 Plotting functions.
 """
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
-from analytics import *
+from rna.analytics import combine_samples, convert_prob_per_mixture_to_marginal_per_class
 from lir import PavLogLR
 
 
