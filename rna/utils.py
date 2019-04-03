@@ -220,3 +220,19 @@ def refactor_classes_map(classes_map, classes_to_evaluate, class_combinations_to
             del classes_map_to_evaluate[key]
 
     return classes_map_full, classes_map_to_evaluate
+
+#TODO: Add classes
+def string2vec(list_of_strings, celltypes, string2index):
+
+    target_classes = np.zeros((len(list_of_strings), celltypes.shape[0]))
+    for i, list_item in enumerate(list_of_strings):
+        if 'and/or' in list_item:
+
+            combined_target = np.zeros((len(list_item.split(' and/or ')), celltypes.shape[0]))
+            for j, string_item in enumerate(list_item.split(' and/or ')):
+                combined_target[j, :] = celltypes[string2index[string_item], :]
+            target_classes[i, :] = np.max(combined_target, axis=0)
+        else:
+            target_classes[i, :] = celltypes[string2index[list_item], :]
+
+    return target_classes

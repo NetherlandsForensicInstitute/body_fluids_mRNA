@@ -32,11 +32,22 @@ def read_df(filename, binarize):
         return df, rv
 
     else:
-        raise ValueError('Data file should contain column '
-                         'of indices, indicated by "rv" in file name.'
-                         'Change te filename by concatenating "_rv" only'
-                         'if you are sure that such a column is present in '
-                         'the data file.')
+        # then 'replicate_values' not included, so
+        # assume that all samples have 4 replicates
+        df = pd.read_excel(filename, delimiter=';')
+        if binarize:
+            df = 1 * (df > 150)
+        # TODO: currently not per celltype
+        # all_celltypes = np.array(df.index)
+        # n_per_celltype = Counter([celltype for celltype in all_celltypes)
+
+        try:
+            rv = np.zeros((df.shape[0], 1))
+            replicates = [1, 2, 3, 4] * int(df.shape[0]/4)
+            rv[:, 0] = replicates
+        except ValueError:
+            rv[:, 0] = [1, 2, 3, 4] * int(df.shape[0] / 4) + [1, 2, 3, 4][0:df.shape[0] - len(replicates)]
+        return df, rv
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
@@ -109,7 +120,11 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
         if include_blank or 'Blank' not in celltype:
             if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
                 data_for_this_celltype = np.array(df.loc[celltype])
-                rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+                if type(rv) == pd.core.frame.DataFrame:
+                    rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+                # TODO: Currently does not work
+                elif type(rv) == list:
+                    rvset_for_this_celltype = rv[rv[:, 1] == celltype, 0]
 
                 end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
                                  rvset_for_this_celltype[i-1] > rvset_for_this_celltype[i] or
