@@ -24,10 +24,10 @@ if __name__ == '__main__':
     target_classes_str = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa', 'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, celltypes, string2index)
 
+
+
     X_augmented, y_augmented, y_nhot_augmented = augment_data(X_single, y_nhot_single, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, string2index, from_penile=from_penile)
 
-    model = MarginalClassifier()
-    model.fit(X_augmented, y_augmented)
-    model.predict_proba(X_augmented, y_nhot_augmented, target_classes)
+
 
 
