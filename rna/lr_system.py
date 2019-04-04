@@ -1,5 +1,9 @@
+import numpy as np
+
 from lir import KDECalibrator, Xn_to_Xy, Xy_to_Xn
 from sklearn.neural_network import MLPClassifier
+
+from rna.analytics import convert_prob_per_mixture_to_marginal_per_class
 
 class MarginalClassifier():
 
@@ -13,49 +17,38 @@ class MarginalClassifier():
         self._classifier.fit(X, y)
         return self
 
-    # TODO: Include calibration
-    def fit_calibration(self, X):
+
+    def predict_proba(self, X, y_nhot, target_classes, for_calibration=False):
+        if not for_calibration:
+            ypred_proba = self._classifier.predict_proba(X)
+
+            mixtures = np.flip(np.unique(y_nhot, axis=0), axis=1) # select unique combinations of celltypes
+            prob_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, mixtures, target_classes, self.MAX_LR)
+
+            return prob_per_target_class
+        else:
+            pass
+
+
+    def fit_calibration(self, X, y_nhot, target_classes):
+        """
+        Makes calibrated model for all claqsses of interest.
+
+        :param X:
+        :param y:
+        :param target_classes:
+        :param index2string:
+        :return:
+        """
+        self.fit(X, y_nhot)
+
+
+        # TODO: outputs calibrated models
+
+    def transform_calibration(self, ):
         pass
 
 
-    # TODO: predict + option to predict calibrated values or not
-    def predict(self, X):
-        ypred = self._classifier.predict(X)
-        return ypred
-
-
-    def predict_proba_per_class(self, Xtest, y_n_hot, labels_in_class, classes_map, classes_map_full):
-        """
-        Predicts probabilties per class and returns probabilities for one class and the other in separate lists.
-        """
-        ypred_proba = self._classifier.predict_proba(Xtest)
-
-        h0_h1_probs_per_class = {}
-        # marginal for each single class sample
-        prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-            ypred_proba, labels_in_class, classes_map, self.MAX_LR)
-
-        for idx, (celltype, i_celltype) in enumerate(sorted(classes_map.items())):
-            i_celltype_full = classes_map_full[celltype]
-            total_proba = prob_per_class[:, i_celltype]
-            if sum(total_proba) > 0:
-                probas_without_cell_type = total_proba[y_n_hot[:, i_celltype_full] == 0]
-                probas_with_cell_type = total_proba[y_n_hot[:, i_celltype_full] == 1]
-                h0_h1_probs_per_class[celltype] = (probas_with_cell_type, probas_without_cell_type)
-
-        return h0_h1_probs_per_class
-
-
-    def predict_proba(self, Xtest, labels_in_class, classes_map):
-        """
-        Predicts probabilties per class.
-        """
-        ypred_proba = self._classifier.predict_proba(Xtest)
-
-        prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-            ypred_proba, labels_in_class, classes_map, self.MAX_LR)
-
-        return prob_per_class
 
 # TODO: Make everything h1_h2
 def calibration_fit(h0_h1_probs, classes_map, Calibrator=KDECalibrator):

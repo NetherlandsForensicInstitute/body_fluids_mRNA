@@ -227,7 +227,6 @@ def string2vec(list_of_strings, celltypes, string2index):
     target_classes = np.zeros((len(list_of_strings), celltypes.shape[0]))
     for i, list_item in enumerate(list_of_strings):
         if 'and/or' in list_item:
-
             combined_target = np.zeros((len(list_item.split(' and/or ')), celltypes.shape[0]))
             for j, string_item in enumerate(list_item.split(' and/or ')):
                 combined_target[j, :] = celltypes[string2index[string_item], :]

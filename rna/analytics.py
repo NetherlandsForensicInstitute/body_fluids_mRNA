@@ -91,8 +91,8 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     return combine_samples(np.array(augmented_samples))
 
 # TODO: Change classes map (?)
-def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
-                 N_SAMPLES_PER_COMBINATION, classes_map, from_penile=False):
+def augment_data(X, y_nhot, n_celltypes, n_features,
+                 N_SAMPLES_PER_COMBINATION, string2index, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -115,56 +115,85 @@ def augment_data(X_singles_raw, y_singles, n_single_cell_types, n_features,
                             mixture labels each single cell type features in
     """
     if from_penile == False:
-        if 'Skin.penile' in classes_map:
-            del classes_map['Skin.penile']
+        if 'Skin.penile' in string2index:
+            del string2index['Skin.penile']
 
-    X = np.zeros((0, n_features))
-    y = []
-    n_single_cell_types_not_penile = n_single_cell_types - 1
-    y_n_hot = np.zeros((
-        2 ** n_single_cell_types_not_penile * N_SAMPLES_PER_COMBINATION,
-        n_single_cell_types
-    ), dtype=int)
-    mixtures_containing_single_cell_type = {celltype: [] for celltype in classes_map}
+    y = np.argmax(y_nhot, axis=1)
+
+    X_augmented = np.zeros((0, n_features))
+    y_augmented = []
+    y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
+                                 n_celltypes), dtype=int)
+    # mixtures_containing_single_cell_type = {celltype : [] for celltype in string2index}
+    # mixtures = np.zeros((2 ** n_celltypes, n_celltypes), dtype=int)
 
     # for each possible combination augment N_SAMPLES_PER_COMBINATION
-    for i in range(2 ** n_single_cell_types_not_penile):
+    for i in range(2 ** n_celltypes):
         binary = bin(i)[2:]
-        while len(binary) < n_single_cell_types_not_penile:
+        while len(binary) < n_celltypes:
             binary = '0' + binary
+
         classes_in_current_mixture = []
-        for j, celltype in enumerate(sorted(classes_map)):
-            if binary[-j - 1] == '1':
-                classes_in_current_mixture.append(j)
-                mixtures_containing_single_cell_type[celltype].append(int(i))
-                y_n_hot[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, j] = 1
+        for (celltype, i_celltype) in sorted(string2index.items()):
+            if binary[-i_celltype - 1] == '1':
+                classes_in_current_mixture.append(i_celltype)
+                # mixtures[i, i_celltype] = 1
+                # mixtures_containing_single_cell_type[celltype].append(int(i))
+                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
         if from_penile:
             # also (always) add penile skin samples
-            y_n_hot[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_single_cell_types - 1] = 1
-        X = np.append(X, construct_random_samples(
-            X_singles_raw, y_singles, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
-        y += [i] * N_SAMPLES_PER_COMBINATION
+            y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
 
-    return X, y, y_n_hot[:, :n_single_cell_types_not_penile], \
-           mixtures_containing_single_cell_type
+        X_augmented = np.append(X_augmented, construct_random_samples(
+            X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+        y_augmented += [i] * N_SAMPLES_PER_COMBINATION
+
+    # assert mixtures.shape[0] == 2 ** n_celltypes, 'n hot encoded matrix does not consist of 2 ** n_celltypes'
+
+    return X_augmented, y_augmented, y_nhot_augmented[:, :n_celltypes]
 
 # TODO: Change labels_in_class/classes_map?
-def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classes_map, MAX_LR):
-    """
-    Converts n_samples x n_mixture_classes matrix of probabilities to a
-    n_samples x n_classes_of_interest matrix, by summing over the relevant
-    mixtures.
+# def convert_prob_per_mixture_to_marginal_per_class(prob, labels_in_class, classes_map, MAX_LR):
+#     """
+#     Converts n_samples x n_mixture_classes matrix of probabilities to a
+#     n_samples x n_classes_of_interest matrix, by summing over the relevant
+#     mixtures.
+#
+#     :param prob: n_samples x n_mixture_classes matrix of probabilities
+#     :param labels_in_class: iterable of len n_classes_of_interest. For each
+#         class, the list of mixture classes that contain the class of interest
+#         are given.
+#     :return: n_samples x n_classes_of_interest matrix of probabilities
+#     """
+#     res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
+#     for idx, (celltype, i_celltype) in enumerate(sorted(classes_map.items())):
+#         if len(labels_in_class[celltype]) > 0:
+#             res_prob[:, i_celltype] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
+#     epsilon = 10 ** -MAX_LR
+#     res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
+#     res_prob = np.where(res_prob < epsilon, epsilon, res_prob)
+#
+#     return res_prob
 
-    :param prob: n_samples x n_mixture_classes matrix of probabilities
-    :param labels_in_class: iterable of len n_classes_of_interest. For each
-        class, the list of mixture classes that contain the class of interest
-        are given.
-    :return: n_samples x n_classes_of_interest matrix of probabilities
+
+def convert_prob_per_mixture_to_marginal_per_class(prob, mixtures, target_classes, MAX_LR):
     """
-    res_prob = np.zeros((prob.shape[0], len(labels_in_class)))
-    for idx, (celltype, i_celltype) in enumerate(sorted(classes_map.items())):
-        if len(labels_in_class[celltype]) > 0:
-            res_prob[:, i_celltype] = np.sum(prob[:, labels_in_class[celltype]], axis=1)
+    Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
+    matrix by summing over the probabilities containing the celltype(s) of interest.
+
+    :param prob: n_samples x n_mixtures containing the predicted probabilities
+    :param mixtures: n_mixtures) x n_celltypes containing the unique mixtures in data
+    :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
+    :param MAX_LR: int
+    :return: n_samples x n_target_classes of probabilities
+    """
+
+    res_prob = np.zeros((prob.shape[0], target_classes.shape[0]))
+    for i, target_class in enumerate(target_classes):
+        relevant_mixture_columns = np.multiply(mixtures, target_class.T)
+        if np.sum(relevant_mixture_columns) > 0:
+            indices_of_target_class = np.argwhere(np.max(relevant_mixture_columns, axis=1) == 1)
+            res_prob[:, i] = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
     epsilon = 10 ** -MAX_LR
     res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
     res_prob = np.where(res_prob < epsilon, epsilon, res_prob)

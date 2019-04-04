@@ -48,7 +48,7 @@ if __name__ == '__main__':
         # NB penile skin treated like all others for classify_single
         classify_single(X_train, y_train, inv_classes_map)
 
-        model = MLPClassifierMarginal()
+        model = MarginalClassifier()
         # model = MLPClassifier(random_state=0)
         # model = LogisticRegression(random_state=0)
 
