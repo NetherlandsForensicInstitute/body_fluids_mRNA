@@ -141,8 +141,9 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
                 # mixtures_containing_single_cell_type[celltype].append(int(i))
                 y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
         if from_penile:
-            # also (always) add penile skin samples
+            # also (always) add penile skin samples. the index for penile is n_celltypes
             y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
+            classes_in_current_mixture.append(n_celltypes)
 
         X_augmented = np.append(X_augmented, construct_random_samples(
             X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
@@ -176,26 +177,14 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
 #     return res_prob
 
 
-def convert_prob_per_mixture_to_marginal_per_class(prob, mixtures, target_classes, MAX_LR):
+def get_mixture_columns_for_class(target_class, priors):
     """
-    Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
-    matrix by summing over the probabilities containing the celltype(s) of interest.
-
-    :param prob: n_samples x n_mixtures containing the predicted probabilities
-    :param mixtures: n_mixtures) x n_celltypes containing the unique mixtures in data
-    :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
-    :param MAX_LR: int
-    :return: n_samples x n_target_classes of probabilities
+    for the target_class, a vector of length n_single_cell_types with 1 or more 1's, give
+    back the columns in the mixtures that contain one or more of these single cell types
+    :param target_class: vector of length n_single_cell_types with 1 or more 1's
+    :param target_class: vector of length n_single_cell_types with 0 or 1 to indicate single cell type has 0 or 1 prior,
+    uniform assumed otherwise
+    :return: list of ints, in [0, 2 ** n_cell_types]
     """
+    raise NotImplementedError()
 
-    res_prob = np.zeros((prob.shape[0], target_classes.shape[0]))
-    for i, target_class in enumerate(target_classes):
-        relevant_mixture_columns = np.multiply(mixtures, target_class.T)
-        if np.sum(relevant_mixture_columns) > 0:
-            indices_of_target_class = np.argwhere(np.max(relevant_mixture_columns, axis=1) == 1)
-            res_prob[:, i] = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
-    epsilon = 10 ** -MAX_LR
-    res_prob = np.where(res_prob > 1 - epsilon, 1 - epsilon, res_prob)
-    res_prob = np.where(res_prob < epsilon, epsilon, res_prob)
-
-    return res_prob

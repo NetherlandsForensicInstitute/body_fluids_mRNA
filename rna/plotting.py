@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
-from rna.analytics import combine_samples, convert_prob_per_mixture_to_marginal_per_class
+from rna.analytics import combine_samples
+from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from lir import PavLogLR
 
 

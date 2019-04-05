@@ -3,7 +3,8 @@ import numpy as np
 from lir import KDECalibrator, Xn_to_Xy, Xy_to_Xn
 from sklearn.neural_network import MLPClassifier
 
-from rna.analytics import convert_prob_per_mixture_to_marginal_per_class
+from rna.analytics import get_mixture_columns_for_class
+
 
 class MarginalClassifier():
 
@@ -17,13 +18,20 @@ class MarginalClassifier():
         self._classifier.fit(X, y)
         return self
 
-
-    def predict_proba(self, X, y_nhot, target_classes, for_calibration=False):
-        if not for_calibration:
+    def predict_proba(self, X, target_classes, without_calibration=False, priors=None):
+        """
+        gives back an N x n_target_class array of probabilities
+        :param X: the N x n_features data
+        :param target_classes:
+        :param without_calibration:
+        :param priors:
+        :return:
+        """
+        if not without_calibration:
             ypred_proba = self._classifier.predict_proba(X)
 
-            mixtures = np.flip(np.unique(y_nhot, axis=0), axis=1) # select unique combinations of celltypes
-            prob_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, mixtures, target_classes, self.MAX_LR)
+            # mixtures = np.flip(np.unique(y_nhot, axis=0), axis=1) # select unique combinations of celltypes
+            prob_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
 
             return prob_per_target_class
         else:
@@ -97,3 +105,38 @@ def calibration_transform(h0_h1_probs_test, calibrators_per_class, classes_map):
         h0_h1_after_calibration[celltype] = (probs0, probs1)
 
     return h0_h1_after_calibration
+
+
+def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
+    """
+    Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
+    matrix by summing over the probabilities containing the celltype(s) of interest.
+
+    :param prob: n_samples x n_mixtures containing the predicted probabilities
+    :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
+    :param MAX_LR: int
+    :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
+    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
+    distribution
+    :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
+    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
+    distribution
+    :return: n_samples x n_target_classes of probabilities
+    """
+
+    lrs = np.zeros((prob.shape[0], target_classes.shape[0]))
+    for i, target_class in enumerate(target_classes):
+        assert sum(target_class) > 0
+
+        # numerator
+        indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
+        numerator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
+
+        # denominator
+        indices_of_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
+        denominator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
+        lrs[:, i] = numerator/denominator
+
+    lrs = np.where(lrs > MAX_LR, MAX_LR, lrs)
+    lrs = np.where(lrs < -MAX_LR, -MAX_LR, lrs)
+    return lrs
