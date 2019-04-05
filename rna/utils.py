@@ -3,6 +3,8 @@ General calculations.
 """
 
 import random
+
+import numpy
 import numpy as np
 
 # TODO: include functions string2vec and vec2string.
@@ -83,10 +85,12 @@ def split_data(X, y, size=(0.4, 0.4)):
 
     def define_random_indices(indices, size):
         """
-        Randomly draws indices and assigns these
+        Randomly defines indices and assigns them to either train
+        or calib. For the test set the same samples are included.
         """
         train_size = size[0]
         calibration_size = size[1]
+
 
         train_index = random.sample(indices, int(train_size * len(indices)))
         indices_no_train = [idx for idx in indices if idx not in train_index]
@@ -132,6 +136,7 @@ def split_data(X, y, size=(0.4, 0.4)):
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 # TODO: Change h0_h1 to h1_h2
+# TODO: Check if needed?
 def probs_to_lrs(h0_h1_probs, classes_map, log=False):
     """
     Converts probabilities to (log) likelihood ratios.
@@ -156,6 +161,7 @@ def probs_to_lrs(h0_h1_probs, classes_map, log=False):
     return h0_h1_lrs
 
 # TODO: Change h0_h1 to h1_h2
+# TODO: Check if needed?
 def average_per_celltype(h0_h1):
     """
     Calculates the average for all values per cell type per class within celltype.
@@ -200,26 +206,6 @@ def sort_calibrators(all_calibrators):
 
     return sorted_calibrators
 
-# TODO: Check if needed?
-def refactor_classes_map(classes_map, classes_to_evaluate, class_combinations_to_evaluate_combined,
-                         from_penile):
-
-    classes_map_full = classes_map.copy()
-    if from_penile:
-        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
-            classes_map_full[combination] = len(classes_map) + idx
-    else:
-        del classes_map_full['Skin.penile']
-        for idx, combination in enumerate(class_combinations_to_evaluate_combined):
-            classes_map_full[combination] = len(classes_map) - 1 + idx
-
-    # adjust classes map for evaluation
-    classes_map_to_evaluate = classes_map.copy()
-    for key in list(classes_map_to_evaluate):
-        if key not in classes_to_evaluate:
-            del classes_map_to_evaluate[key]
-
-    return classes_map_full, classes_map_to_evaluate
 
 #TODO: Add classes
 def string2vec(list_of_strings, celltypes, string2index):
@@ -235,3 +221,16 @@ def string2vec(list_of_strings, celltypes, string2index):
             target_classes[i, :] = celltypes[string2index[list_item], :]
 
     return target_classes
+
+
+def from_nhot_to_labels(y_nhot):
+
+    unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
+    if np.array_equal(np.sum(unique_labels, axis=1), np.ones(y_nhot.shape[1])):
+        y = np.argmax(y_nhot, axis=1)
+    else:
+        y = []
+        for i in range(unique_labels.shape[0]):
+            y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
+
+    return y

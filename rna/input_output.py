@@ -115,7 +115,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
     n_features = len(df.columns)
 
     X_single = []
-    y_single = []
+    # y_single = []
     for celltype in sorted(celltypes_set) + ['Skin.penile']:
         if include_blank or 'Blank' not in celltype:
             if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
@@ -153,7 +153,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
                     n_discarded
                 ))
                 n_per_celltype[celltype] = n_full_samples
-                y_single += [string2index[celltype]] * n_full_samples
+                # y_single += [string2index[celltype]] * n_full_samples
 
     X_single = np.array(X_single)
     n_celltypes_with_penile = len(string2index)
@@ -166,7 +166,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
         end = end + n_per_celltype[index2string[i_celltype]]
         y_nhot_single[begin:end, i_celltype] = 1
 
-    return X_single, y_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
+    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
 
 
 def read_mixture_data(filename, n_single_cell_types_no_penile, classes_map,
