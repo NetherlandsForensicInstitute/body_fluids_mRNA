@@ -35,4 +35,4 @@ if __name__ == '__main__':
 
     model = MarginalClassifier()
     model.fit(X_augmented, y_augmented)
-    model.predict_proba(X_augmented, target_classes)
+    model.predict_lrs(X_augmented, target_classes)

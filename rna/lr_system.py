@@ -18,9 +18,9 @@ class MarginalClassifier():
         self._classifier.fit(X, y)
         return self
 
-    def predict_proba(self, X, target_classes, without_calibration=False, priors=None):
+    def predict_lrs(self, X, target_classes, without_calibration=False, priors=None):
         """
-        gives back an N x n_target_class array of probabilities
+        gives back an N x n_target_class array of LRs
         :param X: the N x n_features data
         :param target_classes:
         :param without_calibration:
@@ -36,7 +36,6 @@ class MarginalClassifier():
             return prob_per_target_class
         else:
             pass
-
 
     def fit_calibration(self, X, y_nhot, target_classes):
         """
@@ -55,7 +54,6 @@ class MarginalClassifier():
 
     def transform_calibration(self, ):
         pass
-
 
 
 # TODO: Make everything h1_h2
@@ -79,6 +77,7 @@ def calibration_fit(h0_h1_probs, classes_map, Calibrator=KDECalibrator):
         calibrators_per_class[celltype] = calibrator.fit(X, y)
 
     return calibrators_per_class
+
 
 # TODO: In class
 # TODO: Make everything h1_h2
