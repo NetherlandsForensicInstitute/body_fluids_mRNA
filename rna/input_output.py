@@ -9,7 +9,7 @@ import pandas as pd
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
-def read_df(filename, binarize):
+def read_df(filename, binarize, number_of_replicates):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.
     Returns the original dataframe and a separate list of indices that are the
@@ -34,24 +34,23 @@ def read_df(filename, binarize):
     else:
         # then 'replicate_values' not included, so
         # assume that all samples have 4 replicates
-        df = pd.read_excel(filename, delimiter=';')
+        df = pd.read_excel(filename, delimiter=';', index_col=0)
+        df.fillna(0, inplace=True)
         if binarize:
             df = 1 * (df > 150)
-        # TODO: currently not per celltype
-        # all_celltypes = np.array(df.index)
-        # n_per_celltype = Counter([celltype for celltype in all_celltypes)
 
         try:
             rv = np.zeros((df.shape[0], 1))
-            replicates = [1, 2, 3, 4] * int(df.shape[0]/4)
+            replicates = [i for i in range(number_of_replicates)] * int(df.shape[0]/number_of_replicates)
             rv[:, 0] = replicates
         except ValueError:
-            rv[:, 0] = [1, 2, 3, 4] * int(df.shape[0] / 4) + [1, 2, 3, 4][0:df.shape[0] - len(replicates)]
+            rv[:, 0] = [i for i in range(number_of_replicates)] * int(df.shape[0] / number_of_replicates) + \
+                       [i for i in range(number_of_replicates)][0:df.shape[0] - len(replicates)]
         return df, rv
 
 
-def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
-                           binarize=True, developing=False, include_blank=False):
+def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
+                           ground_truth_known=True,binarize=True, number_of_replicates=None):
     """
     Returns data per specified cell types.
 
@@ -61,9 +60,9 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
     dimension.
 
     :param filename: name of file to read in, must include "_rv"
+    :param single_cell_types: iterable of strings of all single cell types that exist
+    :param ground_truth_known: does this data file have labels for the real classes?
     :param binarize: whether to binarize raw measurement values
-    :param developing: if developing, ignore Skin and Blank category for speed
-    :param include_blank: whether to include Blank as a separate cell type
     :return: (N_single_cell_experimental_samples x N_measurements per sample x
         N_markers array of measurements,
                 N_single_cell_experimental_samples array of int labels of which
@@ -91,82 +90,92 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx',
 
         return indices_per_replicate_set
 
-    df, rv = read_df(filename, binarize)
-    all_celltypes = np.array(df.index)
-    # penile skin should be treated separately
-    celltypes_set = set(all_celltypes)
-    celltypes_set.remove('Skin.penile')
+    df, rv = read_df(filename, binarize, number_of_replicates)
+    if single_cell_types:
+        celltypes_set = set(single_cell_types)
+    else:
+        if not ground_truth_known:
+            raise ValueError('if no cell types are provided, ground truth should be known')
+        # if not provided, learn the cell types from the data
+        all_celltypes = np.array(df.index)
+        # penile skin should be treated separately
+        celltypes_set = set(all_celltypes)
+        celltypes_set.remove('Skin.penile')
 
     # initialize
     string2index = {}
     index2string = {}
-    i = 0
 
-    for celltype in sorted(celltypes_set) + ['Skin.penile']:
-        if include_blank or 'Blank' not in celltype:
-            if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
-                string2index[celltype] = i
-                index2string[i] = celltype
-                i += 1
-    n_per_celltype = Counter([celltype for celltype in all_celltypes if
-               (not developing or ('Skin' not in celltype and 'Blank' not in celltype))
-               and (include_blank or 'Blank' not in celltype)])
+    for i, celltype in enumerate(sorted(celltypes_set) + ['Skin.penile']):
+        string2index[celltype] = i
+        index2string[i] = celltype
 
+    n_celltypes_with_penile = len(string2index)
     n_features = len(df.columns)
+    n_per_celltype = dict()
 
-    X_single = []
-    y_single = []
-    for celltype in sorted(celltypes_set) + ['Skin.penile']:
-        if include_blank or 'Blank' not in celltype:
-            if not developing or ('Skin' not in celltype and 'Blank' not in celltype):
-                data_for_this_celltype = np.array(df.loc[celltype])
-                if type(rv) == pd.core.frame.DataFrame:
-                    rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
-                # TODO: Currently does not work
-                elif type(rv) == list:
-                    rvset_for_this_celltype = rv[rv[:, 1] == celltype, 0]
+    X_single=[]
+    if ground_truth_known:
+        y_single = []
+        for celltype in sorted(celltypes_set) + ['Skin.penile']:
+            data_for_this_celltype = np.array(df.loc[celltype])
+            if type(rv) == pd.core.frame.DataFrame:
+                rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+            # TODO: Currently does not work
+            elif type(rv) == list:
+                rvset_for_this_celltype = rv[rv[:, 1] == celltype, 0]
 
-                end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
-                                 rvset_for_this_celltype[i-1] > rvset_for_this_celltype[i] or
-                                 rvset_for_this_celltype[i-1] == rvset_for_this_celltype[i]]
-                indices_per_replicate_set = indices_per_replicate(end_replicate, len(rvset_for_this_celltype))
+            n_full_samples, candidate_samples = get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate,
+                                                   rvset_for_this_celltype)
+            X_single.append(candidate_samples)
+            n_per_celltype[celltype] = n_full_samples
+            y_single += [string2index[celltype]] * n_full_samples
 
-                n_full_samples = len(indices_per_replicate_set)
-                n_discarded = 0
+        y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
+        end = 0
+        for n in range(n_celltypes_with_penile):
+            i_celltype = string2index[index2string[n]]
+            begin = end
+            end = end + n_per_celltype[index2string[i_celltype]]
+            y_nhot_single[begin:end, i_celltype] = 1
 
-                for idxs in indices_per_replicate_set:
-                    candidate_samples = data_for_this_celltype[idxs, :]
-
-                    # TODO is make this at least one okay?
-                    if np.sum(candidate_samples[:, -1]) < 1 or \
-                            np.sum(candidate_samples[:, -2]) < 1 \
-                            and 'Blank' not in celltype:
-                        n_full_samples -= 1
-                        n_discarded += 1
-                    else:
-                        X_single.append(candidate_samples)
-
-                print('{} has {} samples (after discarding {} due to QC on '
-                      'structural markers)'.format(
-                    celltype,
-                    n_full_samples,
-                    n_discarded
-                ))
-                n_per_celltype[celltype] = n_full_samples
-                y_single += [string2index[celltype]] * n_full_samples
+    else:
+        n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate,
+                                                         rv)
+        y_nhot_single=None
+        y_single=None
 
     X_single = np.array(X_single)
-    n_celltypes_with_penile = len(string2index)
+    return X_single, y_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, \
+           index2string, list(df.columns), list(df.index)
 
-    y_nhot_single = np.zeros((X_single.shape[0], n_celltypes_with_penile))
-    end = 0
-    for n in range(n_celltypes_with_penile):
-        i_celltype = string2index[index2string[n]]
-        begin = end
-        end = end + n_per_celltype[index2string[i_celltype]]
-        y_nhot_single[begin:end, i_celltype] = 1
 
-    return X_single, y_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
+def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype):
+    end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
+                     rvset_for_this_celltype[i - 1] > rvset_for_this_celltype[i] or
+                     rvset_for_this_celltype[i - 1] == rvset_for_this_celltype[i]]
+    indices_per_replicate_set = indices_per_replicate(end_replicate, len(rvset_for_this_celltype))
+    n_full_samples = len(indices_per_replicate_set)
+    n_discarded = 0
+    X_single = []
+    for idxs in indices_per_replicate_set:
+        candidate_samples = data_for_this_celltype[idxs,:]
+
+        # TODO is make this at least one okay?
+        if np.sum(candidate_samples[:, -1]) < 1 or \
+                np.sum(candidate_samples[:, -2]) < 1 \
+                and 'Blank' not in celltype:
+            n_full_samples -= 1
+            n_discarded += 1
+        else:
+            X_single.append(candidate_samples)
+    print('{} has {} samples (after discarding {} due to QC on '
+          'structural markers)'.format(
+        celltype,
+        n_full_samples,
+        n_discarded
+    ))
+    return n_full_samples, X_single
 
 
 def read_mixture_data(filename, n_single_cell_types_no_penile, classes_map,

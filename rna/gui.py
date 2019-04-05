@@ -13,6 +13,9 @@ import pandas as pd
 from input_output import read_df
 from analytics import combine_samples
 
+from rna.input_output import get_data_per_cell_type
+
+
 class FullScreenApp(object):
 
     def __init__(self, master):
@@ -33,8 +36,8 @@ class AnalyseExcel:
         self.master.minsize(1500, 400)
         self.master.geometry("320x100")
 
-        self.open_filename = '/home/rolf/PycharmProjects/rna-celtypes/Datasets/Dataset_NFI.xlsx'
-        self.save_filename = '/home/rolf/PycharmProjects/rna-celtypes/test'
+        self.open_filename = '../Datasets/example_case.xlsx'
+        self.save_filename = '../scratch/test'
         self.save_text_widget = None
         self.open_text_widget = None
         self.number_of_replicates = 4
@@ -126,24 +129,10 @@ class AnalyseExcel:
     def analyse_data(self):
         # global master, self.tree, button_load
 
-        model_filename, index_test, names, data_unparsed = self.load_data()
+        model_filename, marker_names, names, X_single, n_celltypes_with_penile, \
+            n_features, n_per_celltype, string2index, index2string = self.load_data()
 
-        n_samples, n_features = data_unparsed.shape
-        # for now, discard the remainder?
-        n_full_samples = int(n_samples / self.number_of_replicates)
-        data_raw = np.zeros((n_full_samples, self.number_of_replicates, n_features))
-        n_discarded = 0
-        for i in range(n_full_samples):
-            candidate_samples = data_unparsed[i * self.number_of_replicates:(i + 1) * self.number_of_replicates, :]
-            # discard if the structural measurements were empty
-            if sum(candidate_samples[:, -1]) < self.number_of_replicates-1 or sum(candidate_samples[:, -2]) < self.number_of_replicates-1:
-                print('dropping sample, too low structural measurements!')
-                n_full_samples -= 1
-                data_raw = data_raw[:n_full_samples, :, :]
-                n_discarded += 1
-            else:
-                data_raw[i - n_discarded, :, :] = candidate_samples
-        X = combine_samples(data_raw)
+        X = combine_samples(X_single)
 
         print('data loaded, shape {}. {}'.format(X.shape, X[0, :]))
 
@@ -155,15 +144,15 @@ class AnalyseExcel:
         predicted_proba_4 = []
         proba_final_top = []
         proba_final_bottom = []
-        if index_test != column_names:
+        if marker_names != column_names:
             messagebox.showinfo("Warning",
                                 "'The marker labels are inconsistent with the trained model, please fix the labels. "
-                                "The correct labels are: {}. Found {}".format(column_names, index_test))
+                                "The correct labels are: {}. Found {}".format(column_names, marker_names))
 
         # Load the trained model and all classes present in the trained model.
         model = pickle.load(open(model_filename, 'rb'))
         # classes = pickle.load(open('classes.pkl', 'rb'))
-        mixture_classes_in_single_cell_type = pickle.load(open('mixture_classes_in_single_cell_type', 'rb'))
+        # mixture_classes_in_single_cell_type = pickle.load(open('mixture_classes_in_single_cell_type', 'rb'))
         prob_per_class = get_prob_per_class(X, mixture_classes_in_single_cell_type, model, max_lr=10)
 
         print(prob_per_class)
@@ -467,21 +456,16 @@ class AnalyseExcel:
         # If there is no input file selected, the program quits.
         try:
             # xl = pd.ExcelFile(self.open_filename)
-            df_data = read_df(self.open_filename, True)
+            X_single, _, _, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string,\
+                marker_names, names = \
+                get_data_per_cell_type(filename=self.open_filename, single_cell_types=self.single_cell_types,
+                                   ground_truth_known=False, binarize=True,
+                                       number_of_replicates = self.number_of_replicates)
         except ValueError:
             sys.exit()
         except IndexError:
             sys.exit()
-        # Loading the input RNA data and transforming the data to presence/absence data.
-        # sheetName = xl.sheet_names
-        # df_data = xl.parse(sheetName[0])
-        # df_data = df_data.fillna(0)
-        # df_data[df_data < 150] = 0
-        # df_data[df_data >= 150] = 1
-        test_data = np.array(df_data.values)
-        index_test = list(df_data.columns.values)
-        names = list(df_data.index)
-        return filename, index_test, names, test_data
+        return filename, marker_names, names, X_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
 
     def add_buttons(self):
         for i, cell in enumerate(self.single_cell_types):
