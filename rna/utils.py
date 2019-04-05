@@ -7,7 +7,6 @@ import random
 import numpy
 import numpy as np
 
-# TODO: include functions string2vec and vec2string.
 
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
                                               classes_map,
@@ -193,11 +192,7 @@ def average_per_celltype(h0_h1):
 
 # TODO: Check if needed?
 def sort_calibrators(all_calibrators):
-    """
 
-    :param all_calibrators:
-    :return:
-    """
     celltypes = list(all_calibrators[0].keys())
     sorted_calibrators = {celltype : [] for celltype in celltypes}
     for calibrators in all_calibrators:
@@ -207,7 +202,7 @@ def sort_calibrators(all_calibrators):
     return sorted_calibrators
 
 
-#TODO: Add classes
+
 def string2vec(list_of_strings, celltypes, string2index):
 
     target_classes = np.zeros((len(list_of_strings), celltypes.shape[0]))

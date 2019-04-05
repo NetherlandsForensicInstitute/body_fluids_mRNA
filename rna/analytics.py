@@ -8,6 +8,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
+from rna.utils import from_nhot_to_labels
+
 
 def combine_samples(data_for_class):
     """
@@ -90,7 +92,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))
 
-# TODO: add documentation
+
 def augment_data(X, y_nhot, n_celltypes, n_features,
                  N_SAMPLES_PER_COMBINATION, string2index, from_penile=False):
     """
@@ -106,20 +108,17 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
     :param from_penile: bool: generate sample that (T) always or (F) never
         also contain penile skin
     :return: n_experiments x n_markers array,
-             n_experiments array of int labels for the mixture classes,
              n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample
                 which single cell type it was made up of. Does not contain column for penile skin
-
     """
 
     if from_penile == False:
         if 'Skin.penile' in string2index:
             del string2index['Skin.penile']
 
-    y = np.argmax(y_nhot, axis=1)
+    y = from_nhot_to_labels(y_nhot)
 
     X_augmented = np.zeros((0, n_features))
-    y_augmented = []
     y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
                                  n_celltypes), dtype=int)
 
@@ -141,19 +140,47 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
 
         X_augmented = np.append(X_augmented, construct_random_samples(
             X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
-        y_augmented += [i] * N_SAMPLES_PER_COMBINATION
 
-    return X_augmented, y_augmented, y_nhot_augmented[:, :n_celltypes]
+    return X_augmented, y_nhot_augmented[:, :n_celltypes]
 
 
 def get_mixture_columns_for_class(target_class, priors):
     """
     for the target_class, a vector of length n_single_cell_types with 1 or more 1's, give
     back the columns in the mixtures that contain one or more of these single cell types
-    :param target_class: vector of length n_single_cell_types with 1 or more 1's
-    :param target_class: vector of length n_single_cell_types with 0 or 1 to indicate single cell type has 0 or 1 prior,
+
+    :param target_class: vector of length n_single_cell_types with at least one 1
+    :param priors: vector of length n_single_cell_types with 0 or 1 to indicate single cell type has 0 or 1 prior,
     uniform assumed otherwise
     :return: list of ints, in [0, 2 ** n_cell_types]
     """
-    raise NotImplementedError()
+
+    n_celltypes = len(target_class)
+    mixtures = np.zeros((2 ** n_celltypes, n_celltypes), dtype=int)
+
+    if priors is not None:
+        assert len(target_class) == len(priors), 'Must be about same cell types so lengths must be the same'
+        # include target_classes + priors
+        selected_classes = np.zeros((n_celltypes, 1))
+        for j in range(len(target_class)):
+            if target_class[j] == 1 and priors[j] == 1:
+                selected_classes[j, 0] = 1
+            elif target_class[j] == 0 and priors[j] == 1:
+                selected_classes[j, 0] = 1
+    else:
+        # TODO: Can do this easier?
+        # make all possible combinations
+        for i in range(2 ** n_celltypes):
+            binary = bin(i)[2:]
+            while len(binary) < n_celltypes:
+                binary = '0' + binary
+
+            for n in range(n_celltypes):
+                if binary[-n - 1] == '1':
+                    mixtures[i:(i + 1), n] = 1
+
+        relevant_mixture_columns = np.multiply(mixtures, target_class.T)
+        indices_of_target_class = np.argwhere(np.max(relevant_mixture_columns, axis=1) == 1)
+
+    return indices_of_target_class
 

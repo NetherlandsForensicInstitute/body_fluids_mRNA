@@ -19,23 +19,23 @@ class MarginalClassifier():
         return self
 
 
-    def fit_calibration(self, X_calib, y_nhot_calib, target_classes):
+    def fit_calibration(self, X, y_nhot, target_classes):
         """
         Makes calibrated model for each target class
         """
-        prob_per_target_class = self.predict_proba(X_calib, y_nhot_calib, target_classes)
+        lrs_per_target_class = self.predict_lrs(X, target_classes)
 
         for i, target_class in enumerate(target_classes):
             calibrator = self._calibrator
-            probs = prob_per_target_class[:, i]
-            labels = np.max(np.multiply(y_nhot_calib, target_class.T), axis=1)
+            lrs = lrs_per_target_class[:, i]
+            labels = np.max(np.multiply(y_nhot, target_class.T), axis=1)
             # TODO: Other type of key?
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
+            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(lrs, labels)
 
         return self
 
 
-    def predict_lrs(self, X, target_classes, without_calibration=False, priors=None):
+    def predict_lrs(self, X, target_classes, with_calibration=False, priors=None):
         """
         gives back an N x n_target_class array of LRs
         :param X: the N x n_features data
@@ -44,35 +44,17 @@ class MarginalClassifier():
         :param priors:
         :return:
         """
-        if not without_calibration:
-            ypred_proba = self._classifier.predict_proba(X)
 
-            # mixtures = np.flip(np.unique(y_nhot, axis=0), axis=1) # select unique combinations of celltypes
-            prob_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
-
-            return prob_per_target_class
-        else:
-            pass
-
-
-    def predict_proba(self, X, y_nhot, target_classes, for_calibration=False):
-        """
-        Predicts probability for all n_mixtures and converts them to marginal probabilities
-        for each target class. If for_calibration returns the calibrated probabilities.
-        """
         ypred_proba = self._classifier.predict_proba(X)
+        lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
 
-        mixtures = np.flip(np.unique(y_nhot, axis=0), axis=1) # select unique combinations of celltypes
-        prob_per_target_class = \
-            convert_prob_per_mixture_to_marginal_per_class(ypred_proba, mixtures, target_classes, self.MAX_LR)
-
-        if for_calibration:
+        if with_calibration:
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrators_per_target_class[str(target_class)]
-                lrs_per_target_class = calibrator.transform(prob_per_target_class[:, i])
-                prob_per_target_class[:, i] = lrs_per_target_class / (1 + lrs_per_target_class)
+                caliblrs_per_target_class = calibrator.transform(lrs_per_target_class[:, i])
+                lrs_per_target_class[:, i] = caliblrs_per_target_class
 
-        return prob_per_target_class
+        return lrs_per_target_class
 
 
 def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
@@ -94,13 +76,14 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
 
     lrs = np.zeros((prob.shape[0], target_classes.shape[0]))
     for i, target_class in enumerate(target_classes):
-        assert sum(target_class) > 0
+        assert sum(target_class) > 0, 'Nonexisting class in target_classes'
 
         # numerator
         indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
         numerator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
 
         # denominator
+        # TODO: 1-target_class not same as not target classes
         indices_of_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
         denominator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
         lrs[:, i] = numerator/denominator

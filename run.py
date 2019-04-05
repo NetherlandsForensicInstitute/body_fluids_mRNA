@@ -8,8 +8,8 @@ from rna.lr_system import *
 from rna.utils import *
 
 if __name__ == '__main__':
-    developing = False
-    include_blank = False
+    # developing = False
+    # include_blank = False
     from_penile = False
 
     N_SAMPLES_PER_COMBINATION = 4
@@ -17,8 +17,8 @@ if __name__ == '__main__':
         ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
          'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
 
-    X_single, y_nhot_single, n_celltypes_with_penile, \
-    n_features, n_per_celltype, string2index, index2string = \
+    X_single, y_nhot_single, n_celltypes_with_penile, n_features, \
+    n_per_celltype, string2index, index2string, markers, present_celltypes = \
         get_data_per_cell_type(single_cell_types=single_cell_types)
 
     n_celltypes = n_celltypes_with_penile - 1
@@ -29,12 +29,17 @@ if __name__ == '__main__':
                           'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, celltypes, string2index)
 
-    X_augmented, y_augmented, y_nhot_augmented = augment_data(X_single, y_nhot_single, n_celltypes, n_features,
+
+
+    X_augmented, y_nhot_augmented = augment_data(X_single, y_nhot_single, n_celltypes, n_features,
                                                               N_SAMPLES_PER_COMBINATION, string2index,
                                                               from_penile=from_penile)
 
     model = MarginalClassifier()
-    model.fit(X_augmented, y_augmented)
-    model.predict_proba(X_augmented, y_nhot_augmented, target_classes)
+    model.fit(X_augmented, from_nhot_to_labels(y_nhot_augmented))
+    lrs = model.predict_lrs(X_augmented, target_classes)
+    model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
+    lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)
+
 
 
