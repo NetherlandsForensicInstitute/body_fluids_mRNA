@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
-from rna.analytics import combine_samples, convert_prob_per_mixture_to_marginal_per_class
+from rna.analytics import combine_samples
+from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from lir import PavLogLR
 
 
@@ -102,7 +103,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
         nearest augmented data point. Indication of whether the point may be an
         outlier (eg measurement error or problem with augmentation scheme)
     """
-    y_prob = model.predict_proba(X_mixtures)
+    y_prob = model.predict_lrs(X_mixtures)
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
         y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
 
