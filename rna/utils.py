@@ -7,6 +7,8 @@ import random
 import numpy
 import numpy as np
 
+from rna.constants import single_cell_types
+
 
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
                                               classes_map,
@@ -201,18 +203,18 @@ def sort_calibrators(all_calibrators):
     return sorted_calibrators
 
 
-def string2vec(list_of_strings, celltypes, string2index):
-
-    target_classes = np.zeros((len(list_of_strings), celltypes.shape[0]))
+def string2vec(list_of_strings, string2index):
+    """
+    converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s
+    :param list_of_strings: list of strings. Multiple cell types should be separated by and/or
+    :param string2index: dict that converts single cell type string label to index
+    :return:
+    """
+    target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
     for i, list_item in enumerate(list_of_strings):
-        if 'and/or' in list_item:
-            combined_target = np.zeros((len(list_item.split(' and/or ')), celltypes.shape[0]))
-            for j, string_item in enumerate(list_item.split(' and/or ')):
-                combined_target[j, :] = celltypes[string2index[string_item], :]
-            target_classes[i, :] = np.max(combined_target, axis=0)
-        else:
-            target_classes[i, :] = celltypes[string2index[list_item], :]
-
+        cell_types = list_item.split(' and/or ')
+        for cell_type in cell_types:
+            target_classes[i, string2index[cell_type]] = 1
     return target_classes
 
 

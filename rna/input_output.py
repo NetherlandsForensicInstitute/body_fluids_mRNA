@@ -9,6 +9,9 @@ import pandas as pd
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
+from rna.constants import string2index
+
+
 def read_df(filename, binarize, number_of_replicates):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.
@@ -23,7 +26,7 @@ def read_df(filename, binarize, number_of_replicates):
     """
     if '_rv' in filename:
         # then sure that it includes 'replicate_values'
-        df_rv = pd.read_excel(filename, delimiter=';')
+        df_rv = pd.read_excel(filename, delimiter=';', index_col=0)
         df = df_rv.loc[:, (df_rv.columns.values[:-1])]
         rv = df_rv[['replicate_value']]
         df.fillna(0, inplace=True)
@@ -100,18 +103,13 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
             raise ValueError('if no cell types are provided, ground truth should be known')
         # if not provided, learn the cell types from the data
         all_celltypes = np.array(df.index)
-        # penile skin should be treated separately
-        celltypes_set = set(all_celltypes)
-        celltypes_set.remove('Skin.penile')
+        for celltype in all_celltypes:
+            if celltype not in single_cell_types and celltype!='Skin.penile':
+                raise ValueError('unknown cell type: {}'.format(celltype))
 
-    string2index = {}
-    index2string = {}
 
-    for i, celltype in enumerate(sorted(celltypes_set) + ['Skin.penile']):
-        string2index[celltype] = i
-        index2string[i] = celltype
 
-    n_celltypes_with_penile = len(string2index)
+    n_celltypes_with_penile = len(single_cell_types) + 1
     n_features = len(df.columns)
     n_per_celltype = dict()
 
@@ -119,7 +117,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     if ground_truth_known:
         # y_single = []
 
-        for celltype in sorted(celltypes_set) + ['Skin.penile']:
+
+        for celltype in list(single_cell_types) + ['Skin.penile']:
             data_for_this_celltype = np.array(df.loc[celltype])
 
             if type(rv) == pd.core.frame.DataFrame:
@@ -135,12 +134,13 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
                 X_single.append(repeated_measurements)
             n_per_celltype[celltype] = n_full_samples
 
+
         y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
         end = 0
-        for n in range(n_celltypes_with_penile):
-            i_celltype = string2index[index2string[n]]
+        for i, celltype in enumerate(list(single_cell_types) + ['Skin.penile']):
+            i_celltype = string2index[celltype]
             begin = end
-            end = end + n_per_celltype[index2string[i_celltype]]
+            end = end + n_per_celltype[celltype]
             y_nhot_single[begin:end, i_celltype] = 1
 
     else:
@@ -149,8 +149,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
-    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, \
-           index2string, list(df.columns), list(df.index)
+    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, list(df.columns), list(df.index)
 
 
 def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype):
