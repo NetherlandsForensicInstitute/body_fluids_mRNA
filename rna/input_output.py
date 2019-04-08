@@ -23,7 +23,7 @@ def read_df(filename, binarize, number_of_replicates):
     """
     if '_rv' in filename:
         # then sure that it includes 'replicate_values'
-        df_rv = pd.read_excel(filename, delimiter=';')
+        df_rv = pd.read_excel(filename, delimiter=';', index_col=0)
         df = df_rv.loc[:, (df_rv.columns.values[:-1])]
         rv = df_rv[['replicate_value']]
         df.fillna(0, inplace=True)

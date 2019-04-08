@@ -34,19 +34,26 @@ class MarginalClassifier():
 
         return self
 
-
-    def predict_lrs(self, X, target_classes, with_calibration=False, priors=None):
+    def predict_lrs(self, X, target_classes, with_calibration=False, priors_numerator=None, priors_denominator=None):
         """
         gives back an N x n_target_class array of LRs
         :param X: the N x n_features data
         :param target_classes:
-        :param without_calibration:
-        :param priors:
+        :param with_calibration:
+        :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
+        does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
+        distribution
+        :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
+        does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
+        distribution
         :return:
         """
+        assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
+        assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
 
         ypred_proba = self._classifier.predict_proba(X)
-        lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
+        lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
+                                                                              priors_numerator, priors_denominator)
 
         if with_calibration:
             for i, target_class in enumerate(target_classes):
@@ -73,19 +80,20 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
     distribution
     :return: n_samples x n_target_classes of probabilities
     """
-
-    lrs = np.zeros((prob.shape[0], target_classes.shape[0]))
+    assert type(priors_numerator) == list or type(priors_numerator) == np.ndarray
+    assert type(priors_denominator) == list or type(priors_denominator) == np.ndarray
+    lrs = np.zeros((len(prob), len(target_classes)))
     for i, target_class in enumerate(target_classes):
         assert sum(target_class) > 0, 'Nonexisting class in target_classes'
 
         # numerator
         indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
-        numerator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
+        numerator = np.sum(prob[:, indices_of_target_class], axis=1)
 
         # denominator
         # TODO: 1-target_class not same as not target classes
         indices_of_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
-        denominator = np.sum(prob[:, indices_of_target_class][:, :, 0], axis=1)
+        denominator = np.sum(prob[:, indices_of_target_class], axis=1)
         lrs[:, i] = numerator/denominator
 
     lrs = np.where(lrs > MAX_LR, MAX_LR, lrs)

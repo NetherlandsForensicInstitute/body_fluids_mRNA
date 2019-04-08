@@ -3,17 +3,14 @@ import pickle
 from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
-from tkinter import ttk
 
 import numpy as np
-import pandas as pd
-
 
 # Create a window that fills the screen.
-from input_output import read_df
-from analytics import combine_samples
-
+from rna.analytics import combine_samples
 from rna.input_output import get_data_per_cell_type
+from rna.constants import single_cell_types, marker_names
+from rna.utils import string2vec
 
 
 class FullScreenApp(object):
@@ -29,9 +26,6 @@ class FullScreenApp(object):
 class AnalyseExcel:
 
     def __init__(self):
-        self.single_cell_types = ['Semen.fertile', 'Saliva', 'Nasal.mucosa', 'Menstrual.secretion', 'Blood',
-                                  'Semen.sterile', 'Vaginal.mucosa', 'Skin']
-
         self.master = Tk()
         self.master.minsize(1500, 400)
         self.master.geometry("320x100")
@@ -129,32 +123,38 @@ class AnalyseExcel:
     def analyse_data(self):
         # global master, self.tree, button_load
 
-        model_filename, marker_names, names, X_single, n_celltypes_with_penile, \
-            n_features, n_per_celltype, string2index, index2string = self.load_data()
+        model_filename, read_marker_names, names, X_single, n_celltypes_with_penile, \
+        n_features, n_per_celltype, string2index, index2string = self.load_data()
 
         X = combine_samples(X_single)
 
         print('data loaded, shape {}. {}'.format(X.shape, X[0, :]))
 
-        column_names = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',
-                        'MMP11', 'SEMG1', 'KLK3', 'PRM1', 'ACTB', '18S-rRNA']
-        n_single_cell_types=8
+
+        n_single_cell_types = 8
 
         test_data_grouped = []
         predicted_proba_average = []
         predicted_proba_4 = []
         proba_final_top = []
         proba_final_bottom = []
-        if marker_names != column_names:
+        if read_marker_names != marker_names:
             messagebox.showinfo("Warning",
                                 "'The marker labels are inconsistent with the trained model, please fix the labels. "
-                                "The correct labels are: {}. Found {}".format(column_names, marker_names))
-
+                                "The correct labels are: {}. Found {}".format(marker_names, read_marker_names))
+            print("'The marker labels are inconsistent with the trained model, please fix the labels. "
+                                "The correct labels are: {}. Found {}".format(marker_names, read_marker_names))
         # Load the trained model and all classes present in the trained model.
         model = pickle.load(open(model_filename, 'rb'))
 
-        priors=None # TODO
-        lrs =  model.predict_lrs(X,[1]*len(self.single_cell_types), priors=priors)
+        priors_numerator = get_prior(string2index, self.top_variables)
+        priors_denominator = get_prior(string2index, self.bottom_variables)
+
+        # for now, target classes are all separate classes and vag muc+menstr secr.
+        target_classes_str = list(single_cell_types) + ['Vaginal.mucosa and/or Menstrual.secretion']
+        lrs = model.predict_lrs(X, string2vec(target_classes_str, string2index), priors_numerator=priors_numerator,
+                                priors_denominator=priors_denominator)
+        print(lrs)
         #
         # # classes = pickle.load(open('classes.pkl', 'rb'))
         # # mixture_classes_in_single_cell_type = pickle.load(open('mixture_classes_in_single_cell_type', 'rb'))
@@ -452,28 +452,30 @@ class AnalyseExcel:
 
         mainloop()
 
+
+
     def load_data(self):
         # Load trained model
         if self.is_penile.get():
             filename = 'mlpmodel_penile'
         else:
-            filename = 'mlpmodel'
+            filename = 'calibrated_model'
         # If there is no input file selected, the program quits.
-        try:
-            # xl = pd.ExcelFile(self.open_filename)
-            X_single, _, _, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string,\
-                marker_names, names = \
-                get_data_per_cell_type(filename=self.open_filename, single_cell_types=self.single_cell_types,
+        # try:
+        # xl = pd.ExcelFile(self.open_filename)
+        X_single, _, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string, \
+        marker_names, names = \
+            get_data_per_cell_type(filename=self.open_filename, single_cell_types=single_cell_types,
                                    ground_truth_known=False, binarize=True,
-                                       number_of_replicates = self.number_of_replicates)
-        except ValueError:
-            sys.exit()
-        except IndexError:
-            sys.exit()
+                                   number_of_replicates=self.number_of_replicates)
+        # except ValueError:
+        #     sys.exit()
+        # except IndexError:
+        #     sys.exit()
         return filename, marker_names, names, X_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
 
     def add_buttons(self):
-        for i, cell in enumerate(self.single_cell_types):
+        for i, cell in enumerate(single_cell_types):
             self.top_variables[cell] = StringVar()
             t = Label(self.master, text=cell)
             t.grid(row=2, column=i + 4)
@@ -516,6 +518,19 @@ class AnalyseExcel:
         button_load = Button(self.master, command=self.close, text="Run", height=2, width=20, bg='darkseagreen')
         button_load.grid(row=9, column=2)
 
+
+def get_prior(string2index, variables):
+    priors = [-1] * len(single_cell_types)
+    for cell_type, string_var in variables.items():
+        if string_var.get() == 'Uniform':
+            priors[string2index[cell_type]] = .5
+        elif string_var.get() == 'Always':
+            priors[string2index[cell_type]] = 1
+        elif string_var.get() == 'Never':
+            priors[string2index[cell_type]] = 0
+        else:
+            raise ValueError('unexpected radiobutton string value (Unknown, Always, Never), found {}'.format(string_var.get()))
+    return priors
 
 if __name__ == '__main__':
     # Create a window with buttons for selecting the input file, selecting the save location and a

@@ -8,6 +8,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
+from rna.constants import single_cell_types
 from rna.utils import from_nhot_to_labels
 
 
@@ -155,32 +156,28 @@ def get_mixture_columns_for_class(target_class, priors):
     :return: list of ints, in [0, 2 ** n_cell_types]
     """
 
-    n_celltypes = len(target_class)
-    mixtures = np.zeros((2 ** n_celltypes, n_celltypes), dtype=int)
+    def int_to_binary(i):
+        binary = bin(i)[2:]
+        while len(binary) < len(single_cell_types):
+            binary = '0' + binary
+        return [int(j) for j in binary]
 
-    if priors is not None:
-        assert len(target_class) == len(priors), 'Must be about same cell types so lengths must be the same'
-        # include target_classes + priors
-        selected_classes = np.zeros((n_celltypes, 1))
-        for j in range(len(target_class)):
-            if target_class[j] == 1 and priors[j] == 1:
-                selected_classes[j, 0] = 1
-            elif target_class[j] == 0 and priors[j] == 1:
-                selected_classes[j, 0] = 1
-    else:
-        # TODO: Can do this easier?
-        # make all possible combinations
-        for i in range(2 ** n_celltypes):
-            binary = bin(i)[2:]
-            while len(binary) < n_celltypes:
-                binary = '0' + binary
+    def binary_admissable(binary, target_class, priors):
+        """
+        gives back whether the binary (string of 0 and 1 of length n_single_cell_types) has at least one of
+        target_class in it, and all priors satisfied
+        """
+        for i in range(len(target_class)):
+            # if prior is zero, the class should not occur
+            if binary[i] == 1 and priors[i] == 0:
+                return False
+            # if prior is one, the class should occur
+            if binary[i] == 0 and priors[i] == 1:
+                return False
+        # at least one of the target class should occur
+        if np.inner(binary, target_class)==0:
+            return False
+        return True
 
-            for n in range(n_celltypes):
-                if binary[-n - 1] == '1':
-                    mixtures[i:(i + 1), n] = 1
-
-        relevant_mixture_columns = np.multiply(mixtures, target_class.T)
-        indices_of_target_class = np.argwhere(np.max(relevant_mixture_columns, axis=1) == 1)
-
-    return indices_of_target_class
+    return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
 
