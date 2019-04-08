@@ -55,16 +55,15 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
     return mixture_classes_in_classes_to_evaluate, classes_map_to_evaluate, \
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
-# TODO: Make test split include same samples
-def split_data(X, y, size=(0.4, 0.4)):
+
+def split_data(X, y, size=(0.4, 0.2)):
     """
     Splits the originial dataset in three parts. All parts consist of samples from all
     cell types and there is no overlap between samples within the parts.
 
     :param X:
     :param y:
-    :param size: tuple containing the relative size of the train and calibration data
-        with which the size of the test data is calculated.
+    :param size: tuple containing the relative size of the train and test data
     :return:
     """
 
@@ -75,13 +74,14 @@ def split_data(X, y, size=(0.4, 0.4)):
         """
         index_classes = list(np.unique(y, return_index=True)[1])[1:]
         index_classes1 = index_classes.copy()
-        index_classes1.insert(0, 0)
         index_classes2 = index_classes.copy()
+
+        index_classes1.insert(0, 0)
         index_classes2.append(len(y))
+
         index_classes = zip(index_classes1, index_classes2)
 
-        indices_classes = [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
-        return indices_classes
+        return [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
 
 
     def define_random_indices(indices, size):
@@ -90,21 +90,17 @@ def split_data(X, y, size=(0.4, 0.4)):
         or calib. For the test set the same samples are included.
         """
         train_size = size[0]
-        calibration_size = size[1]
+        test_size = size[1]
 
-
-        train_index = random.sample(indices, int(train_size * len(indices)))
-        indices_no_train = [idx for idx in indices if idx not in train_index]
-        calibration_index = random.sample(indices_no_train, int(calibration_size * len(indices)))
-        test_index = [idx for idx in indices if idx not in calibration_index
-                      if idx not in train_index]
+        test_index = indices[0:int(len(indices) * test_size)]
+        left_over_indices = [i for i in indices if i not in test_index]
+        train_index = random.sample(left_over_indices, int(train_size * len(indices)))
+        calibration_index = [i for i in indices if i not in test_index and i not in train_index]
 
         return train_index, calibration_index, test_index
 
-    # TODO: invoegen try-catch or assert
-    if sum(size) > 1.0:
-        print("The sum of the sizes for the train and calibration"
-              "data must be must be equal to or below 1.0.")
+    assert sum(size) <= 1.0, 'The sum of the size for the train and calibration ' \
+                            'data must be must be equal to or below 1.0.'
 
     indices_classes = indices_per_class(y)
 
