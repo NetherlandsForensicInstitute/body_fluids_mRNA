@@ -80,8 +80,8 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
     distribution
     :return: n_samples x n_target_classes of probabilities
     """
-    assert type(priors_numerator) == list or type(priors_numerator) == np.ndarray
-    assert type(priors_denominator) == list or type(priors_denominator) == np.ndarray
+    assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
+    assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
     lrs = np.zeros((len(prob), len(target_classes)))
     for i, target_class in enumerate(target_classes):
         assert sum(target_class) > 0, 'Nonexisting class in target_classes'

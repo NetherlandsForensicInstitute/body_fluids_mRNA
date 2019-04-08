@@ -167,13 +167,14 @@ def get_mixture_columns_for_class(target_class, priors):
         gives back whether the binary (string of 0 and 1 of length n_single_cell_types) has at least one of
         target_class in it, and all priors satisfied
         """
-        for i in range(len(target_class)):
-            # if prior is zero, the class should not occur
-            if binary[i] == 1 and priors[i] == 0:
-                return False
-            # if prior is one, the class should occur
-            if binary[i] == 0 and priors[i] == 1:
-                return False
+        if priors:
+            for i in range(len(target_class)):
+                # if prior is zero, the class should not occur
+                if binary[i] == 1 and priors[i] == 0:
+                    return False
+                # if prior is one, the class should occur
+                if binary[i] == 0 and priors[i] == 1:
+                    return False
         # at least one of the target class should occur
         if np.inner(binary, target_class)==0:
             return False
