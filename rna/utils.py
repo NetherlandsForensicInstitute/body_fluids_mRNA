@@ -54,13 +54,13 @@ def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_typ
            np.append(y_mixtures_matrix, y_combi, axis=1)
 
 
-def split_data(X, y, size=(0.4, 0.2)):
+def split_data(X, y_nhot, size=(0.4, 0.2)):
     """
     Splits the originial dataset in three parts. All parts consist of samples from all
     cell types and there is no overlap between samples within the parts.
 
     :param X:
-    :param y:
+    :param y_nhot:
     :param size: tuple containing the relative size of the train and test data
     :return:
     """
@@ -97,10 +97,10 @@ def split_data(X, y, size=(0.4, 0.2)):
 
         return train_index, calibration_index, test_index
 
-    assert sum(size) <= 1.0, 'The sum of the size for the train and calibration ' \
+    assert sum(size) <= 1.0, 'The sum of the size for the train and test ' \
                             'data must be must be equal to or below 1.0.'
 
-    indices_classes = indices_per_class(y)
+    indices_classes = indices_per_class(from_nhot_to_labels(y_nhot))
 
     X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = ([] for _ in range(6))
 
@@ -109,14 +109,14 @@ def split_data(X, y, size=(0.4, 0.2)):
         train_index, calibration_index, test_index = define_random_indices(indices, size)
 
         X_for_class = X[indices_class]
-        y_for_class = [y[index_class] for index_class in indices_class]
+        y_nhot_for_class = y_nhot[indices_class]
 
         X_train.extend(X_for_class[train_index])
-        y_train.extend([y_for_class[k] for k in train_index])
+        y_train.extend(y_nhot_for_class[train_index])
         X_calibrate.extend(X_for_class[calibration_index])
-        y_calibrate.extend([y_for_class[k] for k in calibration_index])
+        y_calibrate.extend(y_nhot_for_class[calibration_index])
         X_test.extend(X_for_class[test_index])
-        y_test.extend([y_for_class[k] for k in test_index])
+        y_test.extend(y_nhot_for_class[test_index])
 
     print("The actual distribution (train, calibration, test) is ({}, {}, {})".format(
         round(len(X_train)/X.shape[0], 3),
@@ -125,8 +125,11 @@ def split_data(X, y, size=(0.4, 0.2)):
     )
 
     X_train = np.array(X_train)
+    y_train = np.array(y_train)
     X_calibrate = np.array(X_calibrate)
+    y_calibrate = np.array(y_calibrate)
     X_test = np.array(X_test)
+    y_test = np.array(y_test)
 
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 

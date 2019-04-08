@@ -163,37 +163,84 @@ def plot_data(X):
     plt.savefig('single_cell_type_measurements_after_QC')
 
 
-def plot_histogram_log_lr(h0_h1_lrs, n_bins=30, title='before', density=None, savefig=None, show=None):
+# def plot_histogram_log_lr(h0_h1_lrs, n_bins=30, title='before', density=None, savefig=None, show=None):
+#
+#     celltypes = list(h0_h1_lrs.keys())
+#     plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9/4*len(celltypes)), sharey='row')
+#     # plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
+#
+#     minimum_lik = np.min([min(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
+#     maximum_lik = np.max([max(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
+#     outer_lik = max(abs(minimum_lik), abs(maximum_lik))
+#
+#     for idx, celltype in enumerate(sorted(celltypes)):
+#         log_likrats0 = h0_h1_lrs[celltype][0]
+#         log_likrats1 = h0_h1_lrs[celltype][1]
+#
+#         plt.subplot(int(len(celltypes)/2), 2, idx + 1)
+#         plt.hist(log_likrats0, density=density, color='orange', label='h0', bins=n_bins, alpha=0.5)
+#         plt.hist(log_likrats1, density=density, color='blue', label='h1', bins=n_bins, alpha=0.5)
+#         plt.legend(loc='upper right')
+#         if title == 'after':
+#             plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
+#         plt.ylabel("Density")
+#         plt.xlabel("10logLR")
+#         plt.title(celltype, fontsize=16)
+#         # plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
+#         #          ha='center', va='center', transform=ax.transAxes)
+#
+#     if savefig is not None:
+#         plt.tight_layout()
+#         plt.savefig(savefig)
+#     if show or savefig is None:
+#         plt.show()
 
-    celltypes = list(h0_h1_lrs.keys())
-    plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9/4*len(celltypes)), sharey='row')
-    # plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
 
-    minimum_lik = np.min([min(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
-    maximum_lik = np.max([max(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
-    outer_lik = max(abs(minimum_lik), abs(maximum_lik))
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before',
+                          density=None, savefig=None, show=None):
 
-    for idx, celltype in enumerate(sorted(celltypes)):
-        log_likrats0 = h0_h1_lrs[celltype][0]
-        log_likrats1 = h0_h1_lrs[celltype][1]
+    n_target_classes = len(target_classes)
+    inv_y_nhot = 1-y_nhot
+    plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
+    for i, target_class in enumerate(target_classes):
+        lrs1 = np.multiply(lrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
+        lrs2 = np.multiply(lrs[:, i], np.max(np.multiply(inv_y_nhot, target_class), axis=1))
 
-        plt.subplot(int(len(celltypes)/2), 2, idx + 1)
-        plt.hist(log_likrats0, density=density, color='orange', label='h0', bins=n_bins, alpha=0.5)
-        plt.hist(log_likrats1, density=density, color='blue', label='h1', bins=n_bins, alpha=0.5)
-        plt.legend(loc='upper right')
-        if title == 'after':
-            plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
-        plt.ylabel("Density")
-        plt.xlabel("10logLR")
-        plt.title(celltype, fontsize=16)
-        # plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
-        #          ha='center', va='center', transform=ax.transAxes)
+        plt.subplot(int(n_target_classes / 2), 2, i + 1)
+        plt.hist(lrs1, density=density, color='orange', label='h1', bins=n_bins, alpha=0.5)
+        plt.hist(lrs2, density=density, color='blue', label='h2', bins=n_bins, alpha=0.5)
 
     if savefig is not None:
         plt.tight_layout()
         plt.savefig(savefig)
     if show or savefig is None:
         plt.show()
+
+
+    # celltypes = list(h0_h1_lrs.keys())
+
+    # plt.suptitle('Histogram of log LRs {} calibration'.format(title), size=16)
+
+    # minimum_lik = np.min([min(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
+    # maximum_lik = np.max([max(np.append(h0_h1_lrs[celltype][0], h0_h1_lrs[celltype][1])) for celltype in celltypes])
+    # outer_lik = max(abs(minimum_lik), abs(maximum_lik))
+
+    # for idx, celltype in enumerate(sorted(celltypes)):
+    #     log_likrats0 = h0_h1_lrs[celltype][0]
+    #     log_likrats1 = h0_h1_lrs[celltype][1]
+
+        # plt.subplot(int(len(celltypes)/2), 2, idx + 1)
+        # plt.hist(log_likrats0, density=density, color='orange', label='h0', bins=n_bins, alpha=0.5)
+        # plt.hist(log_likrats1, density=density, color='blue', label='h1', bins=n_bins, alpha=0.5)
+        # plt.legend(loc='upper right')
+        # if title == 'after':
+        #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
+        # plt.ylabel("Density")
+        # plt.xlabel("10logLR")
+        # plt.title(celltype, fontsize=16)
+        # plt.text(0.2, 0.9, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
+        #          ha='center', va='center', transform=ax.transAxes)
+
 
 
 def plot_reliability_plot(h0_h1_probs, y_matrix, title, bins=10, savefig=None, show=None):

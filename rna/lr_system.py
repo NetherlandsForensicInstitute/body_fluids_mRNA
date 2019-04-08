@@ -46,7 +46,8 @@ class MarginalClassifier():
         """
 
         ypred_proba = self._classifier.predict_proba(X)
-        lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
+        lrs_per_target_class = \
+            convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
 
         if with_calibration:
             for i, target_class in enumerate(target_classes):

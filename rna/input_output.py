@@ -1,7 +1,7 @@
 """
 Reads and manipulates datasets.
 """
-# TODO: Rename classes
+
 from collections import Counter, defaultdict
 
 import numpy as np

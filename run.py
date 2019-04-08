@@ -6,13 +6,13 @@ from rna.analytics import *
 from rna.input_output import *
 from rna.lr_system import *
 from rna.utils import *
+from rna.plotting import *
 
 if __name__ == '__main__':
-    # developing = False
-    # include_blank = False
     from_penile = False
 
     N_SAMPLES_PER_COMBINATION = 4
+    N_SAMPLES_PER_COMBINATION_TEST = 2
     single_cell_types = \
         ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
          'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
@@ -29,17 +29,44 @@ if __name__ == '__main__':
                           'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, celltypes, string2index)
 
-    split_data(X_single, from_nhot_to_labels(y_nhot_single))
+    model = MarginalClassifier()
+    model.fit(combine_samples(X_single), from_nhot_to_labels(y_nhot_single))
+    model.predict_lrs(combine_samples(X_single), target_classes)
 
-    X_augmented, y_nhot_augmented = augment_data(X_single, y_nhot_single, n_celltypes, n_features,
-                                                              N_SAMPLES_PER_COMBINATION, string2index,
-                                                              from_penile=from_penile)
+    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
+        split_data(X_single, y_nhot_single)
+
+    # single_samples = combine_samples(X_train)
+    # single_model = MLPClassifier(random_state=0)
+    # single_model.fit(single_samples, from_nhot_to_labels(y_train))
+    # y_pred = single_model.predict(combine_samples(X_test))
+    # print(accuracy_score(from_nhot_to_labels(y_test), y_pred))
 
     model = MarginalClassifier()
-    model.fit(X_augmented, from_nhot_to_labels(y_nhot_augmented))
-    lrs = model.predict_lrs(X_augmented, target_classes)
-    model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
-    lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)
+
+    X_train_augmented, y_train_nhot_augmented = \
+        augment_data(X_train, y_train, n_celltypes, n_features,
+                     N_SAMPLES_PER_COMBINATION, string2index, from_penile=from_penile)
+
+    model.fit(X_train_augmented, from_nhot_to_labels(y_train_nhot_augmented))
+
+    X_calibration_augmented, y_calibration_nhot_augmented = \
+        augment_data(X_calibrate, y_calibrate, n_celltypes, n_features,
+                     N_SAMPLES_PER_COMBINATION, string2index, from_penile=from_penile)
+
+    model.fit_calibration(X_calibration_augmented, y_calibration_nhot_augmented, target_classes)
+
+    X_test_augmented, y_test_nhot_augmented = \
+        augment_data(X_test, y_test, n_celltypes, n_features,
+                     N_SAMPLES_PER_COMBINATION_TEST, string2index, from_penile=from_penile)
+
+    lrs_before_calib = model.predict_lrs(X_test_augmented, target_classes)
+    lrs_after_calib = model.predict_lrs(X_test_augmented, target_classes, with_calibration=True)
+
+    plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, show=True)
+    plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, title='after', show=True)
+
+
 
 
 
