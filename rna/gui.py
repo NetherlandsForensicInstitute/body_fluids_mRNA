@@ -124,7 +124,7 @@ class AnalyseExcel:
         # global master, self.tree, button_load
 
         model_filename, read_marker_names, names, X_single, n_celltypes_with_penile, \
-        n_features, n_per_celltype, string2index, index2string = self.load_data()
+        n_features, n_per_celltype = self.load_data()
 
         X = combine_samples(X_single)
 
@@ -463,7 +463,7 @@ class AnalyseExcel:
         # If there is no input file selected, the program quits.
         # try:
         # xl = pd.ExcelFile(self.open_filename)
-        X_single, _, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string, \
+        X_single, _, n_celltypes_with_penile, n_features, n_per_celltype,  \
         marker_names, names = \
             get_data_per_cell_type(filename=self.open_filename, single_cell_types=single_cell_types,
                                    ground_truth_known=False, binarize=True,
@@ -472,7 +472,7 @@ class AnalyseExcel:
         #     sys.exit()
         # except IndexError:
         #     sys.exit()
-        return filename, marker_names, names, X_single, n_celltypes_with_penile, n_features, n_per_celltype, string2index, index2string
+        return filename, marker_names, names, X_single, n_celltypes_with_penile, n_features, n_per_celltype
 
     def add_buttons(self):
         for i, cell in enumerate(single_cell_types):

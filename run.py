@@ -15,7 +15,7 @@ if __name__ == '__main__':
     N_SAMPLES_PER_COMBINATION = 4
 
     X_single, y_nhot_single, n_celltypes_with_penile, n_features, \
-    n_per_celltype, string2index, index2string, markers, present_celltypes = \
+    n_per_celltype, markers, present_celltypes = \
         get_data_per_cell_type(single_cell_types=single_cell_types)
 
     n_celltypes = n_celltypes_with_penile - 1
@@ -25,6 +25,7 @@ if __name__ == '__main__':
                           'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, string2index)
 
+    model = MarginalClassifier()
     split_data(X_single, from_nhot_to_labels(y_nhot_single))
 
     X_augmented, y_nhot_augmented = augment_data(X_single, y_nhot_single, n_celltypes, n_features,
@@ -33,7 +34,9 @@ if __name__ == '__main__':
 
     model = MarginalClassifier()
     model.fit(X_augmented, from_nhot_to_labels(y_nhot_augmented))
+
     lrs = model.predict_lrs(X_augmented, target_classes)
+
     model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
     pickle.dump(model, open('calibrated_model', 'wb'))
     lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)

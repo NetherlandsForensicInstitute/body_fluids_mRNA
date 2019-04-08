@@ -207,7 +207,6 @@ def string2vec(list_of_strings, string2index):
     :param string2index: dict that converts single cell type string label to index
     :return:
     """
-
     target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
     for i, list_item in enumerate(list_of_strings):
         cell_types = list_item.split(' and/or ')
