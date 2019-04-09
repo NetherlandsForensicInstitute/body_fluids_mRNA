@@ -2,13 +2,16 @@
 Run the most important functions
 """
 import pickle
+import numpy as np
 
-from rna.analytics import *
-from rna.constants import single_cell_types
-from rna.input_output import *
-from rna.lr_system import *
-from rna.utils import *
-from rna.plotting import *
+from rna.analytics import augment_data
+from rna.constants import single_cell_types, string2index
+from rna.input_output import get_data_per_cell_type
+from rna.lr_system import MarginalClassifier
+from rna.utils import string2vec, from_nhot_to_labels, \
+    split_data, change_labels
+from rna.plotting import plot_histogram_log_lr
+
 
 if __name__ == '__main__':
     from_penile = False
@@ -31,15 +34,18 @@ if __name__ == '__main__':
                                                  N_SAMPLES_PER_COMBINATION, string2index,
                                                  from_penile=from_penile)
 
-
     model = MarginalClassifier()
-    model.fit(X_augmented, from_nhot_to_labels(y_nhot_augmented))
-
+    model.fit(X_augmented, change_labels(y_nhot_augmented))
+    y_nhot_augmented_switched = change_labels(y_nhot_augmented, nhot=True)
     lrs = model.predict_lrs(X_augmented, target_classes)
+    # y_pred = model._classifier.predict(X_augmented)
 
-    model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
-    pickle.dump(model, open('calibrated_model', 'wb'))
-    lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)
+    # model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
+    # pickle.dump(model, open('calibrated_model', 'wb'))
+    # lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)
+
+    plot_histogram_log_lr(lrs, y_nhot_augmented_switched, target_classes, show=True)
+    # plot_histogram_log_lr(lrs_calib, y_nhot_augmented, target_classes, title='after', show=True)
 
     # Apply model to splitted data
     X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \

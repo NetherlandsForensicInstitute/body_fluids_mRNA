@@ -229,3 +229,29 @@ def from_nhot_to_labels(y_nhot):
             y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
 
     return y
+
+# TODO: Make this function faster
+def change_labels(y_nhot, nhot=False):
+
+    if nhot:
+        y_nhot_switched = np.flip(y_nhot, axis=1)
+        return y_nhot_switched
+
+    else:
+        unswitched_labels = from_nhot_to_labels(y_nhot)
+        switched_labels = unswitched_labels.copy()
+
+        unique_classes = np.unique(y_nhot, axis=0)
+        unique_labels = from_nhot_to_labels(unique_classes)
+
+        for j in range(y_nhot.shape[0]):
+            for i in range(len(unique_labels)):
+                if np.array_equal(y_nhot[j, :], unique_classes[i]):
+                    switched_labels[j] = unique_labels[i]
+
+        return switched_labels
+
+
+
+
+

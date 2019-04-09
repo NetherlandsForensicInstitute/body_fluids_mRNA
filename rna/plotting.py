@@ -203,6 +203,7 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
     inv_y_nhot = 1-y_nhot
     plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
     for i, target_class in enumerate(target_classes):
+
         lrs1 = np.multiply(lrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
         lrs2 = np.multiply(lrs[:, i], np.max(np.multiply(inv_y_nhot, target_class), axis=1))
 

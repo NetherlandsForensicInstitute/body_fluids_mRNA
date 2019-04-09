@@ -96,8 +96,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     df, rv = read_df(filename, binarize, number_of_replicates)
 
     if single_cell_types:
-        celltypes_set = set(single_cell_types)
-        # TODO: celltypes_set.remove('Skin.penile') ?
+        single_cell_types = set(single_cell_types)
     else:
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')

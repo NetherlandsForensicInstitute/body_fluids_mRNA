@@ -23,7 +23,7 @@ def combine_samples(data_for_class):
                                     for i in range(data_for_class.shape[0])])
     return data_for_class_mean
 
-
+# TODO: Keep this function? Otherwise rewrite
 def classify_single(X, y, inv_classes_map):
     """
     Very simple analysis of single cell type classification, useful as
@@ -160,6 +160,7 @@ def get_mixture_columns_for_class(target_class, priors):
         binary = bin(i)[2:]
         while len(binary) < len(single_cell_types):
             binary = '0' + binary
+        print([int(j) for j in binary])
         return [int(j) for j in binary]
 
     def binary_admissable(binary, target_class, priors):
