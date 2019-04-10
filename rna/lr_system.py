@@ -92,12 +92,12 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
 
         # denominator
         all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
-        # TODO: Only works when priors not defined
+        # TODO: Does this work when priors are defined?
         indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
         # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
         denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
         lrs[:, i] = numerator/denominator
 
-    lrs = np.where(lrs > MAX_LR, MAX_LR, lrs)
-    lrs = np.where(lrs < -MAX_LR, -MAX_LR, lrs)
+    lrs = np.where(lrs > MAX_LR ** 10, MAX_LR ** 10, lrs)
+    lrs = np.where(lrs < -MAX_LR ** 10, -MAX_LR ** 10, lrs)
     return lrs

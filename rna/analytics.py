@@ -160,7 +160,6 @@ def get_mixture_columns_for_class(target_class, priors):
         binary = bin(i)[2:]
         while len(binary) < len(single_cell_types):
             binary = '0' + binary
-        print([int(j) for j in binary])
         return [int(j) for j in binary]
 
     def binary_admissable(binary, target_class, priors):
@@ -174,6 +173,7 @@ def get_mixture_columns_for_class(target_class, priors):
                 if binary[i] == 1 and priors[i] == 0:
                     return False
                 # if prior is one, the class should occur
+                # TODO: should it return True?
                 if binary[i] == 0 and priors[i] == 1:
                     return False
         # at least one of the target class should occur

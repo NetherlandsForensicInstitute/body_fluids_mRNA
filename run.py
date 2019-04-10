@@ -36,16 +36,15 @@ if __name__ == '__main__':
 
     model = MarginalClassifier()
     model.fit(X_augmented, change_labels(y_nhot_augmented))
-    y_nhot_augmented_switched = change_labels(y_nhot_augmented, nhot=True)
     lrs = model.predict_lrs(X_augmented, target_classes)
-    # y_pred = model._classifier.predict(X_augmented)
 
     # model.fit_calibration(X_augmented, y_nhot_augmented, target_classes)
     # pickle.dump(model, open('calibrated_model', 'wb'))
     # lrs_calib = model.predict_lrs(X_augmented, target_classes, with_calibration=True)
 
-    plot_histogram_log_lr(lrs, y_nhot_augmented_switched, target_classes, show=True)
+    plot_histogram_log_lr(lrs, y_nhot_augmented, target_classes, show=True)
     # plot_histogram_log_lr(lrs_calib, y_nhot_augmented, target_classes, title='after', show=True)
+
 
     # Apply model to splitted data
     X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \

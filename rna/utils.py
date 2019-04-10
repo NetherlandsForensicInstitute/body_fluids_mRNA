@@ -4,10 +4,9 @@ General calculations.
 
 import random
 
-import numpy
 import numpy as np
 
-from rna.constants import single_cell_types
+from rna.constants import single_cell_types, index2string
 
 
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
@@ -231,25 +230,32 @@ def from_nhot_to_labels(y_nhot):
     return y
 
 # TODO: Make this function faster
-def change_labels(y_nhot, nhot=False):
+def change_labels(y_nhot):
 
-    if nhot:
-        y_nhot_switched = np.flip(y_nhot, axis=1)
-        return y_nhot_switched
+    unswitched_labels = from_nhot_to_labels(y_nhot)
+    switched_labels = unswitched_labels.copy()
 
+    unique_classes = np.unique(y_nhot, axis=0)
+    unique_labels = from_nhot_to_labels(unique_classes)
+
+    for j in range(y_nhot.shape[0]):
+        for i in range(len(unique_labels)):
+            if np.array_equal(y_nhot[j, :], unique_classes[i]):
+                switched_labels[j] = unique_labels[i]
+
+    return switched_labels
+
+
+def get_celltype_str(target_class):
+
+    indices = np.where(target_class == 1)
+    if len(indices[0]) > 1:
+        celltypes = [index2string[comb] for comb in indices[0]]
+        celltype = ' and/or '.join(celltypes)
     else:
-        unswitched_labels = from_nhot_to_labels(y_nhot)
-        switched_labels = unswitched_labels.copy()
+        celltype = index2string[indices[0][0]]
 
-        unique_classes = np.unique(y_nhot, axis=0)
-        unique_labels = from_nhot_to_labels(unique_classes)
-
-        for j in range(y_nhot.shape[0]):
-            for i in range(len(unique_labels)):
-                if np.array_equal(y_nhot[j, :], unique_classes[i]):
-                    switched_labels[j] = unique_labels[i]
-
-        return switched_labels
+    return celltype
 
 
 
