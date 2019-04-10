@@ -71,7 +71,7 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
         Stores the indices beloging to one class in a list and
         returns a list filled with these lists.
         """
-        index_classes = list(np.unique(y, return_index=True)[1])[1:]
+        index_classes = sorted(list(np.unique(y, return_index=True)[1]))[1:]
         index_classes1 = index_classes.copy()
         index_classes2 = index_classes.copy()
 
@@ -80,7 +80,17 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
 
         index_classes = zip(index_classes1, index_classes2)
 
-        return [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
+        indices_per_class = [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
+
+        # put back in correct order
+        _, idx = np.unique(y, return_index=True)
+        correct_order = y[np.sort(idx)]
+        sorted_indices_per_class = indices_per_class.copy()
+
+        for i, true_index in enumerate(correct_order):
+            sorted_indices_per_class[true_index] = indices_per_class[i]
+
+        return sorted_indices_per_class
 
 
     def define_random_indices(indices, size):

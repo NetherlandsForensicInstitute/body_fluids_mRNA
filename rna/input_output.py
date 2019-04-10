@@ -136,7 +136,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
         y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
         end = 0
-        for i, celltype in enumerate(list(single_cell_types) + ['Skin.penile']):
+        for i, celltype in sorted(enumerate(list(single_cell_types) + ['Skin.penile'])):
             i_celltype = string2index[celltype]
             begin = end
             end = end + n_per_celltype[celltype]

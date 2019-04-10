@@ -4,6 +4,7 @@ from sklearn.neural_network import MLPClassifier
 
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
+from rna.utils import get_celltype_str
 
 class MarginalClassifier():
 
@@ -28,9 +29,8 @@ class MarginalClassifier():
         for i, target_class in enumerate(target_classes):
             calibrator = self._calibrator
             lrs = lrs_per_target_class[:, i]
-            labels = np.max(np.multiply(y_nhot, target_class.T), axis=1)
-            # TODO: Other type of key?
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(lrs, labels)
+            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+            self._calibrators_per_target_class[get_celltype_str(target_class)] = calibrator.fit(lrs, labels)
 
         return self
 
@@ -57,7 +57,7 @@ class MarginalClassifier():
 
         if with_calibration:
             for i, target_class in enumerate(target_classes):
-                calibrator = self._calibrators_per_target_class[str(target_class)]
+                calibrator = self._calibrators_per_target_class[get_celltype_str(target_class)]
                 caliblrs_per_target_class = calibrator.transform(lrs_per_target_class[:, i])
                 lrs_per_target_class[:, i] = caliblrs_per_target_class
 
@@ -91,8 +91,8 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
         numerator = np.sum(prob[:, indices_of_target_class], axis=1)
 
         # denominator
-        all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
         # TODO: Does this work when priors are defined?
+        all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
         indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
         # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
         denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)

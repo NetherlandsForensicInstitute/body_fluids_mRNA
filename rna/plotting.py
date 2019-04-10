@@ -187,9 +187,9 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
         plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
 
         plt.title(celltype, fontsize=16)
-        if title == 'after':
-            outer_lik = max(abs(np.min(lrs)), abs(np.max(lrs)))
-            plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
+        # if title == 'after':
+        #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
+        #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
         if density is not None:
             plt.ylabel("Density")
         else:
