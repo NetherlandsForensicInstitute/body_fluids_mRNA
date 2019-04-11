@@ -4,7 +4,7 @@ Run the most important functions
 import pickle
 import numpy as np
 
-from rna.analytics import augment_data
+from rna.analytics import augment_data, classify_single
 from rna.constants import single_cell_types, string2index
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.lr_system import MarginalClassifier
@@ -12,6 +12,10 @@ from rna.utils import string2vec, split_data, change_labels
 from rna.plotting import plot_histogram_log_lr
 
 from lir.plotting import makeplot_hist_density
+
+def baseline():
+    classify_single(X_train, y_train)
+
 
 def perform_analysis():
     model = MarginalClassifier()
@@ -32,8 +36,6 @@ def perform_analysis():
 
 
 def perform_analysis_splitting_data():
-    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
-        split_data(X_single, y_nhot_single)
 
     model = MarginalClassifier()
 
@@ -84,6 +86,11 @@ if __name__ == '__main__':
                           'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, string2index)
 
-    # perform_analysis()
-    perform_analysis_splitting_data()
+    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = \
+        split_data(X_single, y_nhot_single)
+
+    baseline()
+
+    perform_analysis()
+    # perform_analysis_splitting_data()
 

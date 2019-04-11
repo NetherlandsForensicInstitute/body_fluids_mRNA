@@ -34,6 +34,7 @@ def read_df(filename, binarize, number_of_replicates=1):
         return df, rv
 
     else:
+        # TODO: What type of data is to be expected?
         # then 'replicate_values' not included, so
         # assume that all samples have 4 replicates
         df = pd.read_excel(filename, delimiter=';', index_col=0)
@@ -96,9 +97,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single=[]
     if ground_truth_known:
-        # y_single = []
-
-
         for celltype in list(single_cell_types) + ['Skin.penile']:
             data_for_this_celltype = np.array(df.loc[celltype])
 
@@ -132,6 +130,67 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     assert X_single.shape[0] == y_nhot_single.shape[0]
 
     return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, list(df.columns), list(df.index)
+
+
+def read_mixture_data(filename, n_celltypes, binarize=True):
+    """
+    Reads in the experimental mixture data that is used as test data.
+
+    Note that the samples are saved in a separate numpy array
+    based on their replicate indices. As the size differs per
+    sample, the array is filled up with zeros to get the correct
+    dimension.
+
+    :param n_celltypes: int: number of single cell types
+        excluding penile skine
+    :param binarize: bool: whether to binarize values
+    :return: N_samples x N_markers array of measurements NB only one replicate per
+                    sample,
+                N_samples iterable of mixture class labels - corresponds to the labels
+                    used in data augmentation,
+                N_samples x N_single_cell_type n_hot encoding of the labels NB in
+                    in single cell type space!
+                dict: mixture name -> list of int single cell type labels
+                dict: mixture class label -> mixture name
+    """
+
+    df, rv = read_df(filename, binarize)
+    mixture_celltypes = np.array(df.index)
+
+    # initialize
+    test_map = defaultdict(list)
+    inv_test_map = {}
+    n_per_mixture_celltype = dict()
+
+    X_mixtures = []
+    y_nhot_mixtures = np.zeros((0, n_celltypes))
+    for mixture_celltype in sorted(set(mixture_celltypes)):
+        data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
+        rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
+
+        n_full_samples, X_for_this_celltype = get_data_for_celltype(
+            mixture_celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype)
+
+        for repeated_measurements in X_for_this_celltype:
+            X_mixtures.append(repeated_measurements)
+        n_per_mixture_celltype[mixture_celltype] = n_full_samples
+
+        celltypes = mixture_celltype.split('+')
+        class_label = 0
+        y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_celltypes))
+        for celltype in celltypes:
+            test_map[mixture_celltype].append(string2index[celltype])
+            class_label += 2 ** string2index[celltype]
+            y_nhot_for_this_celltype[:, string2index[celltype]] = 1
+        inv_test_map[class_label] = mixture_celltype
+
+        y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
+
+    X_mixtures = np.array(X_mixtures)
+
+    assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
+
+    return X_mixtures, y_nhot_mixtures, test_map, inv_test_map
 
 
 def indices_per_replicate(end_replicate, last_index):
@@ -180,62 +239,3 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
     return n_full_samples, X_for_this_celltype
 
 
-def read_mixture_data(filename, n_single_cell_types_no_penile, binarize=True):
-    """
-    Reads in the experimental mixture data that is used as test data.
-
-    Note that the samples are saved in a separate numpy array
-    based on their replicate indices. As the size differs per
-    sample, the array is filled up with zeros to get the correct
-    dimension.
-
-    :param n_single_cell_types_no_penile: int: number of single cell types
-        excluding penile skine
-    :param binarize: bool: whether to binarize values
-    :return: N_samples x N_markers array of measurements NB only one replicate per
-                    sample,
-                N_samples iterable of mixture class labels - corresponds to the labels
-                    used in data augmentation,
-                N_samples x N_single_cell_type n_hot encoding of the labels NB in
-                    in single cell type space!
-                dict: mixture name -> list of int single cell type labels
-                dict: mixture class label -> mixture name
-    """
-
-    df, rv = read_df(filename, binarize)
-    mixture_celltypes = np.array(df.index)
-
-    # initialize
-    test_map = defaultdict(list)
-    inv_test_map = {}
-    n_per_mixture_celltype = dict()
-
-    X_mixtures = []
-    y_nhot_mixtures = np.zeros((0, n_single_cell_types_no_penile))
-    for mixture_celltype in sorted(set(mixture_celltypes)):
-        data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
-        rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
-
-        n_full_samples, X_for_this_celltype = get_data_for_celltype(
-            mixture_celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype)
-
-        for repeated_measurements in X_for_this_celltype:
-            X_mixtures.append(repeated_measurements)
-        n_per_mixture_celltype[mixture_celltype] = n_full_samples
-
-        celltypes = mixture_celltype.split('+')
-        class_label = 0
-        y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_single_cell_types_no_penile))
-        for celltype in celltypes:
-            test_map[mixture_celltype].append(string2index[celltype])
-            class_label += 2 ** string2index[celltype]
-            y_nhot_for_this_celltype[:, string2index[celltype]] = 1
-        inv_test_map[class_label] = mixture_celltype
-
-        y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
-
-    X_mixtures = np.array(X_mixtures)
-
-    assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
-
-    return X_mixtures, y_nhot_mixtures, test_map, inv_test_map
