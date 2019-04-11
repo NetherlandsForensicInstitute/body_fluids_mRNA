@@ -144,30 +144,6 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
 
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
-# TODO: Change h0_h1 to h1_h2
-# TODO: Check if needed?
-def probs_to_lrs(h0_h1_probs, classes_map, log=False):
-    """
-    Converts probabilities to (log) likelihood ratios.
-
-    :param h0_h1_probs: dictionary with for each cell type two lists with probabilities for h0 and h1
-    :param classes_map: dictionary with for each cell type the accompanied indexnumber
-    :param log: boolean if True the 10logLRs are calculated
-    :return: dictionary with for each cell type two lists with (10log)LRs for h0 and h1
-    """
-    h0_h1_lrs = {}
-    for celltype in sorted(classes_map):
-        if log:
-            h0_h1_celltype = h0_h1_probs[celltype]
-            h0_h1_lrs[celltype] = [np.log10(h0_h1_celltype[i] / (1 - h0_h1_celltype[i])) for i in
-                                        range(len(h0_h1_celltype))]
-
-        else:
-            h0_h1_celltype = h0_h1_probs[celltype]
-            h0_h1_lrs[celltype] = [h0_h1_celltype[i] / (1 - h0_h1_celltype[i]) for i in
-                                        range(len(h0_h1_celltype))]
-
-    return h0_h1_lrs
 
 # TODO: Change h0_h1 to h1_h2
 # TODO: Check if needed?

@@ -11,7 +11,7 @@ from rna.constants import string2index
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
-def read_df(filename, binarize, number_of_replicates):
+def read_df(filename, binarize, number_of_replicates=1):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.
     Returns the original dataframe and a separate list of indices that are the
@@ -77,21 +77,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     """
 
-    def indices_per_replicate(end_replicate, last_index):
-        """
-        Put all indices from replicates that belong to one sample
-        in a list and returns one list filled with these lists.
-        """
-        end_replicate1 = end_replicate.copy()
-        end_replicate2 = end_replicate.copy()
-
-        end_replicate1.insert(0, 0)
-        end_replicate2.append(last_index)
-        all_ends = zip(end_replicate1, end_replicate2)
-        indices_per_replicate_set = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
-
-        return indices_per_replicate_set
-
     df, rv = read_df(filename, binarize, number_of_replicates)
 
     if single_cell_types:
@@ -104,8 +89,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         for celltype in all_celltypes:
             if celltype not in single_cell_types and celltype!='Skin.penile':
                 raise ValueError('unknown cell type: {}'.format(celltype))
-
-
 
     n_celltypes_with_penile = len(single_cell_types) + 1
     n_features = len(df.columns)
@@ -132,7 +115,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
                 X_single.append(repeated_measurements)
             n_per_celltype[celltype] = n_full_samples
 
-
         y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
         end = 0
         for i, celltype in sorted(enumerate(list(single_cell_types) + ['Skin.penile'])):
@@ -147,7 +129,25 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
+    assert X_single.shape[0] == y_nhot_single.shape[0]
+
     return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, list(df.columns), list(df.index)
+
+
+def indices_per_replicate(end_replicate, last_index):
+    """
+    Put all indices from replicates that belong to one sample
+    in a list and returns one list filled with these lists.
+    """
+    end_replicate1 = end_replicate.copy()
+    end_replicate2 = end_replicate.copy()
+
+    end_replicate1.insert(0, 0)
+    end_replicate2.append(last_index)
+    all_ends = zip(end_replicate1, end_replicate2)
+    indices_per_replicate_set = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
+
+    return indices_per_replicate_set
 
 
 def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype):
@@ -180,7 +180,7 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
     return n_full_samples, X_for_this_celltype
 
 
-def read_mixture_data(filename, n_single_cell_types_no_penile, classes_map, binarize=True):
+def read_mixture_data(filename, n_single_cell_types_no_penile, binarize=True):
     """
     Reads in the experimental mixture data that is used as test data.
 
@@ -202,63 +202,40 @@ def read_mixture_data(filename, n_single_cell_types_no_penile, classes_map, bina
                 dict: mixture class label -> mixture name
     """
 
-    def indices_per_replicate(end_replicate, last_index):
-        """
-        Put all indices from replicates that belong to one sample
-        in a list and returns one list filled with these lists.
-        """
-        end_replicate1 = end_replicate.copy()
-        end_replicate2 = end_replicate.copy()
-
-        end_replicate1.insert(0, 0)
-        end_replicate2.append(last_index)
-        all_ends = zip(end_replicate1, end_replicate2)
-        all_ends = [[i for i in range(the_end[0], the_end[1])] for the_end in all_ends]
-
-        return all_ends
-
-    # df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx', binarize)
     df, rv = read_df(filename, binarize)
+    mixture_celltypes = np.array(df.index)
 
     # initialize
-    class_labels = np.array(df.index)
     test_map = defaultdict(list)
-    X_mixtures = []
-    y_mixtures = []
     inv_test_map = {}
+    n_per_mixture_celltype = dict()
 
-    rvs = np.array(rv).flatten()
-    N_full_samples = len([i for i in range(1, len(rvs)) if rvs[i-1] > rvs[i] or
-                          rvs[i-1] == rvs[i]])+1
-    y_mixtures_n_hot = np.zeros(
-        (N_full_samples, n_single_cell_types_no_penile),
-        dtype=int
-    )
-    n_total = 0
+    X_mixtures = []
+    y_nhot_mixtures = np.zeros((0, n_single_cell_types_no_penile))
+    for mixture_celltype in sorted(set(mixture_celltypes)):
+        data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
+        rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
 
-    for clas in sorted(set(class_labels)):
-        cell_types = clas.split('+')
+        n_full_samples, X_for_this_celltype = get_data_for_celltype(
+            mixture_celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype)
+
+        for repeated_measurements in X_for_this_celltype:
+            X_mixtures.append(repeated_measurements)
+        n_per_mixture_celltype[mixture_celltype] = n_full_samples
+
+        celltypes = mixture_celltype.split('+')
         class_label = 0
-        data_for_this_label = np.array(df.loc[clas], dtype=float)
-        rv_set_per_class = np.array(rv.loc[clas]).flatten()
-        end_replicate = [i for i in range(1, len(rv_set_per_class)) if
-                         rv_set_per_class[i-1] > rv_set_per_class[i] or
-                         rv_set_per_class[i-1] == rv_set_per_class[i]]
-        replicate_indices = indices_per_replicate(end_replicate, len(rv_set_per_class))
+        y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_single_cell_types_no_penile))
+        for celltype in celltypes:
+            test_map[mixture_celltype].append(string2index[celltype])
+            class_label += 2 ** string2index[celltype]
+            y_nhot_for_this_celltype[:, string2index[celltype]] = 1
+        inv_test_map[class_label] = mixture_celltype
 
-        n_full_samples = len(replicate_indices)
+        y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
 
-        for idxs in replicate_indices:
-            X_mixtures.append(data_for_this_label[idxs, :])
-
-        for cell_type in cell_types:
-            test_map[clas].append(classes_map[cell_type])
-            class_label += 2 ** classes_map[cell_type]
-            y_mixtures_n_hot[n_total:n_total + n_full_samples, classes_map[cell_type]] = 1
-        inv_test_map[class_label] = clas
-        n_total += n_full_samples
-
-        y_mixtures += [class_label] * n_full_samples
     X_mixtures = np.array(X_mixtures)
 
-    return X_mixtures, y_mixtures, y_mixtures_n_hot, test_map, inv_test_map
+    assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
+
+    return X_mixtures, y_nhot_mixtures, test_map, inv_test_map

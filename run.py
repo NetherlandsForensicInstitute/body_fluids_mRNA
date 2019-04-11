@@ -6,7 +6,7 @@ import numpy as np
 
 from rna.analytics import augment_data
 from rna.constants import single_cell_types, string2index
-from rna.input_output import get_data_per_cell_type
+from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.lr_system import MarginalClassifier
 from rna.utils import string2vec, split_data, change_labels
 from rna.plotting import plot_histogram_log_lr
@@ -57,7 +57,8 @@ def perform_analysis_splitting_data():
     lrs_after_calib = model.predict_lrs(X_test_augmented, target_classes, with_calibration=True)
 
     plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, show=True)
-    plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, density=True, title='after', show=True)
+    plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes,
+                          density=True, title='after', show=True)
 
     makeplot_hist_density(model.predict_lrs(X_calibration_augmented, target_classes), y_calibration_nhot_augmented,
                           model._calibrators_per_target_class, target_classes, show=True)
@@ -66,14 +67,17 @@ def perform_analysis_splitting_data():
 if __name__ == '__main__':
     from_penile = False
 
-    N_SAMPLES_PER_COMBINATION = 20
-    N_SAMPLES_PER_COMBINATION_TEST = 10
+    N_SAMPLES_PER_COMBINATION = 4
+    N_SAMPLES_PER_COMBINATION_TEST = 2
 
     X_single, y_nhot_single, n_celltypes_with_penile, n_features, \
     n_per_celltype, markers, present_celltypes = \
         get_data_per_cell_type(single_cell_types=single_cell_types)
 
     n_celltypes = n_celltypes_with_penile - 1
+
+    X_mixtures, y_nhot_mixtures, test_map, inv_test_map = \
+        read_mixture_data('Datasets/Dataset_mixtures_rv.xlsx', n_celltypes)
 
     # assume that this is what comes from the GUI
     target_classes_str = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa',
@@ -82,5 +86,4 @@ if __name__ == '__main__':
 
     # perform_analysis()
     perform_analysis_splitting_data()
-
 
