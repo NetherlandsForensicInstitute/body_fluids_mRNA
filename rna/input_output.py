@@ -2,16 +2,15 @@
 Reads and manipulates datasets.
 """
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-
-# TODO: include else option when '_rv' not in filename
-# TODO: imports file that contains 4 rv per sample without rv's connected to
 from rna.constants import string2index
 
 
+# TODO: include else option when '_rv' not in filename
+# TODO: imports file that contains 4 rv per sample without rv's connected to
 def read_df(filename, binarize, number_of_replicates):
     """
     Reads in an xls file as a dataframe, replacing NA and binarizing if required.

@@ -8,10 +8,10 @@ from rna.analytics import augment_data
 from rna.constants import single_cell_types, string2index
 from rna.input_output import get_data_per_cell_type
 from rna.lr_system import MarginalClassifier
-from rna.utils import string2vec, from_nhot_to_labels, \
-    split_data, change_labels
+from rna.utils import string2vec, split_data, change_labels
 from rna.plotting import plot_histogram_log_lr
 
+from lir.plotting import makeplot_hist_density
 
 def perform_analysis():
     model = MarginalClassifier()
@@ -59,12 +59,15 @@ def perform_analysis_splitting_data():
     plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, show=True)
     plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, density=True, title='after', show=True)
 
+    makeplot_hist_density(model.predict_lrs(X_calibration_augmented, target_classes), y_calibration_nhot_augmented,
+                          model._calibrators_per_target_class, target_classes, show=True)
+
 
 if __name__ == '__main__':
     from_penile = False
 
-    N_SAMPLES_PER_COMBINATION = 5
-    N_SAMPLES_PER_COMBINATION_TEST = 4
+    N_SAMPLES_PER_COMBINATION = 20
+    N_SAMPLES_PER_COMBINATION_TEST = 10
 
     X_single, y_nhot_single, n_celltypes_with_penile, n_features, \
     n_per_celltype, markers, present_celltypes = \
@@ -77,6 +80,7 @@ if __name__ == '__main__':
                           'Vaginal.mucosa and/or Menstrual.secretion']
     target_classes = string2vec(target_classes_str, string2index)
 
+    # perform_analysis()
     perform_analysis_splitting_data()
 
 

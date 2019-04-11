@@ -8,7 +8,7 @@ import numpy as np
 
 from rna.constants import single_cell_types, index2string
 
-
+# TODO: Check if function still needed?
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
                                               classes_map,
                                               class_combinations_to_evaluate,

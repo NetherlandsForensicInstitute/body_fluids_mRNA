@@ -19,7 +19,6 @@ class MarginalClassifier():
         self._classifier.fit(X, y)
         return self
 
-
     def fit_calibration(self, X, y_nhot, target_classes):
         """
         Makes calibrated model for each target class
@@ -27,10 +26,12 @@ class MarginalClassifier():
         lrs_per_target_class = self.predict_lrs(X, target_classes)
 
         for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator
+            # TODO: Build this in
+            calibrator = KDECalibrator()
             lrs = lrs_per_target_class[:, i]
+            loglrs = np.log10(lrs)
             labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[get_celltype_str(target_class)] = calibrator.fit(lrs, labels)
+            self._calibrators_per_target_class[get_celltype_str(target_class)] = calibrator.fit(loglrs, labels)
 
         return self
 
@@ -58,7 +59,8 @@ class MarginalClassifier():
         if with_calibration:
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrators_per_target_class[get_celltype_str(target_class)]
-                caliblrs_per_target_class = calibrator.transform(lrs_per_target_class[:, i])
+                log_lrs_per_target_class = np.log10(lrs_per_target_class)
+                caliblrs_per_target_class = calibrator.transform(log_lrs_per_target_class[:, i])
                 lrs_per_target_class[:, i] = caliblrs_per_target_class
 
         return lrs_per_target_class

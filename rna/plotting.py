@@ -165,7 +165,7 @@ def plot_data(X):
 
 
 def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before',
-                          density=None, savefig=None, show=None):
+                          density=False, savefig=None, show=None):
 
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
@@ -186,11 +186,11 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
         plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label='h1', alpha=0.5)
         plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
 
-        plt.title(celltype, fontsize=16)
+        plt.title(celltype)
         # if title == 'after':
         #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
         #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
-        if density is not None:
+        if density:
             plt.ylabel("Density")
         else:
             plt.ylabel("Frequency")
@@ -203,40 +203,40 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
     if show or savefig is None:
         plt.show()
 
-
-def plot_reliability_plot(h0_h1_probs, y_matrix, title, bins=10, savefig=None, show=None):
-
-    celltypes = list(h0_h1_probs.keys())
-    plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9 / 4 * len(celltypes)))
-    plt.suptitle("Reliability plot {} calibration".format(title), size=16)
-    for idx, celltype in enumerate(celltypes):
-        h0h1_probs = np.append(h0_h1_probs[celltype][0], h0_h1_probs[celltype][1])
-        y_true = sorted(y_matrix[:, idx], reverse=True)
-
-        empirical_prob_pos, y_score_bin_mean = calibration_curve(
-            y_true, h0h1_probs, n_bins=bins)
-
-        ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
-        plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
-        scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
-        plt.plot(y_score_bin_mean[scores_not_nan],
-                 empirical_prob_pos[scores_not_nan],
-                 color='red',
-                 marker='o',
-                 linestyle='-',
-                 label=celltype)
-        plt.xlabel("Probability".format(len(empirical_prob_pos)))
-        plt.ylabel("Empirical probability")
-        # plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
-        #          ha='center', va='center', transform=ax.transAxes)
-        plt.legend(loc=9)
-
-    if savefig is not None:
-        plottitle = "Reliability plot {} calibration lowcalib".format(title).replace(" ", "_").lower()
-        plt.tight_layout()
-        plt.savefig(savefig)
-    if show or savefig is None:
-        plt.show()
+# TODO: Check if plot still wanted
+# def plot_reliability_plot(h0_h1_probs, y_matrix, title, bins=10, savefig=None, show=None):
+#
+#     celltypes = list(h0_h1_probs.keys())
+#     plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9 / 4 * len(celltypes)))
+#     plt.suptitle("Reliability plot {} calibration".format(title), size=16)
+#     for idx, celltype in enumerate(celltypes):
+#         h0h1_probs = np.append(h0_h1_probs[celltype][0], h0_h1_probs[celltype][1])
+#         y_true = sorted(y_matrix[:, idx], reverse=True)
+#
+#         empirical_prob_pos, y_score_bin_mean = calibration_curve(
+#             y_true, h0h1_probs, n_bins=bins)
+#
+#         ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
+#         plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
+#         scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
+#         plt.plot(y_score_bin_mean[scores_not_nan],
+#                  empirical_prob_pos[scores_not_nan],
+#                  color='red',
+#                  marker='o',
+#                  linestyle='-',
+#                  label=celltype)
+#         plt.xlabel("Probability".format(len(empirical_prob_pos)))
+#         plt.ylabel("Empirical probability")
+#         # plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
+#         #          ha='center', va='center', transform=ax.transAxes)
+#         plt.legend(loc=9)
+#
+#     if savefig is not None:
+#         plottitle = "Reliability plot {} calibration lowcalib".format(title).replace(" ", "_").lower()
+#         plt.tight_layout()
+#         plt.savefig(savefig)
+#     if show or savefig is None:
+#         plt.show()
 
 
 def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):
