@@ -8,8 +8,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
-from rna.constants import single_cell_types, string2index
+from rna.constants import single_cell_types
 from rna.utils import from_nhot_to_labels
+# from run import label_encoder
 
 
 def combine_samples(data_for_class):
@@ -22,35 +23,6 @@ def combine_samples(data_for_class):
     data_for_class_mean = np.array([np.mean(data_for_class[i], axis=0)
                                     for i in range(data_for_class.shape[0])])
     return data_for_class_mean
-
-
-def classify_single(X, y_nhot):
-    """
-    Very simple analysis of single cell type classification, useful as
-    preliminary test.
-    """
-    # classify single classes
-    single_samples = combine_samples(X)
-    y = from_nhot_to_labels(y_nhot)
-    print('fitting on {} samples, {} features, {} classes'.format(
-        X.shape[0],
-        single_samples.shape[1],
-        len(set(y)))
-    )
-
-    X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
-    single_model = MLPClassifier(random_state=0)
-    single_model.fit(X_train, y_train)
-    y_pred = single_model.predict(X_test)
-    print('train accuracy for single classes: {}'.format(
-        accuracy_score(y_test, y_pred))
-    )
-
-    # Compute confusion matrix
-    cnf_matrix = confusion_matrix(y_test, y_pred)
-    np.set_printoptions(precision=2)
-    print(cnf_matrix)
-    print(string2index)
 
 
 def construct_random_samples(X, y, n, classes_to_include, n_features):
@@ -96,7 +68,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
 
 def augment_data(X, y_nhot, n_celltypes, n_features,
-                 N_SAMPLES_PER_COMBINATION, string2index, from_penile=False):
+                 N_SAMPLES_PER_COMBINATION, label_encoder, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -106,7 +78,7 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
     :param n_celltypes: int: number of single cell types
     :param n_features: int: n_markers
     :param N_SAMPLES_PER_COMBINATION:
-    :param string2index:
+    :param label_encoder:
     :param from_penile: bool: generate sample that (T) always or (F) never
         also contain penile skin
     :return: n_experiments x n_markers array,
@@ -115,8 +87,10 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
     """
 
     if from_penile == False:
-        if 'Skin.penile' in string2index:
-            del string2index['Skin.penile']
+        # TODO: Does this work as expected?
+        if 'Skin.penile' in label_encoder.classes_:
+            label_encoder.classes_ = np.delete(label_encoder.classes_,
+                                               np.argwhere(label_encoder.classes_ == 'Skin.penile'))
 
     y = from_nhot_to_labels(y_nhot)
 
@@ -131,7 +105,9 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
             binary = '0' + binary
 
         classes_in_current_mixture = []
-        for (celltype, i_celltype) in sorted(string2index.items()):
+        # for (celltype, i_celltype) in sorted(string2index.items()):
+        for k in range(len(label_encoder.classes_)):
+            i_celltype = k
             if binary[-i_celltype - 1] == '1':
                 classes_in_current_mixture.append(i_celltype)
                 y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
@@ -184,3 +160,31 @@ def get_mixture_columns_for_class(target_class, priors):
 
     return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
 
+
+def classify_single(X, y_nhot):
+    """
+    Very simple analysis of single cell type classification, useful as
+    preliminary test.
+    """
+    # classify single classes
+    single_samples = combine_samples(X)
+    y = from_nhot_to_labels(y_nhot)
+    print('fitting on {} samples, {} features, {} classes'.format(
+        X.shape[0],
+        single_samples.shape[1],
+        len(set(y)))
+    )
+
+    X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
+    single_model = MLPClassifier(random_state=0)
+    single_model.fit(X_train, y_train)
+    y_pred = single_model.predict(X_test)
+    print('train accuracy for single classes: {}'.format(
+        accuracy_score(y_test, y_pred))
+    )
+
+    # Compute confusion matrix
+    cnf_matrix = confusion_matrix(y_test, y_pred)
+    np.set_printoptions(precision=2)
+    print(cnf_matrix)
+    # print(label_encoder.array)

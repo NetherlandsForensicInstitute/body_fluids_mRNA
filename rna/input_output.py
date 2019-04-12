@@ -6,8 +6,11 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from rna.constants import string2index
 
+from sklearn.preprocessing import LabelEncoder
+
+# TODO: Can do this differently?
+# from run import label_encoder
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
@@ -80,18 +83,29 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     df, rv = read_df(filename, binarize, number_of_replicates)
 
+    label_encoder = LabelEncoder()
     if single_cell_types:
-        single_cell_types = set(single_cell_types)
+        single_cell_types = list(set(single_cell_types))
+        single_cell_types.append('Skin.penile')
+        label_encoder.fit(single_cell_types)
+
+        # assert int(np.argwhere(label_encoder.classes_ == 'Skin.penile')) is len(label_encoder.classes_), 'Skin.penile' \
+        #                                                                                             'must be at the' \
+        #                                                                                             'last index'
+
     else:
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')
         # if not provided, learn the cell types from the data
         all_celltypes = np.array(df.index)
         for celltype in all_celltypes:
+            # TODO: How does this work if single_cell_types is None?
             if celltype not in single_cell_types and celltype!='Skin.penile':
                 raise ValueError('unknown cell type: {}'.format(celltype))
 
-    n_celltypes_with_penile = len(single_cell_types) + 1
+        label_encoder.fit(all_celltypes)
+
+    n_celltypes_with_penile = len(single_cell_types)
     n_features = len(df.columns)
     n_per_celltype = dict()
 
@@ -115,8 +129,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
         y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
         end = 0
-        for i, celltype in sorted(enumerate(list(single_cell_types) + ['Skin.penile'])):
-            i_celltype = string2index[celltype]
+        for i, celltype in enumerate(list(single_cell_types) + ['Skin.penile']):
+            i_celltype = label_encoder.transform([celltype])
             begin = end
             end = end + n_per_celltype[celltype]
             y_nhot_single[begin:end, i_celltype] = 1
@@ -129,10 +143,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     assert X_single.shape[0] == y_nhot_single.shape[0]
 
-    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, list(df.columns), list(df.index)
+    # if 'Skin.penile' in label_encoder.classes_:
+    #     label_encoder.classes_ = np.delete(label_encoder.classes_, np.argwhere(label_encoder.classes_ == 'Skin.penile'))
+
+    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, \
+           label_encoder, list(df.columns), list(df.index)
 
 
-def read_mixture_data(filename, n_celltypes, binarize=True):
+def read_mixture_data(filename, n_celltypes, label_encoder, binarize=True):
     """
     Reads in the experimental mixture data that is used as test data.
 
@@ -179,9 +197,9 @@ def read_mixture_data(filename, n_celltypes, binarize=True):
         class_label = 0
         y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_celltypes))
         for celltype in celltypes:
-            test_map[mixture_celltype].append(string2index[celltype])
-            class_label += 2 ** string2index[celltype]
-            y_nhot_for_this_celltype[:, string2index[celltype]] = 1
+            test_map[mixture_celltype].append(label_encoder.transform([celltype]))
+            class_label += 2 ** int(label_encoder.transform([celltype]))
+            y_nhot_for_this_celltype[:, label_encoder.transform([celltype])] = 1
         inv_test_map[class_label] = mixture_celltype
 
         y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))

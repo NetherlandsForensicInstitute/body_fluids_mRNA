@@ -12,7 +12,7 @@ from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from rna.utils import get_celltype_str
 from lir import PavLogLR
 
-
+# TODO: Make this function work (?)
 def boxplot_per_single_class_category(y_prob_per_class,
                                       y_augmented_matrix,
                                       classes_to_evaluate,
@@ -73,7 +73,7 @@ def boxplot_per_single_class_category(y_prob_per_class,
     #     plt.title(inv_classes_map[i])
     # plt.savefig('singles boxplot')
 
-
+# TODO: Make this function work (?)
 def plot_for_experimental_mixture_data(X_mixtures,
                                        y_mixtures,
                                        y_mixtures_matrix,
@@ -173,7 +173,7 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
     plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
     for i, target_class in enumerate(target_classes):
 
-        celltype = get_celltype_str(target_class)
+        # celltype = get_celltype_str(target_class)
 
         loglrs1 = np.multiply(loglrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
         loglrs2 = np.multiply(loglrs[:, i], 1-np.max(np.multiply(y_nhot, target_class), axis=1))
@@ -186,7 +186,7 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
         plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label='h1', alpha=0.5)
         plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
 
-        plt.title(celltype)
+        plt.title(target_class)
         # if title == 'after':
         #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
         #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))

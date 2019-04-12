@@ -6,7 +6,7 @@ import random
 
 import numpy as np
 
-from rna.constants import single_cell_types, index2string
+from rna.constants import single_cell_types
 
 # TODO: Check if function still needed?
 def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
@@ -188,18 +188,19 @@ def sort_calibrators(all_calibrators):
     return sorted_calibrators
 
 
-def string2vec(list_of_strings, string2index):
+def string2vec(list_of_strings, label_encoder):
     """
     converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s
     :param list_of_strings: list of strings. Multiple cell types should be separated by and/or
-    :param string2index: dict that converts single cell type string label to index
+    :param label_encoder
     :return:
     """
+
     target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
     for i, list_item in enumerate(list_of_strings):
-        cell_types = list_item.split(' and/or ')
-        for cell_type in cell_types:
-            target_classes[i, string2index[cell_type]] = 1
+        celltypes = list_item.split(' and/or ')
+        for celltype in celltypes:
+            target_classes[i, int(label_encoder.transform([celltype]))] = 1
     return target_classes
 
 
@@ -232,14 +233,14 @@ def change_labels(y_nhot):
     return switched_labels
 
 
-def get_celltype_str(target_class):
+def get_celltype_str(target_class, label_encoder):
 
-    indices = np.where(target_class == 1)
+    indices = np.where(target_class == 1)[0]
     if len(indices[0]) > 1:
-        celltypes = [index2string[comb] for comb in indices[0]]
+        celltypes = [label_encoder([comb]) for comb in indices]
         celltype = ' and/or '.join(celltypes)
     else:
-        celltype = index2string[indices[0][0]]
+        celltype = label_encoder([indices[0]])
 
     return celltype
 
