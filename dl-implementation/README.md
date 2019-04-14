@@ -14,7 +14,7 @@ files:
   # name of the file (in the data dir) with the single measurements
   single: 'single_name.csv'
   # name of the file (in the data dir) with the mixture measurments
-  mixture: 'dataset_mixture_ann.csv'
+  mixture: 'mixture_name.csv'
   # separator of the files
   csv_sep: ','
 
