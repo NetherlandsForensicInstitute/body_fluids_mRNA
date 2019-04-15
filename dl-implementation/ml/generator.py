@@ -315,68 +315,70 @@ class EvalGenerator(DataGenerator):
             self.indexes.append(['augmented', y, len(self.augmented[y]) - 1])
 
 
-def read_data(file: str, type_col:str, rep_col: str, val_col: str, pred_col: str,
-              blank_labels: str, filter_labels: str,
-              cut_off: int,
+def read_data(file: str, cols: dict, labels: dict, cut_off: int,
               include_blanks: bool = False, apply_filter: bool = True) -> Tuple[list, list]:
     """
     read in data from csv file into pandas and convert it to samples and classes
 
     :param file: string of file location
-    :param type_col: column name of the sample type
-    :param rep_col: column name of the replication value
-    :param val_col: column names of the validation markers
-    :param pred_col: column names of the prediction markers
+    :param cols: dict with mapping for variable groups
+        `{'type':str, 'replicate':str, 'validation':list, 'prediction':list}`
     :param cut_off: value at which a marker should be considered valid.
-    :param blank_labels: names of types that indicate that the type is a blank
-    :param filter_labels: names of the types that should be filtered if filter is true
+    :param labels: dict with the mapping for the names of the types that should be filtered/are the blanks
+        `{'blanks': list, 'filter': list}`
     :param include_blanks: boolean to indicate if blanks should be included in the samples (and classes)
     :param apply_filter: boolean to indicate if sample types specified in project yaml should be filtered
     :return: the samples (x) and corresponding classes (y)
     """
+    # Log process
+    logger.info(f'==Processing file {file}==')
     # read data
     df = pd.read_csv(file)
     # fill missing with 0
     df.fillna(0, inplace=True)
     # if blanks should not be included remove them from the data
     if not include_blanks:
-        df = df[~df['type'].isin(blank_labels)]
+        df = df[~df[cols.get('type')].isin(labels.get('blanks'))]
     if apply_filter:
-        df = df[~df['type'].isin(filter_labels)]
+        df = df[~df[cols.get('type')].isin(labels.get('filter'))]
     # extract samples and classes
-    x, y = extract_samples(df, type_col, rep_col, val_col, pred_col, cut_off)
+    x, y = extract_samples(df, cols, cut_off)
+    # log number of samples
+    logger.info(f'Returned {len(x)} valid samples')
 
     return x, y
 
 
-def extract_samples(df: pd.DataFrame,
-                    type_col: str, rep_col: str, val_col: str, pred_col: str,
-                    cut_off: int) -> Tuple[list, list]:
+def extract_samples(df: pd.DataFrame, cols: dict, cut_off: int) -> Tuple[list, list]:
     """
     Extract the samples and classes from a dataframe
 
     :param df: a pandas dataframe
-    :param type_col: column name of the sample type
-    :param rep_col: column name of the replication value
-    :param val_col: column names of the validation markers
-    :param pred_col: column names of the prediction markers
+    :param cols: dict with mapping for varible groups
+        `{'type':str, 'replicate':str, 'validation':list, 'prediction':list}`
     :param cut_off: value at which a marker should be considered valid.
     :return: the samples (x) and corresponding classes (y)
     """
     # check if next replicate value is smaller ot the same as current (indicating a 'new' sample
-    sample_idx = (df[rep_col] <= df[rep_col].shift()).cumsum()
+    sample_idx = (df[cols.get('replicate')] <= df[cols.get('replicate')].shift()).cumsum()
     grouped_dfs = df.groupby(sample_idx)
     # init x and y
     x, y = list(), list()
+    # setup logging for cleaning
+    dropped = False
     # iterate over grouped data frames
     for _, grouped_df in grouped_dfs:
         # Placeholder for check if sample is valid
-        if np.all((grouped_df[val_col] > cut_off).sum() > 0):
-            x.append(np.array(grouped_df[pred_col]))
-            y.append(grouped_df[type_col].iloc[0])
+        if np.all((grouped_df[cols.get('validation')] > cut_off).sum() > 0):
+            x.append(np.array(grouped_df[cols.get('prediction')]))
+            y.append(grouped_df[cols.get('type')].iloc[0])
         else:
-            sample_type = grouped_df[type_col].iloc[0]
+            dropped = True
+            sample_type = grouped_df[cols.get('type')].iloc[0]
             logger.warning(f'dropped a {sample_type} sample')
+    # if all samples are satisfactory, put this in the log
+    if not dropped:
+        logger.info('All samples are contained')
 
     return x, y
 
@@ -395,8 +397,7 @@ def split_train_test(x, y) -> Tuple[list, list, list, list]:
 
 
 def generate_data(file_s: str, file_m: str,
-                  type_col:str, rep_col: str, val_col: str, pred_col: str,
-                  blank_labels: str, filter_labels: str,
+                  cols: dict, labels: dict,
                   cut_off: int,
                   include_blanks: bool = False, apply_filter: bool = True, include_mixtures: bool = False) -> \
         Tuple[list, list, list, list, LabelEncoder]:
@@ -405,28 +406,25 @@ def generate_data(file_s: str, file_m: str,
 
     :param file_s: file name of single samples
     :param file_m: file name of mixture samples
-    :param type_col: column name of the sample type
-    :param rep_col: column name of the replication value
-    :param val_col: column names of the validation markers
-    :param pred_col: column names of the prediction markers
-    :param blank_labels: names of types that indicate that the type is a blank
-    :param filter_labels: names of the types that should be filtered if filter is true
+    :param cols: dict with mapping for varible groups
+        `{'type':str, 'replicate':str, 'validation':list, 'prediction':list}`
+    :param labels: dict with the mapping for the names of the types that should be filtered/are the blanks
+        `{'blanks': list, 'filter': list}`
     :param cut_off: value at which a marker should be considered valid.
     :param include_blanks: Boolean to indicate if blank samples should be included
     :param apply_filter: Boolean to indicate if sample types (as specified in the yaml) should be filtered
     :param include_mixtures: Boolean to indicate if mixtures should be included
     :return: A list with train sample, classes for these samples, test samples, classes for these samples, and a fitted
-    labelencoder to transform the string labels to numeric values
+        labelencoder to transform the string labels to numeric values
     """
     # init label encoder
     label_encoder = LabelEncoder()
     # get singles data
     x_single, y_single = read_data(file=os.path.join('data', file_s),
-                                   type_col=type_col, rep_col=rep_col, val_col=val_col, pred_col=pred_col,
-                                   blank_labels=blank_labels, filter_labels=filter_labels, cut_off=cut_off,
+                                   cols=cols, labels=labels, cut_off=cut_off,
                                    include_blanks=include_blanks, apply_filter=apply_filter)
     # fit encoder on classes from the singles (assuming the mixtures set has no new classes)
-    label_encoder.fit(list(set(y_single) - set(blank_labels)))
+    label_encoder.fit(list(set(y_single) - set(labels.get('blanks'))))
     # split samples
     x_single_train, y_single_train, x_single_test, y_single_test = split_train_test(x_single, y_single)
 
@@ -434,8 +432,7 @@ def generate_data(file_s: str, file_m: str,
     if include_mixtures:
         # get mixture data
         x_mix, y_mix = read_data(file=os.path.join('data', file_m),
-                                 type_col=type_col, rep_col=rep_col, val_col=val_col, pred_col=pred_col,
-                                 blank_labels=blank_labels, filter_labels=filter_labels, cut_off=cut_off,
+                                 cols=cols, labels=labels, cut_off=cut_off,
                                  include_blanks=include_blanks, apply_filter=apply_filter)
         # split samples
         x_mix_train, y_mix_train, x_mix_test, y_mix_test = split_train_test(x_mix, y_mix)

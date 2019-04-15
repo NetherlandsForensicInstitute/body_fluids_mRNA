@@ -56,14 +56,18 @@ def create_generators(arguments: dict, config: dict) -> Tuple[DataGenerator, Eva
     :param config: confidence object with specific information regarding the data
     :return: two DataGenerators, the first containing the train data, the second containing the test data
     """
+    cols = dict(**config.columns)
+    labels = dict(**config.sample_types)
+
     # generate data and split into train and test, and return the label encoder for the purpose of
     # converting the output (y) from string to a numeric value
     x_train, y_train, x_test, y_test, label_encoder = generate_data(
-        file_s=config.files.single, file_m=config.files.mixture,
-        type_col=config.columns.type, rep_col=config.columns.replicate,
-        val_col=config.columns.validation, pred_col=config.columns.prediction,
-        blank_labels=config.sample_types.blanks, filter_labels=config.sample_types.filter, cut_off=config.cut_off,
+        file_s=config.files.single, file_m=config.files.mixture, cols=cols, labels=labels, cut_off=config.cut_off,
         include_blanks=arguments["--blanks"], apply_filter=True, include_mixtures=arguments["--mixture"])
+
+    # log the classes
+    logger.info(f'==Used sample types (n={len(label_encoder.classes_)})==')
+    [logger.info(class_) for class_ in list(label_encoder.classes_)]
 
     # init sampling for training
     sampling = {"single": 1,
@@ -74,16 +78,16 @@ def create_generators(arguments: dict, config: dict) -> Tuple[DataGenerator, Eva
     cut_off = config.cut_off if arguments['--cutoff'] else None
 
     # init train generator
-    train_generator = DataGenerator(x_train, y_train, encoder=label_encoder, blank_labels=config.sample_types.blanks,
-                                    n_features=len(config.columns.prediction), sampling=sampling,
+    train_generator = DataGenerator(x_train, y_train, encoder=label_encoder, blank_labels=labels.get('blanks'),
+                                    n_features=len(cols.get('prediction')), sampling=sampling,
                                     batch_size=int(arguments["--batch"]), batches_per_epoch=len(x_train),
                                     cut_off=cut_off)
 
     # init eval generator
     augmented_samples = len(x_test)//2 if arguments["--augment"] else None
 
-    eval_generator = EvalGenerator(x_test, y_test, encoder=label_encoder, blank_labels=config.sample_types.blanks,
-                                   augmented_samples=augmented_samples, n_features=len(config.columns.prediction),
+    eval_generator = EvalGenerator(x_test, y_test, encoder=label_encoder, blank_labels=labels.get('blanks'),
+                                   augmented_samples=augmented_samples, n_features=len(cols.get('prediction')),
                                    cut_off=cut_off)
 
     return train_generator, eval_generator
