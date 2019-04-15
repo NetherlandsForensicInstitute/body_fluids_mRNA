@@ -4,7 +4,6 @@ from sklearn.neural_network import MLPClassifier
 
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
-from rna.utils import get_celltype_str
 
 class MarginalClassifier():
 
@@ -89,6 +88,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
 
         # denominator
         # TODO: Does this work when priors are defined?
+        # TODO: Rewrite with priors.
         all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
         indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
         # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)

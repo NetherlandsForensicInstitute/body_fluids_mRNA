@@ -9,7 +9,7 @@ from sklearn.calibration import calibration_curve
 
 from rna.analytics import combine_samples
 from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
-from rna.utils import get_celltype_str
+from rna.utils import vec2string
 from lir import PavLogLR
 
 # TODO: Make this function work (?)
@@ -164,16 +164,17 @@ def plot_data(X):
     plt.savefig('single_cell_type_measurements_after_QC')
 
 
-def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before',
-                          density=False, savefig=None, show=None):
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
+                          title='before', density=False, savefig=None, show=None):
 
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
 
     plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
+    plt.suptitle('Histogram {} calibration'.format(title))
     for i, target_class in enumerate(target_classes):
 
-        # celltype = get_celltype_str(target_class)
+        celltype = vec2string(target_class, label_encoder)
 
         loglrs1 = np.multiply(loglrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
         loglrs2 = np.multiply(loglrs[:, i], 1-np.max(np.multiply(y_nhot, target_class), axis=1))
@@ -186,7 +187,7 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
         plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label='h1', alpha=0.5)
         plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
 
-        plt.title(target_class)
+        plt.title(celltype)
         # if title == 'after':
         #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
         #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
@@ -202,41 +203,6 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, n_bins=30, title='before'
         plt.savefig(savefig)
     if show or savefig is None:
         plt.show()
-
-# TODO: Check if plot still wanted
-# def plot_reliability_plot(h0_h1_probs, y_matrix, title, bins=10, savefig=None, show=None):
-#
-#     celltypes = list(h0_h1_probs.keys())
-#     plt.subplots(int(len(celltypes)/2), 2, figsize=(9, 9 / 4 * len(celltypes)))
-#     plt.suptitle("Reliability plot {} calibration".format(title), size=16)
-#     for idx, celltype in enumerate(celltypes):
-#         h0h1_probs = np.append(h0_h1_probs[celltype][0], h0_h1_probs[celltype][1])
-#         y_true = sorted(y_matrix[:, idx], reverse=True)
-#
-#         empirical_prob_pos, y_score_bin_mean = calibration_curve(
-#             y_true, h0h1_probs, n_bins=bins)
-#
-#         ax = plt.subplot(int(len(celltypes)/2), 2, idx + 1)
-#         plt.plot([0.0, 1.0], [0.0, 1.0], 'k', label="Perfect")
-#         scores_not_nan = np.logical_not(np.isnan(empirical_prob_pos))
-#         plt.plot(y_score_bin_mean[scores_not_nan],
-#                  empirical_prob_pos[scores_not_nan],
-#                  color='red',
-#                  marker='o',
-#                  linestyle='-',
-#                  label=celltype)
-#         plt.xlabel("Probability".format(len(empirical_prob_pos)))
-#         plt.ylabel("Empirical probability")
-#         # plt.text(0.8, 0.1, 'N_train = 100,\nN_test = 50,\nN_calibration = 4',
-#         #          ha='center', va='center', transform=ax.transAxes)
-#         plt.legend(loc=9)
-#
-#     if savefig is not None:
-#         plottitle = "Reliability plot {} calibration lowcalib".format(title).replace(" ", "_").lower()
-#         plt.tight_layout()
-#         plt.savefig(savefig)
-#     if show or savefig is None:
-#         plt.show()
 
 # TODO: Make function work
 def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):

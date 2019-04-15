@@ -8,53 +8,6 @@ import numpy as np
 
 from rna.constants import single_cell_types
 
-# TODO: Check if function still needed?
-def create_information_on_classes_to_evaluate(mixture_classes_in_single_cell_type,
-                                              classes_map,
-                                              class_combinations_to_evaluate,
-                                              y_mixtures,
-                                              y_mixtures_matrix):
-    """
-    Generates data structures pertaining to all classes to evaluate, which are
-    single cell types and certain combinations thereof
-
-    :param mixture_classes_in_single_cell_type:
-    :param classes_map:
-    :param class_combinations_to_evaluate:
-    :param y_mixtures:
-    :param y_mixtures_matrix:
-    :return:
-    """
-    # select relevant classes to evaluate
-    mixture_classes_in_classes_to_evaluate = mixture_classes_in_single_cell_type.copy()
-    for celltype in list(mixture_classes_in_classes_to_evaluate):
-        if celltype not in classes_map:
-            del mixture_classes_in_classes_to_evaluate[celltype]
-
-    # change the classes map integers
-    classes_map_to_evaluate = classes_map.copy()
-    for idx, celltype in enumerate(sorted(classes_map_to_evaluate)):
-        classes_map_to_evaluate[celltype] = idx
-
-    y_combi = np.zeros((len(y_mixtures), len(class_combinations_to_evaluate)))
-    for i_combination, combination in enumerate(class_combinations_to_evaluate):
-        labels = []
-        str_combination = ''
-        for k, cell_type in enumerate(combination):
-            labels += mixture_classes_in_single_cell_type[cell_type]
-            if k < len(combination)-1:
-                str_combination += cell_type + ' and/or '
-            else:
-                str_combination += cell_type
-        mixture_classes_in_classes_to_evaluate[str_combination] = (list(set(labels)))
-        classes_map_to_evaluate[str_combination] = len(classes_map_to_evaluate) + i_combination
-        for i in set(labels):
-            y_combi[np.where(np.array(y_mixtures) == i), i_combination] = 1
-
-    return mixture_classes_in_classes_to_evaluate, classes_map_to_evaluate, \
-           np.append(y_mixtures_matrix, y_combi, axis=1)
-
-
 def split_data(X, y_nhot, size=(0.4, 0.2)):
     """
     Splits the originial dataset in three parts. All parts consist of samples from all
@@ -68,7 +21,7 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
 
     def indices_per_class(y):
         """
-        Stores the indices beloging to one class in a list and
+        Stores the indices belonging to one class in a list and
         returns a list filled with these lists.
         """
         index_classes = sorted(list(np.unique(y, return_index=True)[1]))[1:]
@@ -145,55 +98,13 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
     return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
-# TODO: Change h0_h1 to h1_h2
-# TODO: Check if needed?
-def average_per_celltype(h0_h1):
-    """
-    Calculates the average for all values per cell type per class within celltype.
-
-    :param h0_h1: list filled with dictionaries with for each cell type two lists with values for h0 and h1
-    :return: dictionary with for each cell type two lists with the average value for h0 and h1
-    """
-
-    celltypes = list(h0_h1[0].keys())
-
-    combined0 = {celltype : [] for celltype in celltypes}
-    combined1 = {celltype : [] for celltype in celltypes}
-
-    for values in h0_h1:
-        celltypes_test = list(values.keys())
-        assert len(celltypes) == len(celltypes_test), 'Number of celltypes compared is different'
-        assert False in [celltype in celltypes for celltype in celltypes_test], 'Different celltypes are compared'
-
-        for celltype in celltypes:
-            combined0[celltype].append(values[celltype][0].reshape(-1, 1))
-            combined1[celltype].append(values[celltype][1].reshape(-1, 1))
-
-    h0_h1_avg_lrs = {}
-    for i in range(len(combined0)):
-        h0_h1_avg_lrs[celltypes[i]] = (np.mean(combined0[celltypes[i]], axis=0),
-                                       np.mean(combined1[celltypes[i]], axis=0))
-
-    return h0_h1_avg_lrs
-
-# TODO: Check if needed?
-def sort_calibrators(all_calibrators):
-
-    celltypes = list(all_calibrators[0].keys())
-    sorted_calibrators = {celltype : [] for celltype in celltypes}
-    for calibrators in all_calibrators:
-        for celltype in celltypes:
-            sorted_calibrators[celltype].append(calibrators[celltype])
-
-    return sorted_calibrators
-
-
 def string2vec(list_of_strings, label_encoder):
     """
-    converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s
+    Converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s
+
     :param list_of_strings: list of strings. Multiple cell types should be separated by and/or
-    :param label_encoder
-    :return:
+    :param label_encoder: LabelEncoder mapping strings to indices and vice versa
+    :return: n_mixures x n_celltypes matrix
     """
 
     target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
@@ -205,11 +116,19 @@ def string2vec(list_of_strings, label_encoder):
 
 
 def from_nhot_to_labels(y_nhot):
+    """
+    Converts nhot encoded matrix into list with labels for unique rows.
+
+    :param y_nhot: nhot encoded matrix
+    :return: list of length y_nhot.shape[0]
+    """
 
     unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
     if np.array_equal(np.sum(unique_labels, axis=1), np.ones(y_nhot.shape[1])):
         y = np.argmax(y_nhot, axis=1)
     else:
+        # assumes that the nhot encoded matrix first row consists of zero's
+        # and a 1 is added each row starting from the right.
         y = []
         for i in range(unique_labels.shape[0]):
             y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
@@ -217,10 +136,15 @@ def from_nhot_to_labels(y_nhot):
     return y
 
 # TODO: Make this function faster
-def change_labels(y_nhot):
+def replace_labels(y_nhot):
+    """
+    Replace current labels with labels such that in correct order.
 
-    unswitched_labels = from_nhot_to_labels(y_nhot)
-    switched_labels = unswitched_labels.copy()
+    :param y_nhot: nhot encoded matrix
+    :return: list of length y_nhot.shape[0]
+    """
+
+    switched_labels = from_nhot_to_labels(y_nhot)
 
     unique_classes = np.unique(y_nhot, axis=0)
     unique_labels = from_nhot_to_labels(unique_classes)
@@ -233,16 +157,28 @@ def change_labels(y_nhot):
     return switched_labels
 
 
-def get_celltype_str(target_class, label_encoder):
+def vec2string(target_class, label_encoder):
+    """
+    Converts a vector of 0s and 1s into a string being one cell type or combined cell types.
 
-    indices = np.where(target_class == 1)[0]
-    if len(indices[0]) > 1:
-        celltypes = [label_encoder([comb]) for comb in indices]
-        celltype = ' and/or '.join(celltypes)
+    :param target_class: vector with 0s and 1s
+    :param label_encoder: LabelEncoder mapping strings to indices and vice versa
+    :return: string
+    """
+
+    assert np.argwhere(target_class == 0).size + np.argwhere(target_class == 1).size is len(target_class), \
+        'target_class contains value other than 0 or 1.'
+
+    if np.sum(target_class) < 2:
+        i_celltype = int(np.argwhere(target_class == 1)[0])
+        celltype = label_encoder.classes_[i_celltype]
     else:
-        celltype = label_encoder([indices[0]])
+        i_celltypes = np.argwhere(target_class == 1)
+        celltypes = [label_encoder.classes_[int(i_celltype)] for i_celltype in i_celltypes]
+        celltype = ' and/or '.join(celltypes)
 
     return celltype
+
 
 
 

@@ -9,8 +9,6 @@ import pandas as pd
 
 from sklearn.preprocessing import LabelEncoder
 
-# TODO: Can do this differently?
-# from run import label_encoder
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
@@ -38,6 +36,7 @@ def read_df(filename, binarize, number_of_replicates=1):
 
     else:
         # TODO: What type of data is to be expected?
+        # TODO: Add replicate numbers manually
         # then 'replicate_values' not included, so
         # assume that all samples have 4 replicates
         df = pd.read_excel(filename, delimiter=';', index_col=0)
@@ -88,11 +87,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         single_cell_types = list(set(single_cell_types))
         single_cell_types.append('Skin.penile')
         label_encoder.fit(single_cell_types)
-
-        # assert int(np.argwhere(label_encoder.classes_ == 'Skin.penile')) is len(label_encoder.classes_), 'Skin.penile' \
-        #                                                                                             'must be at the' \
-        #                                                                                             'last index'
-
     else:
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')
@@ -142,9 +136,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     X_single = np.array(X_single)
 
     assert X_single.shape[0] == y_nhot_single.shape[0]
-
-    # if 'Skin.penile' in label_encoder.classes_:
-    #     label_encoder.classes_ = np.delete(label_encoder.classes_, np.argwhere(label_encoder.classes_ == 'Skin.penile'))
 
     return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)

@@ -86,11 +86,10 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
                 which single cell type it was made up of. Does not contain column for penile skin
     """
 
-    if from_penile == False:
-        # TODO: Does this work as expected?
-        if 'Skin.penile' in label_encoder.classes_:
-            label_encoder.classes_ = np.delete(label_encoder.classes_,
-                                               np.argwhere(label_encoder.classes_ == 'Skin.penile'))
+    # if from_penile == False:
+    #     if 'Skin.penile' in label_encoder.classes_:
+    #         label_encoder.classes_ = np.delete(label_encoder.classes_,
+    #                                            np.argwhere(label_encoder.classes_ == 'Skin.penile'))
 
     y = from_nhot_to_labels(y_nhot)
 
@@ -106,8 +105,7 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
 
         classes_in_current_mixture = []
         # for (celltype, i_celltype) in sorted(string2index.items()):
-        for k in range(len(label_encoder.classes_)):
-            i_celltype = k
+        for i_celltype in range(len(label_encoder.classes_)):
             if binary[-i_celltype - 1] == '1':
                 classes_in_current_mixture.append(i_celltype)
                 y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
@@ -187,4 +185,3 @@ def classify_single(X, y_nhot):
     cnf_matrix = confusion_matrix(y_test, y_pred)
     np.set_printoptions(precision=2)
     print(cnf_matrix)
-    # print(label_encoder.array)
