@@ -53,9 +53,8 @@ class MarginalClassifier():
         if with_calibration:
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrators_per_target_class[str(target_class)]
-                log_lrs_per_target_class = np.log10(lrs_per_target_class)
-                caliblrs_per_target_class = calibrator.transform(log_lrs_per_target_class[:, i])
-                lrs_per_target_class[:, i] = caliblrs_per_target_class
+                loglrs_per_target_class = np.log10(lrs_per_target_class)
+                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
 
         return lrs_per_target_class
 
@@ -95,6 +94,8 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
         denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
         lrs[:, i] = numerator/denominator
 
+    # TODO: Does this work when signal vals in stead of binary?
     lrs = np.where(lrs > MAX_LR ** 10, MAX_LR ** 10, lrs)
     lrs = np.where(lrs < -MAX_LR ** 10, -MAX_LR ** 10, lrs)
+
     return lrs

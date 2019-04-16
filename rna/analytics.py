@@ -10,7 +10,6 @@ from sklearn.model_selection import train_test_split
 
 from rna.constants import single_cell_types
 from rna.utils import from_nhot_to_labels
-# from run import label_encoder
 
 
 def combine_samples(data_for_class):
@@ -61,14 +60,15 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))
 
 
-def augment_data(X, y_nhot, n_celltypes, n_features,
-                 N_SAMPLES_PER_COMBINATION, label_encoder, from_penile=False):
+def augment_data(X, y_nhot, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
+                 label_encoder, binarize=False, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -85,12 +85,6 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
              n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample
                 which single cell type it was made up of. Does not contain column for penile skin
     """
-
-    # if from_penile == False:
-    #     if 'Skin.penile' in label_encoder.classes_:
-    #         label_encoder.classes_ = np.delete(label_encoder.classes_,
-    #                                            np.argwhere(label_encoder.classes_ == 'Skin.penile'))
-
     y = from_nhot_to_labels(y_nhot)
 
     X_augmented = np.zeros((0, n_features))
@@ -104,7 +98,6 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
             binary = '0' + binary
 
         classes_in_current_mixture = []
-        # for (celltype, i_celltype) in sorted(string2index.items()):
         for i_celltype in range(len(label_encoder.classes_)):
             if binary[-i_celltype - 1] == '1':
                 classes_in_current_mixture.append(i_celltype)
@@ -116,6 +109,9 @@ def augment_data(X, y_nhot, n_celltypes, n_features,
 
         X_augmented = np.append(X_augmented, construct_random_samples(
             X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+
+    if binarize:
+        X_augmented = np.where(X_augmented >= 150, 1, 0)
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 

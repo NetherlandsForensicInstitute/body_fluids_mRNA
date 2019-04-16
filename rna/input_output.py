@@ -2,13 +2,13 @@
 Reads and manipulates datasets.
 """
 
-from collections import defaultdict
+
+from collections import Counter, defaultdict
 
 import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import LabelEncoder
-
 
 # TODO: include else option when '_rv' not in filename
 # TODO: imports file that contains 4 rv per sample without rv's connected to
@@ -54,8 +54,47 @@ def read_df(filename, binarize, number_of_replicates=1):
         return df, rv
 
 
+def read_df(filename, nreplicates=None):
+    """
+    Reads in an xls file as a dataframe, replacing NA if required.
+    Returns the dataframe containing the data with the signal values and a dataframe
+    with the repeated measurements belonging to a sample.
+
+    :param filename: path to the file
+    :param nreplicates: number of repeated measurements
+    :return: df: pd.DataFrame and rv: pf.DataFrame
+    """
+    raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
+    try:
+        rv = raw_df[['replicate_value']]
+        df = raw_df.loc[:, (raw_df.columns.values != 'replicate_value')]
+        df.fillna(0, inplace=True)
+    except KeyError:
+        print("Replicate values have not been found and will be added manually."
+              "The number of repeated measurements per sample is {}".format(nreplicates))
+        df = raw_df.copy()
+        df.fillna(0, inplace=True)
+        unique_celltypes = pd.Series(df.index).unique()
+        n_per_celltype = Counter(df.index)
+
+        rv_list = []
+        for celltype in unique_celltypes:
+            replicates_for_this_celltype = [i for i in range(1, nreplicates + 1)] * int(
+                n_per_celltype[celltype] / nreplicates)
+            if (n_per_celltype[celltype]/nreplicates).is_integer():
+                rv_list.extend(replicates_for_this_celltype)
+            else:
+                replicates_for_this_celltype = replicates_for_this_celltype + \
+                                               [i for i in range(1, nreplicates+1)][0:n_per_celltype[celltype] - len(replicates_for_this_celltype)]
+                rv_list.extend(replicates_for_this_celltype)
+        rv = pd.DataFrame(rv_list, index=df.index)
+
+    return df, rv
+
+
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
-                           ground_truth_known=True, binarize=True, number_of_replicates=None):
+                           ground_truth_known=True, nreplicates=None):
+
     """
     Returns data per specified cell types.
 
@@ -80,7 +119,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     """
 
-    df, rv = read_df(filename, binarize, number_of_replicates)
+    df, rv = read_df(filename, nreplicates)
 
     label_encoder = LabelEncoder()
     if single_cell_types:
@@ -107,12 +146,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     if ground_truth_known:
         for celltype in list(single_cell_types) + ['Skin.penile']:
             data_for_this_celltype = np.array(df.loc[celltype])
-
-            if type(rv) == pd.core.frame.DataFrame:
-                rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
-            # TODO: Currently does not work
-            elif type(rv) == list:
-                rvset_for_this_celltype = rv[rv[:, 1] == celltype, 0]
+            rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+            assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
             n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
                                                                       indices_per_replicate, rvset_for_this_celltype)

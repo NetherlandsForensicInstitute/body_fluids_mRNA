@@ -180,6 +180,11 @@ def vec2string(target_class, label_encoder):
     return celltype
 
 
+def remove_markers(X):
+    """
+    Removes the gender and control markers.
+    """
+    return np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
 
 
