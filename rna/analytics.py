@@ -3,13 +3,16 @@ Performs project specific.
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
 from rna.constants import single_cell_types
-from rna.utils import from_nhot_to_labels
+from rna.utils import from_nhot_to_labels, replace_labels
+
+from lir.lr import calculate_cllr
 
 
 def combine_samples(data_for_class):
@@ -43,7 +46,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     if len(classes_to_include) == 0:
         return np.zeros((n, n_features))
     data_for_class=[]
-    for j, clas in enumerate(classes_to_include):
+    for clas in classes_to_include:
         data_for_class.append(X[np.argwhere(np.array(y) == clas).flatten()])
 
     augmented_samples = []
@@ -170,14 +173,63 @@ def classify_single(X, y_nhot):
     )
 
     X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
-    single_model = MLPClassifier(random_state=0)
+    single_model = MLPClassifier(random_state=0, max_iter=1000)
     single_model.fit(X_train, y_train)
     y_pred = single_model.predict(X_test)
     print('train accuracy for single classes: {}'.format(
         accuracy_score(y_test, y_pred))
     )
 
+    plt.plot(single_model.loss_curve_)
+    plt.xlabel("Steps")
+    plt.ylabel("Loss")
+    plt.show()
+
     # Compute confusion matrix
     cnf_matrix = confusion_matrix(y_test, y_pred)
     np.set_printoptions(precision=2)
-    print(cnf_matrix)
+    # print(cnf_matrix)
+
+
+# def remove_markers(X):
+#     """
+#     Removes the gender and control markers.
+#     """
+#     return np.array([X[i][:, :-4] for i in range(X.shape[0])])
+
+
+def cllr(lrs, y_nhot, target_class):
+    """
+    Computes the cllr for one celltype.
+
+    :param lrs:
+    :param y_nhot:
+    :param target_class:
+    :return:
+    """
+
+    lrs1 = np.multiply(lrs, np.max(np.multiply(y_nhot, target_class), axis=1))
+    lrs2 = np.multiply(lrs, 1 - np.max(np.multiply(y_nhot, target_class), axis=1))
+
+    # delete zeros
+    lrs1 = np.delete(lrs1, np.where(lrs1 == -0.0))
+    lrs2 = np.delete(lrs2, np.where(lrs2 == 0.0))
+
+    return calculate_cllr(lrs1, lrs2).cllr
+
+
+def print_metrics():
+    print('===Command line arguments===\n')
+    print("[--augment] = {}\n".format(None))
+    print("[--binarize] = {}\n".format(None))
+    print("[--sigmoid] = {}\n".format(None))
+    print("[--samples] = {}\n".format(None))
+    print("[--model] = {}\n".format(None))
+    print("[--parameters] = {}\n".format(None))
+    print("[--test] = {}\n".format(None))
+    print(" ")
+    print('===Performance===\n')
+    print("Classification accuracy: {}\n".format(None))
+    print("Cllr: {}\n".format(None))
+
+

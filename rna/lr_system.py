@@ -5,11 +5,13 @@ from sklearn.neural_network import MLPClassifier
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
 
+
 class MarginalClassifier():
 
     def __init__(self, random_state=0, classifier=MLPClassifier,
-                 calibrator=KDECalibrator, MAX_LR=10):
-        self._classifier = classifier(random_state=random_state)
+                 calibrator=KDECalibrator, MAX_LR=10, max_iter=200,
+                 epsilon=1e-08):
+        self._classifier = classifier(random_state=random_state, max_iter=max_iter, epsilon=epsilon)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
@@ -95,7 +97,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
         lrs[:, i] = numerator/denominator
 
     # TODO: Does this work when signal vals in stead of binary?
-    lrs = np.where(lrs > MAX_LR ** 10, MAX_LR ** 10, lrs)
-    lrs = np.where(lrs < -MAX_LR ** 10, -MAX_LR ** 10, lrs)
+    lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
+    lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
 
     return lrs

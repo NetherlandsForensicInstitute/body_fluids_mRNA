@@ -8,7 +8,7 @@ import numpy as np
 
 from rna.constants import single_cell_types
 
-def split_data(X, y_nhot, size=(0.4, 0.2)):
+def split_data(X, y_nhot, size=(0.4, 0.2), markers=False):
     """
     Splits the originial dataset in three parts. All parts consist of samples from all
     cell types and there is no overlap between samples within the parts.
@@ -24,26 +24,17 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
         Stores the indices belonging to one class in a list and
         returns a list filled with these lists.
         """
-        index_classes = sorted(list(np.unique(y, return_index=True)[1]))[1:]
+        index_classes = list(np.unique(y, return_index=True)[1])[1:]
         index_classes1 = index_classes.copy()
         index_classes2 = index_classes.copy()
 
         index_classes1.insert(0, 0)
         index_classes2.append(len(y))
 
+        assert sum([index_classes1[i] < index_classes2[i] for i in range(len(index_classes1))]) == len(index_classes1)
+
         index_classes = zip(index_classes1, index_classes2)
-
-        indices_per_class = [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
-
-        # put back in correct order
-        _, idx = np.unique(y, return_index=True)
-        correct_order = y[np.sort(idx)]
-        sorted_indices_per_class = indices_per_class.copy()
-
-        for i, true_index in enumerate(correct_order):
-            sorted_indices_per_class[true_index] = indices_per_class[i]
-
-        return sorted_indices_per_class
+        return [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
 
 
     def define_random_indices(indices, size):
@@ -63,6 +54,9 @@ def split_data(X, y_nhot, size=(0.4, 0.2)):
 
     assert sum(size) <= 1.0, 'The sum of the size for the train and test ' \
                             'data must be must be equal to or below 1.0.'
+
+    if markers:
+        X = remove_markers(X)
 
     indices_classes = indices_per_class(from_nhot_to_labels(y_nhot))
 
@@ -126,12 +120,21 @@ def from_nhot_to_labels(y_nhot):
     unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
     if np.array_equal(np.sum(unique_labels, axis=1), np.ones(y_nhot.shape[1])):
         y = np.argmax(y_nhot, axis=1)
-    else:
+    elif unique_labels.shape[0] == 2 ** unique_labels.shape[1]:
         # assumes that the nhot encoded matrix first row consists of zero's
         # and a 1 is added each row starting from the right.
         y = []
         for i in range(unique_labels.shape[0]):
             y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
+    elif unique_labels.shape[0] == 7:
+        # mixtures
+        unique_labels = np.unique(y_nhot, axis=0)
+        y = np.zeros((y_nhot.shape[0], 1))
+        for i in range(unique_labels.shape[0]):
+            index = sum([2 ** int(idx) for idx in np.argwhere(unique_labels[i] == 1)])
+            y[np.where(np.all(y_nhot == unique_labels[i], axis=1))[0], :] = index
+    else:
+        raise ValueError("Cannot convert {} encoded matrix into labels.".format(y_nhot))
 
     return y
 
@@ -185,7 +188,6 @@ def remove_markers(X):
     Removes the gender and control markers.
     """
     return np.array([X[i][:, :-4] for i in range(X.shape[0])])
-
 
 
 
