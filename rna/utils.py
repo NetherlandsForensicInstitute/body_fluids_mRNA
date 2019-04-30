@@ -55,25 +55,25 @@ def from_nhot_to_labels(y_nhot):
 
 # TODO: Make this function faster
 # TODO: Still needed?
-def replace_labels(y_nhot):
-    """
-    Replace current labels with labels such that in correct order.
-
-    :param y_nhot: nhot encoded matrix
-    :return: list of length y_nhot.shape[0]
-    """
-
-    switched_labels = from_nhot_to_labels(y_nhot)
-
-    unique_classes = np.unique(y_nhot, axis=0)
-    unique_labels = from_nhot_to_labels(unique_classes)
-
-    for j in range(y_nhot.shape[0]):
-        for i in range(len(unique_labels)):
-            if np.array_equal(y_nhot[j, :], unique_classes[i]):
-                switched_labels[j] = unique_labels[i]
-
-    return switched_labels
+# def replace_labels(y_nhot):
+#     """
+#     Replace current labels with labels such that in correct order.
+#
+#     :param y_nhot: nhot encoded matrix
+#     :return: list of length y_nhot.shape[0]
+#     """
+#
+#     switched_labels = from_nhot_to_labels(y_nhot)
+#
+#     unique_classes = np.unique(y_nhot, axis=0)
+#     unique_labels = from_nhot_to_labels(unique_classes)
+#
+#     for j in range(y_nhot.shape[0]):
+#         for i in range(len(unique_labels)):
+#             if np.array_equal(y_nhot[j, :], unique_classes[i]):
+#                 switched_labels[j] = unique_labels[i]
+#
+#     return switched_labels
 
 
 def vec2string(target_class, label_encoder):

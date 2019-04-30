@@ -24,7 +24,7 @@ class MarginalClassifier():
         Makes calibrated model for each target class
         """
         try:
-            lrs_per_target_class = self.predict_lrs(X, target_classes)
+            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrator()
@@ -35,7 +35,7 @@ class MarginalClassifier():
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
 
-    def predict_lrs(self, X, target_classes, with_calibration=False, priors_numerator=None, priors_denominator=None):
+    def predict_lrs(self, X, target_classes, with_calibration=True, priors_numerator=None, priors_denominator=None):
         """
         gives back an N x n_target_class array of LRs
         :param X: the N x n_features data

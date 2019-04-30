@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from rna.analytics import combine_samples, remove_markers
+from rna import constants
 
 from sklearn.preprocessing import LabelEncoder
 
@@ -82,13 +83,13 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         single_cell_types = list(set(single_cell_types))
         label_encoder.fit(single_cell_types)
     else:
+        # TODO: Make code clearer (not sure how --> comment Rolf pull request)
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')
         # if not provided, learn the cell types from the data
         all_celltypes = np.array(df.index)
         for celltype in all_celltypes:
-            # TODO: How does this work if single_cell_types is None?
-            if celltype not in single_cell_types and celltype!='Skin.penile':
+            if celltype not in constants.single_cell_types and celltype!='Skin.penile':
                 raise ValueError('unknown cell type: {}'.format(celltype))
 
         label_encoder.fit(all_celltypes)
@@ -120,6 +121,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
             end = end + n_per_celltype[celltype]
             y_nhot_single[begin:end, i_celltype] = 1
 
+        assert np.array(X_single).shape[0] == y_nhot_single.shape[0]
+
     else:
         n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv)
         y_nhot_single=None
@@ -128,8 +131,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     if markers:
         X_single = remove_markers(X_single)
-
-    assert X_single.shape[0] == y_nhot_single.shape[0]
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)

@@ -13,67 +13,6 @@ from rna.utils import vec2string
 from lir import PavLogLR
 
 # TODO: Make this function work (?)
-def boxplot_per_single_class_category(y_prob_per_class,
-                                      y_augmented_matrix,
-                                      classes_to_evaluate,
-                                      classes_combinations_to_evaluate):
-    """
-    for single cell type, plot the distribution of marginal LRs for each cell type,
-    as well as for specified combinations of classes.
-
-    :param X_augmented_test: N_samples x N_markers array of observations
-    :param y_augmented_matrix: N_samples x (N_single_cell_types + N_combos)
-        n_hot encoding
-    :param classes_to_evaluate: list of str, names of classes to evaluate
-    :param mixtures_in_classes_of_interest: list of lists, specifying for each
-        class in classes_to_evaluate which
-    mixture labels contain these
-    :param class_combinations_to_evaluate: list of lists of int, specifying
-        combinations of single cell types to consider
-    :return: None
-    """
-
-    classes_only_single = classes_to_evaluate.copy()
-    for celltype, i_celltype in classes_to_evaluate.items():
-        if 'and/or' in celltype:
-            del classes_only_single[celltype]
-
-    n_single_classes_to_draw = y_augmented_matrix.shape[1]
-    # y_prob = model.predict_proba(X_augmented_test)
-    # y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-    #     y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
-    log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-    plt.subplots(2, int(n_single_classes_to_draw/2), figsize=(18, 9))
-    for idx, (celltype, i_celltype) in enumerate(sorted(classes_to_evaluate.items())):
-    # for i, celltype in enumerate(classes_to_evaluate):
-        i_celltype = classes_to_evaluate[celltype]
-        indices = [j for j in range(y_augmented_matrix.shape[0]) if
-                   y_augmented_matrix[j, i_celltype] == 1
-                   and sum(y_augmented_matrix[j, :]) == 1]
-        plt.subplot(2, int(n_single_classes_to_draw/2), idx + 1)
-        plt.xlim([-MAX_LR -.5, MAX_LR+.5])
-        bplot = plt.boxplot(log_lrs_per_class[indices, :], vert=False,
-                            labels=classes_to_evaluate, patch_artist=True)
-        colors = ['white'] * (n_single_classes_to_draw + 1)
-        colors[i_celltype] = 'black'
-        for j, comb in enumerate(classes_combinations_to_evaluate):
-            if celltype in comb:
-                colors[n_single_classes_to_draw + j] = 'black'
-        for patch, color in zip(bplot['boxes'], colors):
-            patch.set_facecolor(color)
-        plt.title(celltype)
-    plt.show()
-
-    #     for j, comb in enumerate(class_combinations_to_evaluate):
-    #         if inv_classes_map[i] in comb:
-    #             colors[n_single_classes_to_draw + j] = 'black'
-    #     for patch, color in zip(bplot['boxes'], colors):
-    #         patch.set_facecolor(color)
-    #
-    #     plt.title(inv_classes_map[i])
-    # plt.savefig('singles boxplot')
-
-# TODO: Make this function work (?)
 def plot_for_experimental_mixture_data(X_mixtures,
                                        y_mixtures,
                                        y_mixtures_matrix,
