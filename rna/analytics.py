@@ -90,7 +90,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
     """
 
     if X.size == 0:
-        # TODO: How matrices defined?
+        # TODO: Matrices defined correctly?
         X_augmented=None
         y_nhot_augmented=np.zeros((0, n_celltypes))
 
@@ -139,9 +139,7 @@ def get_mixture_columns_for_class(target_class, priors):
         binary = bin(i)[2:]
         while len(binary) < len(single_cell_types):
             binary = '0' + binary
-        nhot = np.flip([int(j) for j in binary]).tolist()
-        print(nhot)
-        return nhot
+        return np.flip([int(j) for j in binary]).tolist()
 
     def binary_admissable(binary, target_class, priors):
         """
@@ -154,7 +152,7 @@ def get_mixture_columns_for_class(target_class, priors):
                 if binary[i] == 1 and priors[i] == 0:
                     return False
                 # if prior is one, the class should occur
-                # TODO: should it return True?
+                # as binary is zero it does not occur and return False
                 if binary[i] == 0 and priors[i] == 1:
                     return False
         # at least one of the target class should occur
@@ -209,10 +207,10 @@ def cllr(lrs, y_nhot, target_class):
     """
     Computes the cllr for one celltype.
 
-    :param lrs:
-    :param y_nhot:
-    :param target_class:
-    :return:
+    :param lrs: numpy array: N_samples with the LRs from the method
+    :param y_nhot: N_samples x N_single_cell_type n_hot encoding of the labels
+    :param target_class: vector of length n_single_cell_types with at least one 1
+    :return: float: the log-likehood cost ratio
     """
 
     lrs1 = np.multiply(lrs, np.max(np.multiply(y_nhot, target_class), axis=1))
@@ -222,4 +220,4 @@ def cllr(lrs, y_nhot, target_class):
     lrs1 = np.delete(lrs1, np.where(lrs1 == -0.0))
     lrs2 = np.delete(lrs2, np.where(lrs2 == 0.0))
 
-    return calculate_cllr(lrs1, lrs2).cllr
+    return calculate_cllr(lrs2, lrs1).cllr

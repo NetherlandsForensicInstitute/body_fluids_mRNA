@@ -29,7 +29,7 @@ def from_nhot_to_labels(y_nhot):
     Converts nhot encoded matrix into list with labels for unique rows.
 
     :param y_nhot: nhot encoded matrix
-    :return: list of length y_nhot.shape[0]
+    :return: list of length N_samples
     """
 
     unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
@@ -53,28 +53,6 @@ def from_nhot_to_labels(y_nhot):
 
     return y
 
-# TODO: Make this function faster
-# TODO: Still needed?
-# def replace_labels(y_nhot):
-#     """
-#     Replace current labels with labels such that in correct order.
-#
-#     :param y_nhot: nhot encoded matrix
-#     :return: list of length y_nhot.shape[0]
-#     """
-#
-#     switched_labels = from_nhot_to_labels(y_nhot)
-#
-#     unique_classes = np.unique(y_nhot, axis=0)
-#     unique_labels = from_nhot_to_labels(unique_classes)
-#
-#     for j in range(y_nhot.shape[0]):
-#         for i in range(len(unique_labels)):
-#             if np.array_equal(y_nhot[j, :], unique_classes[i]):
-#                 switched_labels[j] = unique_labels[i]
-#
-#     return switched_labels
-
 
 def vec2string(target_class, label_encoder):
     """
@@ -97,3 +75,15 @@ def vec2string(target_class, label_encoder):
         celltype = ' and/or '.join(celltypes)
 
     return celltype
+
+
+def print_settings(settings):
+    # print("augment : {}".format(settings.augment))
+    print("binarize : {}".format(settings.binarize))
+    print("markers : {}".format(settings.markers))
+    # print("lps : {}".format(settings.binarize))
+    print("nsamples : {}".format(settings.nsamples))
+    print("test_size : {}".format(settings.test_size))
+    print("calibration_size : {}".format(settings.calibration_size))
+    # print("model : {}".format(settings.binarize))
+

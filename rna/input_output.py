@@ -52,7 +52,7 @@ def read_df(filename, nreplicates=None):
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
-                           nreplicates=None, ground_truth_known=True, markers=False):
+                           nreplicates=None, ground_truth_known=True, markers=True):
 
     """
     Returns data per specified cell types.
@@ -67,13 +67,12 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     :param ground_truth_known: does this data file have labels for the real classes?
     :return: (N_single_cell_experimental_samples x N_measurements per sample x
         N_markers array of measurements,
-                N_single_cell_experimental_samples array of int labels of which
-                    cell type was measured,
+                N_samples x N_single_cell_type n_hot encoding of the labels NB in
+                    in single cell type space!
                 N_cell types,
                 N_markers (=N_features),
-                dict: cell type name -> cell type index,
-                dict: cell type index -> cell type name,
                 dict: cell type index -> N_measurements for cell type
+                LabelEncoder: cell type index -> cell type name and cell type name -> cell type index
     """
 
     df, rv = read_df(filename, nreplicates)
@@ -129,14 +128,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
-    if markers:
+    if not markers:
         X_single = remove_markers(X_single)
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)
 
 
-def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=False):
+def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
     """
     Reads in the experimental mixture data that is used as test data.
 

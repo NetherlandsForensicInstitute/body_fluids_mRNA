@@ -14,11 +14,11 @@ Options:
     --model             The model used for the analysis: ['MLR', 'MLP', 'DL', 'XGB']
 """
 
-augment=True
+# augment=True
 binarize=True
 markers=True
-lps=True
-nsamples=(4, 2)
+# lps=True
+nsamples=(20, 10)
 test_size=0.2
 calibration_size=0.4
-model=[1, 0, 0, 0]
+# model=[1, 0, 0, 0]
