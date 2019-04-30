@@ -1,7 +1,7 @@
 import numpy as np
 
 from sklearn.neural_network import MLPClassifier
-
+import xgboost as 
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
 
@@ -23,13 +23,17 @@ class MarginalClassifier():
         """
         Makes calibrated model for each target class
         """
-        lrs_per_target_class = self.predict_lrs(X, target_classes)
+        try:
+            lrs_per_target_class = self.predict_lrs(X, target_classes)
 
-        for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator()
-            loglrs = np.log10(lrs_per_target_class[:, i])
-            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrator()
+                loglrs = np.log10(lrs_per_target_class[:, i])
+                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+        except ValueError:
+            for target_class in target_classes:
+                self._calibrators_per_target_class[str(target_class)] = None
 
     def predict_lrs(self, X, target_classes, with_calibration=False, priors_numerator=None, priors_denominator=None):
         """

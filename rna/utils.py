@@ -2,94 +2,9 @@
 General calculations.
 """
 
-import random
-
 import numpy as np
 
 from rna.constants import single_cell_types
-
-def split_data(X, y_nhot, size=(0.4, 0.2), markers=False):
-    """
-    Splits the originial dataset in three parts. All parts consist of samples from all
-    cell types and there is no overlap between samples within the parts.
-
-    :param X:
-    :param y_nhot:
-    :param size: tuple containing the relative size of the train and test data
-    :return:
-    """
-
-    def indices_per_class(y):
-        """
-        Stores the indices belonging to one class in a list and
-        returns a list filled with these lists.
-        """
-        index_classes = list(np.unique(y, return_index=True)[1])[1:]
-        index_classes1 = index_classes.copy()
-        index_classes2 = index_classes.copy()
-
-        index_classes1.insert(0, 0)
-        index_classes2.append(len(y))
-
-        assert sum([index_classes1[i] < index_classes2[i] for i in range(len(index_classes1))]) == len(index_classes1)
-
-        index_classes = zip(index_classes1, index_classes2)
-        return [[i for i in range(index_class[0], index_class[1])] for index_class in index_classes]
-
-
-    def define_random_indices(indices, size):
-        """
-        Randomly defines indices and assigns them to either train
-        or calib. For the test set the same samples are included.
-        """
-        train_size = size[0]
-        test_size = size[1]
-
-        test_index = indices[0:int(len(indices) * test_size)]
-        left_over_indices = [i for i in indices if i not in test_index]
-        train_index = random.sample(left_over_indices, int(train_size * len(indices)))
-        calibration_index = [i for i in indices if i not in test_index and i not in train_index]
-
-        return train_index, calibration_index, test_index
-
-    assert sum(size) <= 1.0, 'The sum of the size for the train and test ' \
-                            'data must be must be equal to or below 1.0.'
-
-    if markers:
-        X = remove_markers(X)
-
-    indices_classes = indices_per_class(from_nhot_to_labels(y_nhot))
-
-    X_train, y_train, X_calibrate, y_calibrate, X_test, y_test = ([] for _ in range(6))
-
-    for indices_class in indices_classes:
-        indices = [i for i in range(len(indices_class))]
-        train_index, calibration_index, test_index = define_random_indices(indices, size)
-
-        X_for_class = X[indices_class]
-        y_nhot_for_class = y_nhot[indices_class]
-
-        X_train.extend(X_for_class[train_index])
-        y_train.extend(y_nhot_for_class[train_index])
-        X_calibrate.extend(X_for_class[calibration_index])
-        y_calibrate.extend(y_nhot_for_class[calibration_index])
-        X_test.extend(X_for_class[test_index])
-        y_test.extend(y_nhot_for_class[test_index])
-
-    print("The actual distribution (train, calibration, test) is ({}, {}, {})".format(
-        round(len(X_train)/X.shape[0], 3),
-        round(len(X_calibrate)/X.shape[0], 3),
-        round(len(X_test)/X.shape[0], 3))
-    )
-
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
-    X_calibrate = np.array(X_calibrate)
-    y_calibrate = np.array(y_calibrate)
-    X_test = np.array(X_test)
-    y_test = np.array(y_test)
-
-    return X_train, y_train, X_calibrate, y_calibrate, X_test, y_test
 
 
 def string2vec(list_of_strings, label_encoder):
@@ -139,6 +54,7 @@ def from_nhot_to_labels(y_nhot):
     return y
 
 # TODO: Make this function faster
+# TODO: Still needed?
 def replace_labels(y_nhot):
     """
     Replace current labels with labels such that in correct order.
@@ -170,7 +86,7 @@ def vec2string(target_class, label_encoder):
     """
 
     assert np.argwhere(target_class == 0).size + np.argwhere(target_class == 1).size is len(target_class), \
-        'target_class contains value other than 0 or 1.'
+        'target_class contains value(s) other than 0 or 1.'
 
     if np.sum(target_class) < 2:
         i_celltype = int(np.argwhere(target_class == 1)[0])
@@ -181,13 +97,3 @@ def vec2string(target_class, label_encoder):
         celltype = ' and/or '.join(celltypes)
 
     return celltype
-
-
-def remove_markers(X):
-    """
-    Removes the gender and control markers.
-    """
-    return np.array([X[i][:, :-4] for i in range(X.shape[0])])
-
-
-

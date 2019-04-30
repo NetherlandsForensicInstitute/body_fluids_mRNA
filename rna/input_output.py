@@ -3,13 +3,12 @@ Reads and manipulates datasets.
 """
 
 
-from collections import Counter, defaultdict
+from collections import Counter
 
 import numpy as np
 import pandas as pd
 
-from rna.analytics import combine_samples
-from rna.utils import remove_markers
+from rna.analytics import combine_samples, remove_markers
 
 from sklearn.preprocessing import LabelEncoder
 
@@ -31,7 +30,7 @@ def read_df(filename, nreplicates=None):
     except KeyError:
         print("Replicate values have not been found and will be added manually."
               "The number of repeated measurements per sample is {}".format(nreplicates))
-        df = raw_df.copy()
+        df = raw_df
         df.fillna(0, inplace=True)
         unique_celltypes = pd.Series(df.index).unique()
         n_per_celltype = Counter(df.index)
@@ -52,7 +51,7 @@ def read_df(filename, nreplicates=None):
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
-                           ground_truth_known=True, nreplicates=None):
+                           nreplicates=None, ground_truth_known=True, markers=False):
 
     """
     Returns data per specified cell types.
@@ -74,7 +73,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
                 dict: cell type name -> cell type index,
                 dict: cell type index -> cell type name,
                 dict: cell type index -> N_measurements for cell type
-
     """
 
     df, rv = read_df(filename, nreplicates)
@@ -101,7 +99,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single=[]
     if ground_truth_known:
-        print("===Removed samples===")
+        print("===Removed samples===\n")
         for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
             rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
@@ -127,6 +125,9 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         y_nhot_single=None
 
     X_single = np.array(X_single)
+
+    if markers:
+        X_single = remove_markers(X_single)
 
     assert X_single.shape[0] == y_nhot_single.shape[0]
 
@@ -184,14 +185,14 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=False):
             y_nhot_for_this_celltype[:, label_encoder.transform([celltype])] = 1
 
         y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
+
     X_mixtures = np.array(X_mixtures)
-
-    assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
-
     X_mixtures = combine_samples(X_mixtures)
 
-    if markers:
+    if not markers:
         X_mixtures = remove_markers(X_mixtures)
+
+    assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
 
     return X_mixtures, y_nhot_mixtures, mixture_label_encoder
 
@@ -235,12 +236,6 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
 
 
     print("{} sample(s) from {}".format(n_discarded, celltype))
-
-    # print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(
-    #     celltype,
-    #     n_full_samples,
-    #     n_discarded
-    # ))
 
     return n_full_samples, X_for_this_celltype
 

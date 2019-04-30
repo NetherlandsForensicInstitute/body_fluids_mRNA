@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
 from rna.constants import single_cell_types
-from rna.utils import from_nhot_to_labels, replace_labels
+from rna.utils import from_nhot_to_labels
 
 from lir.lr import calculate_cllr
 
@@ -70,7 +70,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     return combine_samples(np.array(augmented_samples))
 
 
-def augment_data(X, y_nhot, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
+def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
                  label_encoder, binarize=False, from_penile=False):
     """
     Generate data for the power set of single cell types
@@ -88,33 +88,38 @@ def augment_data(X, y_nhot, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
              n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample
                 which single cell type it was made up of. Does not contain column for penile skin
     """
-    y = from_nhot_to_labels(y_nhot)
 
-    X_augmented = np.zeros((0, n_features))
-    y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
-                                 n_celltypes), dtype=int)
+    if X.size == 0:
+        # TODO: How matrices defined?
+        X_augmented=None
+        y_nhot_augmented=np.zeros((0, n_celltypes))
 
-    # for each possible combination augment N_SAMPLES_PER_COMBINATION
-    for i in range(2 ** n_celltypes):
-        binary = bin(i)[2:]
-        while len(binary) < n_celltypes:
-            binary = '0' + binary
+    else:
+        X_augmented = np.zeros((0, n_features))
+        y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
+                                     n_celltypes), dtype=int)
 
-        classes_in_current_mixture = []
-        for i_celltype in range(len(label_encoder.classes_)):
-            if binary[-i_celltype - 1] == '1':
-                classes_in_current_mixture.append(i_celltype)
-                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
-        if from_penile:
-            # also (always) add penile skin samples. the index for penile is n_celltypes
-            y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
-            classes_in_current_mixture.append(n_celltypes)
+        # for each possible combination augment N_SAMPLES_PER_COMBINATION
+        for i in range(2 ** n_celltypes):
+            binary = bin(i)[2:]
+            while len(binary) < n_celltypes:
+                binary = '0' + binary
 
-        X_augmented = np.append(X_augmented, construct_random_samples(
-            X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+            classes_in_current_mixture = []
+            for i_celltype in range(len(label_encoder.classes_)):
+                if binary[-i_celltype - 1] == '1':
+                    classes_in_current_mixture.append(i_celltype)
+                    y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
+            if from_penile:
+                # also (always) add penile skin samples. the index for penile is n_celltypes
+                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
+                classes_in_current_mixture.append(n_celltypes)
 
-    if binarize:
-        X_augmented = np.where(X_augmented >= 150, 1, 0)
+            X_augmented = np.append(X_augmented, construct_random_samples(
+                X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+
+        if binarize:
+            X_augmented = np.where(X_augmented >= 150, 1, 0)
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 
@@ -134,7 +139,9 @@ def get_mixture_columns_for_class(target_class, priors):
         binary = bin(i)[2:]
         while len(binary) < len(single_cell_types):
             binary = '0' + binary
-        return [int(j) for j in binary]
+        nhot = np.flip([int(j) for j in binary]).tolist()
+        print(nhot)
+        return nhot
 
     def binary_admissable(binary, target_class, priors):
         """
@@ -191,11 +198,11 @@ def classify_single(X, y_nhot):
     # print(cnf_matrix)
 
 
-# def remove_markers(X):
-#     """
-#     Removes the gender and control markers.
-#     """
-#     return np.array([X[i][:, :-4] for i in range(X.shape[0])])
+def remove_markers(X):
+    """
+    Removes the gender and control markers.
+    """
+    return np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
 
 def cllr(lrs, y_nhot, target_class):
@@ -216,20 +223,3 @@ def cllr(lrs, y_nhot, target_class):
     lrs2 = np.delete(lrs2, np.where(lrs2 == 0.0))
 
     return calculate_cllr(lrs1, lrs2).cllr
-
-
-def print_metrics():
-    print('===Command line arguments===\n')
-    print("[--augment] = {}\n".format(None))
-    print("[--binarize] = {}\n".format(None))
-    print("[--sigmoid] = {}\n".format(None))
-    print("[--samples] = {}\n".format(None))
-    print("[--model] = {}\n".format(None))
-    print("[--parameters] = {}\n".format(None))
-    print("[--test] = {}\n".format(None))
-    print(" ")
-    print('===Performance===\n')
-    print("Classification accuracy: {}\n".format(None))
-    print("Cllr: {}\n".format(None))
-
-
