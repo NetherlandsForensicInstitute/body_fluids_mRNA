@@ -8,12 +8,11 @@ from rna.analytics import get_mixture_columns_for_class
 
 class MarginalClassifier():
 
-    def __init__(self, random_state=0, classifier=MLPClassifier,
-                 calibrator=KDECalibrator, MAX_LR=10, max_iter=200,
-                 epsilon=1e-08):
-        self._classifier = classifier(random_state=random_state, max_iter=max_iter, epsilon=epsilon)
+    def __init__(self, random_state=0, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', MAX_LR=10, max_iter=200, epsilon=1e-08):
+        self._classifier = classifier(activation=activation, random_state=random_state, max_iter=max_iter, epsilon=epsilon)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
+        self.activation = activation
         self.MAX_LR = MAX_LR
 
     def fit_classifier(self, X, y):
@@ -35,7 +34,7 @@ class MarginalClassifier():
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
 
-    def predict_lrs(self, X, target_classes, with_calibration=True, priors_numerator=None, priors_denominator=None):
+    def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True):
         """
         gives back an N x n_target_class array of LRs
         :param X: the N x n_features data
@@ -52,9 +51,16 @@ class MarginalClassifier():
         assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
         assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
 
-        ypred_proba = self._classifier.predict_proba(X)
-        lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
-                                                                              priors_numerator, priors_denominator)
+        if self.activation == 'relu':
+            # lps
+            ypred_proba = self._classifier.predict_proba(X)
+            lrs_per_target_class = convert_prob_per_mixture_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
+                                                                                      priors_numerator, priors_denominator)
+        elif self.activation == 'logistic':
+            # sigmoids
+            ypred_proba = self._classifier.predict_proba(X)
+            lrs_per_target_class = convert_prob_per_single_to_target_classes(ypred_proba, target_classes, self.MAX_LR,
+                                                                             priors_numerator, priors_denominator)
 
         if with_calibration:
             for i, target_class in enumerate(target_classes):
@@ -85,7 +91,7 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
     assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
     lrs = np.zeros((len(prob), len(target_classes)))
     for i, target_class in enumerate(target_classes):
-        assert sum(target_class) > 0, 'Nonexisting class in target_classes'
+        assert sum(target_class) > 0, 'No cell type given as target class'
 
         # numerator
         indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
@@ -94,11 +100,27 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
         # denominator
         # TODO: Does this work when priors are defined?
         # TODO: Rewrite with priors.
+        # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
         all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
         indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
-        # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
         denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
         lrs[:, i] = numerator/denominator
+
+    # TODO: Does this work when signal vals in stead of binary?
+    lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
+    lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
+
+    return lrs
+
+
+def convert_prob_per_single_to_target_classes(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
+
+    # TODO: Incorporate priors
+    lrs = np.zeros((len(prob), len(target_classes)))
+    for i, target_class in enumerate(target_classes):
+        assert sum(target_class) > 0, 'No cell type given as target class'
+        prob_target_class = np.mean(np.multiply(prob, target_class), axis=1)
+        lrs[:, i] = prob_target_class / (1 - prob_target_class)
 
     # TODO: Does this work when signal vals in stead of binary?
     lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)

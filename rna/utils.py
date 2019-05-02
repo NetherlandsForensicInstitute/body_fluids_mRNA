@@ -24,6 +24,29 @@ def string2vec(list_of_strings, label_encoder):
     return target_classes
 
 
+def vec2string(target_class, label_encoder):
+    """
+    Converts a vector of 0s and 1s into a string being one cell type or combined cell types.
+
+    :param target_class: vector with 0s and 1s
+    :param label_encoder: LabelEncoder mapping strings to indices and vice versa
+    :return: string
+    """
+
+    assert np.argwhere(target_class == 0).size + np.argwhere(target_class == 1).size is len(target_class), \
+        'target_class contains value(s) other than 0 or 1.'
+
+    if np.sum(target_class) < 2:
+        i_celltype = int(np.argwhere(target_class == 1)[0])
+        celltype = label_encoder.classes_[i_celltype]
+    else:
+        i_celltypes = np.argwhere(target_class == 1)
+        celltypes = [label_encoder.classes_[int(i_celltype)] for i_celltype in i_celltypes]
+        celltype = ' and/or '.join(celltypes)
+
+    return celltype
+
+
 def from_nhot_to_labels(y_nhot):
     """
     Converts nhot encoded matrix into list with labels for unique rows.
@@ -54,36 +77,17 @@ def from_nhot_to_labels(y_nhot):
     return y
 
 
-def vec2string(target_class, label_encoder):
+def from_labels_to_nhot(y):
     """
-    Converts a vector of 0s and 1s into a string being one cell type or combined cell types.
+    Converts list with labels to nhot encoded matrix.
 
-    :param target_class: vector with 0s and 1s
-    :param label_encoder: LabelEncoder mapping strings to indices and vice versa
-    :return: string
+    :param y: list of length N_samples
+    :return: nhot encoded matrix
     """
+    assert len(np.unique(y)) == 8, "More than n_celltypes of labels"
 
-    assert np.argwhere(target_class == 0).size + np.argwhere(target_class == 1).size is len(target_class), \
-        'target_class contains value(s) other than 0 or 1.'
+    y_nhot = np.zeros((len(y), len(np.unique(y))))
+    for i in range(y_nhot.shape[0]):
+        y_nhot[i, y[i]] = 1
 
-    if np.sum(target_class) < 2:
-        i_celltype = int(np.argwhere(target_class == 1)[0])
-        celltype = label_encoder.classes_[i_celltype]
-    else:
-        i_celltypes = np.argwhere(target_class == 1)
-        celltypes = [label_encoder.classes_[int(i_celltype)] for i_celltype in i_celltypes]
-        celltype = ' and/or '.join(celltypes)
-
-    return celltype
-
-
-def print_settings(settings):
-    # print("augment : {}".format(settings.augment))
-    print("binarize : {}".format(settings.binarize))
-    print("markers : {}".format(settings.markers))
-    # print("lps : {}".format(settings.binarize))
-    print("nsamples : {}".format(settings.nsamples))
-    print("test_size : {}".format(settings.test_size))
-    print("calibration_size : {}".format(settings.calibration_size))
-    # print("model : {}".format(settings.binarize))
-
+    return y_nhot
