@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import normalize
 
 from rna.constants import single_cell_types
 from rna.utils import from_nhot_to_labels
@@ -120,6 +121,10 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
 
         if binarize:
             X_augmented = np.where(X_augmented >= 150, 1, 0)
+        else:
+            # normalize
+            # X_augmented = X_augmented / 1000
+            X_augmented = normalize(X_augmented)
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 
@@ -200,7 +205,12 @@ def remove_markers(X):
     """
     Removes the gender and control markers.
     """
-    return np.array([X[i][:, :-4] for i in range(X.shape[0])])
+    try:
+        X = X[:, :-4]
+    except IndexError:
+        X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
+
+    return X
 
 
 def cllr(lrs, y_nhot, target_class):

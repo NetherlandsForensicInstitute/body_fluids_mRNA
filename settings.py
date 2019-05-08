@@ -15,13 +15,12 @@ Options:
     --model             The model used for the analysis: ['MLR', 'MLP', 'DL', 'XGB']
 """
 
-# TODO: Currently running tests with [--augment] and [--lps]
-augment=False
-binarize=True
+augment=True
+binarize=False
 markers=True
-lps=False
+lps=True
 # cal_probs=True
-nsamples=(4, 2)
+nsamples=(20, 10)
 test_size=0.2
 calibration_size=0.4
-# model=[1, 0, 0, 0]
+model='MLP'

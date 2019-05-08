@@ -8,6 +8,8 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
+from sklearn.preprocessing import normalize
+
 from rna.analytics import combine_samples, remove_markers
 from rna import constants
 
@@ -130,6 +132,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     if not markers:
         X_single = remove_markers(X_single)
+        n_features = n_features-4
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)
@@ -188,6 +191,8 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
 
     X_mixtures = np.array(X_mixtures)
     X_mixtures = combine_samples(X_mixtures)
+    if not binarize:
+        X_mixtures = normalize(X_mixtures)
 
     if not markers:
         X_mixtures = remove_markers(X_mixtures)

@@ -8,8 +8,8 @@ from rna.analytics import get_mixture_columns_for_class
 
 class MarginalClassifier():
 
-    def __init__(self, random_state=0, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', MAX_LR=10, max_iter=200, epsilon=1e-08):
-        self._classifier = classifier(activation=activation, random_state=random_state, max_iter=max_iter, epsilon=epsilon)
+    def __init__(self, random_state=0, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', MAX_LR=10):
+        self._classifier = classifier(activation=activation, random_state=random_state)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.activation = activation
@@ -119,7 +119,11 @@ def convert_prob_per_single_to_target_classes(prob, target_classes, MAX_LR, prio
     lrs = np.zeros((len(prob), len(target_classes)))
     for i, target_class in enumerate(target_classes):
         assert sum(target_class) > 0, 'No cell type given as target class'
-        prob_target_class = np.mean(np.multiply(prob, target_class), axis=1)
+        prob_target_class = prob[:, np.argwhere(target_class == 1).flatten()]
+        if prob_target_class.shape[1] > 1:
+            # more than one cell type
+            prob_target_class = np.mean(prob_target_class, axis=1)
+        prob_target_class = np.reshape(prob_target_class, -1, 1)
         lrs[:, i] = prob_target_class / (1 - prob_target_class)
 
     # TODO: Does this work when signal vals in stead of binary?
