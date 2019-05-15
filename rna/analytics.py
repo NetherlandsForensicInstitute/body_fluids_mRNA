@@ -60,11 +60,19 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
             n_replicates = len(sampled_sample)
             sampled.append(sampled_sample[np.random.permutation(n_replicates)])
         # TODO thus lower replicates for more cell types. is this an issue?
+        # print("Smallest replicates:", smallest_replicates)
+        # for sample in sampled:
+        #     print("Length sample in samples:", len(sample))
+        # ---------------------------------------------------
+        # Smallest replicates: 2
+        # Length sample in samples: 4
+        # Length sample in samples: 4
+        # Length sample in samples: 4
+        # Length sample in samples: 2
         smallest_replicates = min([len(sample) for sample in sampled])
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            # combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
@@ -91,7 +99,8 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
     """
 
     if X.size == 0:
-        # TODO: Matrices defined correctly?
+        # This is the case when calibration_size = 0.0, this is an implicit way to
+        # ensure that calibration is not performed.
         X_augmented=None
         y_nhot_augmented=np.zeros((0, n_celltypes))
 
@@ -121,8 +130,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
 
         if binarize:
             X_augmented = np.where(X_augmented >= 150, 1, 0)
-        else:
-            # normalize
+        else: # normalize
             # X_augmented = X_augmented / 1000
             X_augmented = normalize(X_augmented)
 
@@ -227,7 +235,7 @@ def cllr(lrs, y_nhot, target_class):
     lrs2 = np.multiply(lrs, 1 - np.max(np.multiply(y_nhot, target_class), axis=1))
 
     # delete zeros
-    lrs1 = np.delete(lrs1, np.where(lrs1 == -0.0))
+    lrs1 = np.delete(lrs1, np.where(lrs1 == 0.0))
     lrs2 = np.delete(lrs2, np.where(lrs2 == 0.0))
 
     return calculate_cllr(lrs2, lrs1).cllr

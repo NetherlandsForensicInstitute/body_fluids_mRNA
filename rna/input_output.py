@@ -101,7 +101,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single=[]
     if ground_truth_known:
-        print("===Removed samples===\n")
+        # print("===Removed samples===\n")
         for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
             rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
@@ -116,7 +116,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
         y_nhot_single = np.zeros((len(X_single), n_celltypes))
         end = 0
-        for i, celltype in enumerate(list(label_encoder.classes_)):
+        for celltype in list(label_encoder.classes_):
             i_celltype = label_encoder.transform([celltype])
             begin = end
             end = end + n_per_celltype[celltype]
@@ -240,7 +240,7 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
             X_for_this_celltype.append(candidate_samples)
 
 
-    print("{} sample(s) from {}".format(n_discarded, celltype))
+    # print("{} sample(s) from {}".format(n_discarded, celltype))
 
     return n_full_samples, X_for_this_celltype
 

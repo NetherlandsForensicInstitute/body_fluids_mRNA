@@ -49,7 +49,8 @@ def vec2string(target_class, label_encoder):
 
 def from_nhot_to_labels(y_nhot):
     """
-    Converts nhot encoded matrix into list with labels for unique rows.
+    Converts nhot encoded matrix into list with labels for unique rows,
+    the unique rows representing the combinations of cell types.
 
     :param y_nhot: nhot encoded matrix
     :return: list of length N_samples
