@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.calibration import calibration_curve
 
 from rna.analytics import combine_samples
-from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
+# from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from rna.utils import vec2string
 from lir import PavLogLR
 
@@ -140,8 +140,43 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
     if savefig is not None:
         plt.tight_layout()
         plt.savefig(savefig)
+        plt.close()
     if show or savefig is None:
         plt.show()
+
+
+def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
+
+    MLR_bin_lps, MLP_bin_lps, XGB_bin_lps = n_metric[:, 0, 0, :].T
+    MLR_bin_sig, MLP_bin_sig, XGB_bin_sig = n_metric[:, 1, 0, :].T
+    MLR_ori_lps, MLP_ori_lps, XGB_ori_lps = n_metric[:, 0, 1, :].T
+    MLR_ori_sig, MLP_ori_sig, XGB_ori_sig = n_metric[:, 1, 1, :].T
+
+    data = [MLR_bin_lps, MLP_bin_lps, XGB_bin_lps,
+            MLR_bin_sig, MLP_bin_sig, XGB_bin_sig,
+            MLR_ori_lps, MLP_ori_lps, XGB_ori_lps,
+            MLR_ori_sig, MLP_ori_sig, XGB_ori_sig]
+
+    names = ['MLR_bin_lps', 'MLP_bin_lps', 'XGB_bin_lps',
+            'MLR_bin_sig', 'MLP_bin_sig', 'XGB_bin_sig',
+            'MLR_ori_lps', 'MLP_ori_lps', 'XGB_ori_lps',
+            'MLR_ori_sig', 'MLP_ori_sig', 'XGB_ori_sig']
+
+    fig, ax = plt.subplots()
+    ax.set_title("Boxplots of {} for {} folds".format(name_metric, n_metric.shape[0]))
+    ax.boxplot(data, vert=False)
+    ax.set_xlabel(name_metric)
+    plt.yticks(list(range(1, len(names)+1)), names)
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.show()
+
+    plt.close(fig)
+
 
 # TODO: Make function work
 def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):

@@ -11,7 +11,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import normalize
 
 from rna.constants import single_cell_types
-from rna.utils import from_nhot_to_labels
 
 from lir.lr import calculate_cllr
 
@@ -48,7 +47,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         return np.zeros((n, n_features))
     data_for_class=[]
     for clas in classes_to_include:
-        data_for_class.append(X[np.argwhere(np.array(y) == clas).flatten()])
+        data_for_class.append(X[np.argwhere(np.array(y) == clas)[:, 0]])
 
     augmented_samples = []
     for i in range(n):
@@ -73,7 +72,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))
@@ -129,10 +128,10 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
                 X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
 
         if binarize:
-            X_augmented = np.where(X_augmented >= 150, 1, 0)
+            X_augmented = np.where(X_augmented > 150, 1, 0)
         else: # normalize
-            # X_augmented = X_augmented / 1000
-            X_augmented = normalize(X_augmented)
+            X_augmented = X_augmented / 1000
+            # X_augmented = normalize(X_augmented)
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 
@@ -176,37 +175,37 @@ def get_mixture_columns_for_class(target_class, priors):
     return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
 
 
-def classify_single(X, y_nhot):
-    """
-    Very simple analysis of single cell type classification, useful as
-    preliminary test.
-    """
-    # classify single classes
-    single_samples = combine_samples(X)
-    y = from_nhot_to_labels(y_nhot)
-    print('fitting on {} samples, {} features, {} classes'.format(
-        X.shape[0],
-        single_samples.shape[1],
-        len(set(y)))
-    )
-
-    X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
-    single_model = MLPClassifier(random_state=0, max_iter=1000)
-    single_model.fit(X_train, y_train)
-    y_pred = single_model.predict(X_test)
-    print('train accuracy for single classes: {}'.format(
-        accuracy_score(y_test, y_pred))
-    )
-
-    plt.plot(single_model.loss_curve_)
-    plt.xlabel("Steps")
-    plt.ylabel("Loss")
-    plt.show()
-
-    # Compute confusion matrix
-    cnf_matrix = confusion_matrix(y_test, y_pred)
-    np.set_printoptions(precision=2)
-    # print(cnf_matrix)
+# def classify_single(X, y_nhot):
+#     """
+#     Very simple analysis of single cell type classification, useful as
+#     preliminary test.
+#     """
+#     # classify single classes
+#     single_samples = combine_samples(X)
+#     y = from_nhot_to_labels(y_nhot)
+#     print('fitting on {} samples, {} features, {} classes'.format(
+#         X.shape[0],
+#         single_samples.shape[1],
+#         len(set(y)))
+#     )
+#
+#     X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
+#     single_model = MLPClassifier(random_state=0, max_iter=1000)
+#     single_model.fit(X_train, y_train)
+#     y_pred = single_model.predict(X_test)
+#     print('train accuracy for single classes: {}'.format(
+#         accuracy_score(y_test, y_pred))
+#     )
+#
+#     plt.plot(single_model.loss_curve_)
+#     plt.xlabel("Steps")
+#     plt.ylabel("Loss")
+#     plt.show()
+#
+#     # Compute confusion matrix
+#     cnf_matrix = confusion_matrix(y_test, y_pred)
+#     np.set_printoptions(precision=2)
+#     # print(cnf_matrix)
 
 
 def remove_markers(X):
@@ -238,4 +237,7 @@ def cllr(lrs, y_nhot, target_class):
     lrs1 = np.delete(lrs1, np.where(lrs1 == 0.0))
     lrs2 = np.delete(lrs2, np.where(lrs2 == 0.0))
 
-    return calculate_cllr(lrs2, lrs1).cllr
+    if len(lrs1) > 0 and len(lrs2) > 0:
+        return calculate_cllr(lrs2, lrs1).cllr
+    else:
+        return 9999.0000

@@ -25,6 +25,7 @@ def read_df(filename, nreplicates=None):
     :param nreplicates: number of repeated measurements
     :return: df: pd.DataFrame and rv: pf.DataFrame
     """
+    pd.options.mode.chained_assignment = None # to silence warning
     raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
     try:
         rv = raw_df[['replicate_value']]
@@ -192,7 +193,8 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
     X_mixtures = np.array(X_mixtures)
     X_mixtures = combine_samples(X_mixtures)
     if not binarize:
-        X_mixtures = normalize(X_mixtures)
+        # X_mixtures = normalize(X_mixtures)
+        X_mixtures = X_mixtures / 1000
 
     if not markers:
         X_mixtures = remove_markers(X_mixtures)

@@ -47,48 +47,58 @@ def vec2string(target_class, label_encoder):
     return celltype
 
 
-def from_nhot_to_labels(y_nhot):
+class MultiLabelEncoder():
+
+    def __init__(self, n_classes):
+        self.n_classes = n_classes
+        self.nhot_of_combinations = make_nhot_matrix_of_combinations(n_classes)
+
+    def nhot_to_labels(self, y_nhot):
+        y = np.array([np.argwhere(np.all(self.nhot_of_combinations == y_nhot[i, :], axis=1)).flatten() for i in range(y_nhot.shape[0])])
+        return y.ravel()
+
+    def labels_to_nhot(self, y):
+        if len(y.shape) == 1 or y.shape[1] == 1:
+            n = y.shape[0]
+            y_nhot = np.vstack(self.nhot_of_combinations[y[i], :] for i in range(n))
+        return y_nhot
+
+    def transform_single(self, y):
+        """
+        Transforms the MultiLabelEncoded labels into original labels
+        """
+        y = y.reshape(-1, 1)
+        y_transformed = np.zeros_like(y)
+        for label in np.unique(y):
+            y_transformed[np.argwhere(np.all(y == label, axis=1)).flatten()] = np.log2(label)
+
+        return y_transformed
+
+
+    def inv_transform_single(self, y):
+        """
+        Transforms the original labels into the MultiLabelEncoded labels
+        """
+        y_transformed = np.zeros_like(y)
+        for label in np.unique(y):
+            y_transformed[np.argwhere(np.all(y == label, axis=1)).flatten()] = 2 ** label
+
+        return y_transformed
+
+
+def make_nhot_matrix_of_combinations(N):
     """
-    Converts nhot encoded matrix into list with labels for unique rows,
-    the unique rows representing the combinations of cell types.
+    Makes nhot encoded matrix with all possible combinations of existing
+    single cell types.
 
-    :param y_nhot: nhot encoded matrix
-    :return: list of length N_samples
+    :param N: int
+    :return: 2**N x N nhot encoded matrix
     """
 
-    unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
-    if np.array_equal(np.sum(unique_labels, axis=1), np.ones(y_nhot.shape[1])):
-        y = np.argmax(y_nhot, axis=1)
-    elif unique_labels.shape[0] == 2 ** unique_labels.shape[1]:
-        # assumes that the nhot encoded matrix first row consists of zero's
-        # and a 1 is added each row starting from the right.
-        y = []
-        for i in range(unique_labels.shape[0]):
-            y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
-    elif unique_labels.shape[0] == 7:
-        # mixtures
-        unique_labels = np.unique(y_nhot, axis=0)
-        y = np.zeros((y_nhot.shape[0], 1))
-        for i in range(unique_labels.shape[0]):
-            index = sum([2 ** int(idx) for idx in np.argwhere(unique_labels[i] == 1)])
-            y[np.where(np.all(y_nhot == unique_labels[i], axis=1))[0], :] = index
-    else:
-        raise ValueError("Cannot convert {} encoded matrix into labels.".format(y_nhot))
+    def int_to_binary(i):
+        binary = bin(i)[2:]
+        while len(binary) < N:
+            binary = '0' + binary
+        return np.flip([int(j) for j in binary]).tolist()
 
-    return y
-
-
-def from_labels_to_nhot(y):
-    """
-    Converts list with labels to nhot encoded matrix.
-
-    :param y: list of length N_samples
-    :return: nhot encoded matrix
-    """
-    assert len(np.unique(y)) == 8, "More than n_celltypes of labels"
-
-    y_nhot = np.zeros((len(y), len(np.unique(y))))
-    for i in range(y_nhot.shape[0]):
-        y_nhot[i, y[i]] = 1
-
-    return y_nhot
+    return np.array([int_to_binary(i) for i in range(2**N)])
