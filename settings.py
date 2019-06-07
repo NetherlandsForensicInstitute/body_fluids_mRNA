@@ -15,10 +15,10 @@ Options:
 
 augment=True
 # binarize=True
-markers=True
-# lps=True
+markers=False
+# lps=False
 cal_probs=False # Not incorporated in single_analysis.py
 nsamples=(50, 50, 25)
 test_size=0.2
 calibration_size=0.5
-# model='XGB'
+# model='MLR'

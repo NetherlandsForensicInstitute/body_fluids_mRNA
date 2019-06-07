@@ -14,6 +14,7 @@ from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier
 from rna.utils import vec2string, string2vec, MultiLabelEncoder
 from rna.plotting import plot_histogram_log_lr
+from scratch.plotting import plot_ece
 
 import settings
 
@@ -168,21 +169,25 @@ def individual_analysis(tc, show=True):
         print("     min/max LR after: {0:.5f} / {1:.5f}".format(lrs_after_calib_mixt[:, i].min(), lrs_after_calib_mixt[:, i].max()))
 
     if show:
-        plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, show=show)
-        # plot_histogram_log_lr(lrs_before_calib_mixt, y_nhot_mixtures, target_classes, label_encoder, show=show)
+        plot_ece(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder)
 
-        if not settings.model == 'MLR':
-            plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
-                              density=True, title='after', show=show)
 
-            if settings.augment:
-                makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-                                      y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                      label_encoder, show=show)
-            else:
-                makeplot_hist_density(model.predict_lrs(X_calib, target_classes, with_calibration=False),
-                                      y_calib, model._calibrators_per_target_class, target_classes,
-                                      label_encoder, show=show)
+    # if show:
+    #     plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, show=show)
+    #     # plot_histogram_log_lr(lrs_before_calib_mixt, y_nhot_mixtures, target_classes, label_encoder, show=show)
+    #
+    #     if not settings.model == 'MLR':
+    #         plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
+    #                           density=True, title='after', show=show)
+    #
+    #         if settings.augment:
+    #             makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+    #                                   y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+    #                                   label_encoder, show=show)
+    #         else:
+    #             makeplot_hist_density(model.predict_lrs(X_calib, target_classes, with_calibration=False),
+    #                                   y_calib, model._calibrators_per_target_class, target_classes,
+    #                                   label_encoder, show=show)
 
 
 def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):

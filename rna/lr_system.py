@@ -15,8 +15,8 @@ from keras.layers import Dense, Dropout
 
 class MarginalMLPClassifier():
 
-    def __init__(self, random_state=0, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', MAX_LR=10):
-        self._classifier = classifier(activation=activation, random_state=random_state)
+    def __init__(self, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', random_state=0, max_iter=500, MAX_LR=10):
+        self._classifier = classifier(activation=activation, random_state=random_state, max_iter=max_iter)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR

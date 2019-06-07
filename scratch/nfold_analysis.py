@@ -3,6 +3,7 @@ Run nfold analysis.
 """
 
 import settings
+import time
 
 import numpy as np
 
@@ -40,6 +41,7 @@ def nfold_analysis(nfolds, tc):
     cllr_vag_menstr_mixt = (np.zeros((nfolds, len(BINARIZE), len(LPS), len(MODELS))) for i in range(16))
 
     for n in range(nfolds):
+        start = time.time()
         print("Fold {}".format(n))
 
         # ======= Split data =======
@@ -105,6 +107,9 @@ def nfold_analysis(nfolds, tc):
                     cllr_vag_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 4], y_nhot_mixtures, target_classes[4])
                     cllr_vag_menstr[n, i, j, k] = cllr(lrs_after_calib[:, 5], y_test_nhot_augmented, target_classes[5])
                     cllr_vag_menstr_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 5], y_nhot_mixtures, target_classes[5])
+
+        end = time.time()
+        print("Execution time fold {} in seconds: {}".format(n, (end - start)))
 
     print("\nMean of (augmented) train accuracy:")
     print("------------------------------------")
