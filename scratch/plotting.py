@@ -11,7 +11,7 @@ def plot_ece(lrs, y_nhot, target_classes, label_encoder):
 
     priors = np.linspace(0.001, 1-0.001, 50).tolist()
 
-    plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
+    plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)))
     for i, target_class in enumerate(target_classes):
 
         celltype = vec2string(target_class, label_encoder)

@@ -5,10 +5,8 @@ Performs project specific.
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import normalize
 
 from rna.constants import single_cell_types
 

@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+from matplotlib import rc
 
 from . import lr
 from .util import Xn_to_Xy
@@ -14,6 +15,7 @@ from rna.utils import vec2string
 
 LOG = logging.getLogger(__name__)
 
+rc('text', usetex=True)
 
 def process_vector(preprocessor, *X):
     X = [ np.empty(shape=(0,X[0].shape[1])) if x is None else x for x in X ]
@@ -255,34 +257,43 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
     """
 
     loglrs = np.log10(lrs)
+    X = np.arange(np.min(loglrs)-0.25,
+                  np.max(loglrs)+0.25, .01)
+    X = X.reshape(-1, 1)
 
-    plt.subplots(2, int(loglrs.shape[1]/2), figsize=(14, 9))
+    n_target_classes = len(target_classes)
+    n_rows = int(n_target_classes / 2)
+    fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True)
+
+    j = 0
+    k = 0
+
     for i, target_class in enumerate(target_classes):
+
         celltype = vec2string(target_class, label_encoder)
 
-        loglrs1 = np.multiply(loglrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
-        loglrs2 = np.multiply(loglrs[:, i], 1 - np.max(np.multiply(y_nhot, target_class), axis=1))
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-        loglrs1 = np.delete(loglrs1, np.where(loglrs1 == -0.0))
-        loglrs2 = np.delete(loglrs2, np.where(loglrs2 == 0.0))
-
-        X = np.arange(np.min(np.append(loglrs1, loglrs2))-0.25,
-                      np.max(np.append(loglrs1, loglrs2))+0.25, .01)
-
-        X = X.reshape(-1, 1)
         calibrators[str(target_class)].transform(X)
 
-        plt.subplot(2, int(lrs.shape[1] / 2), i + 1)
-        plt.hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-        plt.hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+        axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+        axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+        axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+        axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+        axs[j, k].set_title(celltype)
 
-        plt.plot(X, calibrators[str(target_class)].p1, color='orange', label='density h1')
-        plt.plot(X, calibrators[str(target_class)].p0, color='blue', label='density h2')
+        if (i % 2) == 0:
+            k = 1
+        else:
+            k = 0
+            j = j + 1
 
-        plt.title(celltype)
-        plt.xlabel('10logLR')
-        plt.ylabel('Density')
-        plt.legend(loc=2, framealpha=0.5)
+    fig.text(0.5, 0.04, '10logLR', ha='center')
+    fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
         plt.savefig(savefig)

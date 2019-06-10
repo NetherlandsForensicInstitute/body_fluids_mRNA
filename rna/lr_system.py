@@ -186,13 +186,20 @@ class MarginalXGBClassifier():
         return lrs_per_target_class
 
 
-class DLClassifier():
+class MarginalDLClassifier():
 
     def __init__(self, units=80, n_classes=8, n_features=19):
         self.units = units
         self.n_classes = n_classes
         self.n_features = n_features
         self._classifier = self.create_model()
+
+    def fit_classifier(self, X, y):
+        model = self.create_model()
+        model.fit_generator(X, epochs=2, validation_data=validation_gen,
+                            callbacks=callbacks, verbose=1, shuffle=False)
+
+        return self.model
 
     def build_model(self, units: int, n_classes: int, n_features: int) -> Model:
         """
@@ -249,7 +256,6 @@ class DLClassifier():
         model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features)
         # compile model
         self.compile_model(model)
-        print(model.summary)
 
         return model
 

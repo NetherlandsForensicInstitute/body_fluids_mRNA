@@ -6,7 +6,6 @@ import numpy as np
 
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPClassifier
 
 from rna.analytics import augment_data, cllr, combine_samples
 from rna.constants import single_cell_types
@@ -50,7 +49,6 @@ def individual_analysis(tc, show=True):
 
     assert X_single[0].shape[1] == X_mixtures.shape[1]
 
-
     X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
 
     # X_train_nrp, X_test_nrp, y_train_nrp, y_test_nrp = train_test_split(X_single_nrp, y_single_nrp, stratify=y_single_nrp, test_size=settings.test_size)
@@ -59,8 +57,8 @@ def individual_analysis(tc, show=True):
         X_calib = np.array([])
         y_calib = np.array([])
 
-        X_calib_nrp = np.array([])
-        y_calib_nrp = np.array([])
+        # X_calib_nrp = np.array([])
+        # y_calib_nrp = np.array([])
 
     else:
         X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
@@ -70,6 +68,8 @@ def individual_analysis(tc, show=True):
     X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features, settings.nsamples[0], label_encoder, binarize=settings.binarize, from_penile=from_penile)
     X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features, settings.nsamples[1], label_encoder, binarize=settings.binarize, from_penile=from_penile)
     X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features, settings.nsamples[2], label_encoder, binarize=settings.binarize, from_penile=from_penile)
+
+    X_test_augmented_reduced, y_test_nhot_augmented_reduced = only_use_same_combinations_as_in_mixtures(X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
 
     X_train = combine_samples(X_train)
     X_calib = combine_samples(X_calib)
@@ -108,9 +108,14 @@ def individual_analysis(tc, show=True):
     if settings.augment:
         print("\n===Training process===\n")
         print("Trains on {} samples".format(X_train_augmented.shape[0]))
+        # TODO: Uncomment for using original test augmented
+        # lrs_before_calib, lrs_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+        #     generate_lrs(model, mle, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+        #                  y_calib_nhot_augmented, X_test_augmented, X_mixtures, target_classes)
+
         lrs_before_calib, lrs_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(model, mle, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
-                         y_calib_nhot_augmented, X_test_augmented, X_mixtures, target_classes)
+                         y_calib_nhot_augmented, X_test_augmented_reduced, X_mixtures, target_classes)
 
     else:
         y_train = mle.inv_transform_single(y_train)
@@ -125,8 +130,12 @@ def individual_analysis(tc, show=True):
         print("\n===Training process===\n")
         print("Trains on {} samples".format(X_train.shape[0]))
         # TODO: Uncomment for original data taken into account the repeated measurements
+        # TODO: Or uncomment for using original test augmented
+        # lrs_before_calib, lrs_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+        #     generate_lrs(model, mle, X_train, y_train, X_calib, y_calib, X_test_augmented, X_mixtures, target_classes)
+
         lrs_before_calib, lrs_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-            generate_lrs(model, mle, X_train, y_train, X_calib, y_calib, X_test_augmented, X_mixtures, target_classes)
+            generate_lrs(model, mle, X_train, y_train, X_calib, y_calib, X_test_augmented_reduced, X_mixtures, target_classes)
 
         # TODO: Uncomment for original data when ignore repeated measurements
         # lrs_before_calib, lrs_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt= \
@@ -135,7 +144,8 @@ def individual_analysis(tc, show=True):
     print("\n===Performance metrics===\n")
     if settings.augment:
         print("Train accuracy (augmented): {0:.4f}".format(get_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)))
-        print("Test accuracy (augmented): {0:.4f}".format(get_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)))
+        # print("Test accuracy (augmented): {0:.4f}".format(get_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)))
+        print("Test accuracy (augmented): {0:.4f}".format(get_accuracy(model, mle, y_test_nhot_augmented_reduced, X_test_augmented_reduced, target_classes)))
         print("Mixture accuracy (original): {0:.4f}".format(get_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)))
         print("Single accuracy (original): {0:.4f}\n".format(get_accuracy(model, mle, mle.inv_transform_single(y_test), X_test, target_classes)))
     else:
@@ -156,7 +166,7 @@ def individual_analysis(tc, show=True):
     print("------------------------------------")
     for i, target_class in enumerate(target_classes):
         print("Cllr for {}: {}".format(vec2string(target_class, label_encoder),
-                                       round(cllr(lrs_after_calib[:, i], y_test_nhot_augmented, target_class), 4)))
+                                       round(cllr(lrs_after_calib[:, i], y_test_nhot_augmented_reduced, target_class), 4)))
         print("     min/max LR before: {0:.5f} / {1:.5f}".format(lrs_before_calib[:, i].min(), lrs_before_calib[:, i].max()))
         print("     min/max LR after: {0:.5f} / {1:.5f}".format(lrs_after_calib[:, i].min(), lrs_after_calib[:, i].max()))
 
@@ -169,25 +179,20 @@ def individual_analysis(tc, show=True):
         print("     min/max LR after: {0:.5f} / {1:.5f}".format(lrs_after_calib_mixt[:, i].min(), lrs_after_calib_mixt[:, i].max()))
 
     if show:
-        plot_ece(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder)
+        # plot_ece(lrs_before_calib, y_test_nhot_augmented_reduced, target_classes, label_encoder)
 
+        # plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented_reduced, target_classes, label_encoder, show=show)
+        plot_histogram_log_lr(lrs_before_calib_mixt, y_nhot_mixtures, target_classes, label_encoder, show=show)
 
-    # if show:
-    #     plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, show=show)
-    #     # plot_histogram_log_lr(lrs_before_calib_mixt, y_nhot_mixtures, target_classes, label_encoder, show=show)
-    #
-    #     if not settings.model == 'MLR':
-    #         plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
-    #                           density=True, title='after', show=show)
-    #
-    #         if settings.augment:
-    #             makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-    #                                   y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-    #                                   label_encoder, show=show)
-    #         else:
-    #             makeplot_hist_density(model.predict_lrs(X_calib, target_classes, with_calibration=False),
-    #                                   y_calib, model._calibrators_per_target_class, target_classes,
-    #                                   label_encoder, show=show)
+        if not settings.model == 'MLR':
+            # plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented_reduced, target_classes, label_encoder,
+            #                   title='after', show=show)
+            plot_histogram_log_lr(lrs_after_calib_mixt, y_nhot_mixtures, target_classes, label_encoder,
+                                  title='after', show=show)
+
+            makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                                  y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                                  label_encoder, show=show)
 
 
 def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):
@@ -209,6 +214,21 @@ def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):
     y_single_nrp = np.asarray(y_single_nrp)
 
     return X_single_nrp, y_nhot_single_nrp, y_single_nrp
+
+
+def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtures):
+    """
+    Make sure that the combinations of cell types present in the mixtures dataset is the
+    same in the augmented test dataset.
+    """
+
+    unique_mixture_combinations = np.unique(y_nhot_mixtures, axis=0)
+    indices = np.array([np.argwhere(np.all(y_nhot == unique_mixture_combinations[i, :], axis=1)).ravel() for i in range(unique_mixture_combinations.shape[0])]).flatten()
+
+    X_reduced = X_augmented[indices, :]
+    y_nhot_reduced = y_nhot[indices, :]
+
+    return X_reduced, y_nhot_reduced
 
 
 def generate_lrs(model, mle, X_train, y_train, X_calib, y_calib, X_test, X_mixtures, target_classes):

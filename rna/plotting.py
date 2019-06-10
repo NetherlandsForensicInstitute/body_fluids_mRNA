@@ -7,10 +7,14 @@ import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
+from matplotlib import rc
+
 from rna.analytics import combine_samples
 # from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from rna.utils import vec2string
 from lir import PavLogLR
+
+rc('text', usetex=True)
 
 # TODO: Make this function work (?)
 def plot_for_experimental_mixture_data(X_mixtures,
@@ -109,33 +113,38 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
 
-    plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
+    n_rows = int(n_target_classes / 2)
+    fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
     plt.suptitle('Histogram {} calibration'.format(title))
+
+    j = 0
+    k = 0
+
     for i, target_class in enumerate(target_classes):
 
         celltype = vec2string(target_class, label_encoder)
 
-        loglrs1 = np.multiply(loglrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
-        loglrs2 = np.multiply(loglrs[:, i], 1-np.max(np.multiply(y_nhot, target_class), axis=1))
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-        # delete zeros
-        loglrs1 = np.delete(loglrs1, np.where(loglrs1 == -0.0))
-        loglrs2 = np.delete(loglrs2, np.where(loglrs2 == 0.0))
+        axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+        axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+        axs[j, k].set_title(celltype)
 
-        plt.subplot(int(n_target_classes / 2), 2, i + 1)
-        plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label='h1', alpha=0.5)
-        plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
-
-        plt.title(celltype)
-        # if title == 'after':
-        #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
-        #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
-        if density:
-            plt.ylabel("Density")
+        if (i % 2) == 0:
+            k = 1
         else:
-            plt.ylabel("Frequency")
-        plt.xlabel("10logLR")
-        plt.legend(loc=9)
+            k = 0
+            j = j + 1
+
+    fig.text(0.5, 0.04, "10logLR", ha='center')
+    if density:
+        fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+    else:
+        fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
         plt.tight_layout()
@@ -147,20 +156,20 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    MLR_bin_lps, MLP_bin_lps, XGB_bin_lps = n_metric[:, 0, 0, :].T
+    MLR_bin_soft, MLP_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
     MLR_bin_sig, MLP_bin_sig, XGB_bin_sig = n_metric[:, 1, 0, :].T
-    MLR_ori_lps, MLP_ori_lps, XGB_ori_lps = n_metric[:, 0, 1, :].T
-    MLR_ori_sig, MLP_ori_sig, XGB_ori_sig = n_metric[:, 1, 1, :].T
+    MLR_norm_soft, MLP_norm_soft, XGB_norm_soft = n_metric[:, 0, 1, :].T
+    MLR_norm_sig, MLP_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
 
-    data = [MLR_bin_lps, MLP_bin_lps, XGB_bin_lps,
+    data = [MLR_bin_soft, MLP_bin_soft, XGB_bin_soft,
             MLR_bin_sig, MLP_bin_sig, XGB_bin_sig,
-            MLR_ori_lps, MLP_ori_lps, XGB_ori_lps,
-            MLR_ori_sig, MLP_ori_sig, XGB_ori_sig]
+            MLR_norm_soft, MLP_norm_soft, XGB_norm_soft,
+            MLR_norm_sig, MLP_norm_sig, XGB_norm_sig]
 
-    names = ['MLR_bin_lps', 'MLP_bin_lps', 'XGB_bin_lps',
+    names = ['MLR_bin_soft', 'MLP_bin_soft', 'XGB_bin_soft',
             'MLR_bin_sig', 'MLP_bin_sig', 'XGB_bin_sig',
-            'MLR_ori_lps', 'MLP_ori_lps', 'XGB_ori_lps',
-            'MLR_ori_sig', 'MLP_ori_sig', 'XGB_ori_sig']
+            'MLR_norm_soft', 'MLP_norm_soft', 'XGB_norm_soft',
+            'MLR_norm_sig', 'MLP_norm_sig', 'XGB_norm_sig']
 
     fig, ax = plt.subplots()
     ax.set_title("Boxplots of {} for {} folds".format(name_metric, n_metric.shape[0]))
