@@ -5,11 +5,13 @@ from sklearn.neural_network import MLPClassifier
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
 
+
 class MarginalClassifier():
 
     def __init__(self, random_state=0, classifier=MLPClassifier,
-                 calibrator=KDECalibrator, MAX_LR=10):
-        self._classifier = classifier(random_state=random_state)
+                 calibrator=KDECalibrator, MAX_LR=10, max_iter=200,
+                 epsilon=1e-08):
+        self._classifier = classifier(random_state=random_state, max_iter=max_iter, epsilon=epsilon)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
@@ -21,19 +23,23 @@ class MarginalClassifier():
         """
         Makes calibrated model for each target class
         """
-        lrs_per_target_class = self.predict_lrs(X, target_classes)
+        try:
+            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
-        for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator()
-            loglrs = np.log10(lrs_per_target_class[:, i])
-            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrator()
+                loglrs = np.log10(lrs_per_target_class[:, i])
+                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+        except ValueError:
+            for target_class in target_classes:
+                self._calibrators_per_target_class[str(target_class)] = None
 
-    def predict_lrs(self, X, target_classes, with_calibration=False, priors_numerator=None, priors_denominator=None):
+    def predict_lrs(self, X, target_classes, with_calibration=True, priors_numerator=None, priors_denominator=None):
         """
         gives back an N x n_target_class array of LRs
         :param X: the N x n_features data
-        :param target_classes:
+        :param target_classes: vector of length n_single_cell_types with at least one 1
         :param with_calibration:
         :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
         does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
@@ -53,9 +59,8 @@ class MarginalClassifier():
         if with_calibration:
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrators_per_target_class[str(target_class)]
-                log_lrs_per_target_class = np.log10(lrs_per_target_class)
-                caliblrs_per_target_class = calibrator.transform(log_lrs_per_target_class[:, i])
-                lrs_per_target_class[:, i] = caliblrs_per_target_class
+                loglrs_per_target_class = np.log10(lrs_per_target_class)
+                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
 
         return lrs_per_target_class
 
@@ -95,6 +100,8 @@ def convert_prob_per_mixture_to_marginal_per_class(prob, target_classes, MAX_LR,
         denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
         lrs[:, i] = numerator/denominator
 
-    lrs = np.where(lrs > MAX_LR ** 10, MAX_LR ** 10, lrs)
-    lrs = np.where(lrs < -MAX_LR ** 10, -MAX_LR ** 10, lrs)
+    # TODO: Does this work when signal vals in stead of binary?
+    lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
+    lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
+
     return lrs

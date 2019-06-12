@@ -2,60 +2,58 @@
 Reads and manipulates datasets.
 """
 
-from collections import defaultdict
+
+from collections import Counter
 
 import numpy as np
 import pandas as pd
 
+from rna.analytics import combine_samples, remove_markers
+from rna import constants
+
 from sklearn.preprocessing import LabelEncoder
 
-
-# TODO: include else option when '_rv' not in filename
-# TODO: imports file that contains 4 rv per sample without rv's connected to
-def read_df(filename, binarize, number_of_replicates=1):
+def read_df(filename, nreplicates=None):
     """
-    Reads in an xls file as a dataframe, replacing NA and binarizing if required.
-    Returns the original dataframe and a separate list of indices that are the
-    replicate numbers that belong to each sample.
+    Reads in an xls file as a dataframe, replacing NA if required.
+    Returns the dataframe containing the data with the signal values and a dataframe
+    with the repeated measurements belonging to a sample.
 
-    Note that this function only works if '_rv' is in the filename.
-
-    :param filename: name of file to read in
-    :param binarize: whether to binarize - use a cutoff value to convert to 0/1
-    :return: (dataframe, list of indices)
+    :param filename: path to the file
+    :param nreplicates: number of repeated measurements
+    :return: df: pd.DataFrame and rv: pf.DataFrame
     """
-    if '_rv' in filename:
-        # then sure that it includes 'replicate_values'
-        df_rv = pd.read_excel(filename, delimiter=';', index_col=0)
-        df = df_rv.loc[:, (df_rv.columns.values[:-1])]
-        rv = df_rv[['replicate_value']]
+    raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
+    try:
+        rv = raw_df[['replicate_value']]
+        df = raw_df.loc[:, (raw_df.columns.values != 'replicate_value')]
         df.fillna(0, inplace=True)
-        if binarize:
-            df = 1 * (df > 150)
-        return df, rv
-
-    else:
-        # TODO: What type of data is to be expected?
-        # TODO: Add replicate numbers manually
-        # then 'replicate_values' not included, so
-        # assume that all samples have 4 replicates
-        df = pd.read_excel(filename, delimiter=';', index_col=0)
+    except KeyError:
+        print("Replicate values have not been found and will be added manually."
+              "The number of repeated measurements per sample is {}".format(nreplicates))
+        df = raw_df
         df.fillna(0, inplace=True)
-        if binarize:
-            df = 1 * (df > 150)
+        unique_celltypes = pd.Series(df.index).unique()
+        n_per_celltype = Counter(df.index)
 
-        try:
-            rv = np.zeros((df.shape[0], 1))
-            replicates = [i for i in range(number_of_replicates)] * int(df.shape[0]/number_of_replicates)
-            rv[:, 0] = replicates
-        except ValueError:
-            rv[:, 0] = [i for i in range(number_of_replicates)] * int(df.shape[0] / number_of_replicates) + \
-                       [i for i in range(number_of_replicates)][0:df.shape[0] - len(replicates)]
-        return df, rv
+        rv_list = []
+        for celltype in unique_celltypes:
+            replicates_for_this_celltype = [i for i in range(1, nreplicates + 1)] * int(
+                n_per_celltype[celltype] / nreplicates)
+            if (n_per_celltype[celltype]/nreplicates).is_integer():
+                rv_list.extend(replicates_for_this_celltype)
+            else:
+                replicates_for_this_celltype = replicates_for_this_celltype + \
+                                               [i for i in range(1, nreplicates+1)][0:n_per_celltype[celltype] - len(replicates_for_this_celltype)]
+                rv_list.extend(replicates_for_this_celltype)
+        rv = pd.DataFrame(rv_list, index=df.index)
+
+    return df, rv
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
-                           ground_truth_known=True, binarize=True, number_of_replicates=None):
+                           nreplicates=None, ground_truth_known=True, markers=True):
+
     """
     Returns data per specified cell types.
 
@@ -67,52 +65,45 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     :param filename: name of file to read in, must include "_rv"
     :param single_cell_types: iterable of strings of all single cell types that exist
     :param ground_truth_known: does this data file have labels for the real classes?
-    :param binarize: whether to binarize raw measurement values
     :return: (N_single_cell_experimental_samples x N_measurements per sample x
         N_markers array of measurements,
-                N_single_cell_experimental_samples array of int labels of which
-                    cell type was measured,
+                N_samples x N_single_cell_type n_hot encoding of the labels NB in
+                    in single cell type space!
                 N_cell types,
                 N_markers (=N_features),
-                dict: cell type name -> cell type index,
-                dict: cell type index -> cell type name,
                 dict: cell type index -> N_measurements for cell type
-
+                LabelEncoder: cell type index -> cell type name and cell type name -> cell type index
     """
 
-    df, rv = read_df(filename, binarize, number_of_replicates)
+    df, rv = read_df(filename, nreplicates)
 
     label_encoder = LabelEncoder()
     if single_cell_types:
         single_cell_types = list(set(single_cell_types))
-        single_cell_types.append('Skin.penile')
         label_encoder.fit(single_cell_types)
     else:
+        # TODO: Make code clearer (not sure how --> comment Rolf pull request)
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')
         # if not provided, learn the cell types from the data
         all_celltypes = np.array(df.index)
         for celltype in all_celltypes:
-            # TODO: How does this work if single_cell_types is None?
-            if celltype not in single_cell_types and celltype!='Skin.penile':
+            if celltype not in constants.single_cell_types and celltype!='Skin.penile':
                 raise ValueError('unknown cell type: {}'.format(celltype))
 
         label_encoder.fit(all_celltypes)
 
-    n_celltypes_with_penile = len(single_cell_types)
+    n_celltypes = len(single_cell_types)
     n_features = len(df.columns)
     n_per_celltype = dict()
 
     X_single=[]
     if ground_truth_known:
-        for celltype in list(single_cell_types) + ['Skin.penile']:
+        print("===Removed samples===\n")
+        for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
-
-            if type(rv) == pd.core.frame.DataFrame:
-                rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
-            # TODO: Currently does not work
-            elif type(rv) == list:
-                rvset_for_this_celltype = rv[rv[:, 1] == celltype, 0]
+            rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+            assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
             n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
                                                                       indices_per_replicate, rvset_for_this_celltype)
@@ -121,13 +112,15 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
                 X_single.append(repeated_measurements)
             n_per_celltype[celltype] = n_full_samples
 
-        y_nhot_single = np.zeros((len(X_single), n_celltypes_with_penile))
+        y_nhot_single = np.zeros((len(X_single), n_celltypes))
         end = 0
-        for i, celltype in enumerate(list(single_cell_types) + ['Skin.penile']):
+        for i, celltype in enumerate(list(label_encoder.classes_)):
             i_celltype = label_encoder.transform([celltype])
             begin = end
             end = end + n_per_celltype[celltype]
             y_nhot_single[begin:end, i_celltype] = 1
+
+        assert np.array(X_single).shape[0] == y_nhot_single.shape[0]
 
     else:
         n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv)
@@ -135,13 +128,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
-    assert X_single.shape[0] == y_nhot_single.shape[0]
+    if not markers:
+        X_single = remove_markers(X_single)
 
-    return X_single, y_nhot_single, n_celltypes_with_penile, n_features, n_per_celltype, \
+    return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)
 
 
-def read_mixture_data(filename, n_celltypes, label_encoder, binarize=True):
+def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
     """
     Reads in the experimental mixture data that is used as test data.
 
@@ -163,17 +157,18 @@ def read_mixture_data(filename, n_celltypes, label_encoder, binarize=True):
                 dict: mixture class label -> mixture name
     """
 
-    df, rv = read_df(filename, binarize)
+    df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx')
     mixture_celltypes = np.array(df.index)
+    mixture_label_encoder = LabelEncoder()
+    mixture_label_encoder.fit(mixture_celltypes)
 
-    # initialize
-    test_map = defaultdict(list)
-    inv_test_map = {}
+    if binarize:
+        df = 1 * (df > 150)
+
     n_per_mixture_celltype = dict()
-
     X_mixtures = []
     y_nhot_mixtures = np.zeros((0, n_celltypes))
-    for mixture_celltype in sorted(set(mixture_celltypes)):
+    for mixture_celltype in list(mixture_label_encoder.classes_):
         data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
         rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
 
@@ -185,21 +180,21 @@ def read_mixture_data(filename, n_celltypes, label_encoder, binarize=True):
         n_per_mixture_celltype[mixture_celltype] = n_full_samples
 
         celltypes = mixture_celltype.split('+')
-        class_label = 0
         y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_celltypes))
         for celltype in celltypes:
-            test_map[mixture_celltype].append(label_encoder.transform([celltype]))
-            class_label += 2 ** int(label_encoder.transform([celltype]))
             y_nhot_for_this_celltype[:, label_encoder.transform([celltype])] = 1
-        inv_test_map[class_label] = mixture_celltype
 
         y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
 
     X_mixtures = np.array(X_mixtures)
+    X_mixtures = combine_samples(X_mixtures)
+
+    if not markers:
+        X_mixtures = remove_markers(X_mixtures)
 
     assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
 
-    return X_mixtures, y_nhot_mixtures, test_map, inv_test_map
+    return X_mixtures, y_nhot_mixtures, mixture_label_encoder
 
 
 def indices_per_replicate(end_replicate, last_index):
@@ -239,11 +234,8 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
         else:
             X_for_this_celltype.append(candidate_samples)
 
-    print('{} has {} samples (after discarding {} due to QC on structural markers)'.format(
-        celltype,
-        n_full_samples,
-        n_discarded
-    ))
+
+    print("{} sample(s) from {}".format(n_discarded, celltype))
 
     return n_full_samples, X_for_this_celltype
 

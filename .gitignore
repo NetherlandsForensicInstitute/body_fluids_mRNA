@@ -6,5 +6,5 @@ Datasets
 .ipynb_checkpoints/
 Plots/
 calibrated_model
-lir/
 mlpmodel
+.idea/

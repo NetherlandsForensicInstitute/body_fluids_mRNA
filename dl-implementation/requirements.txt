@@ -1,0 +1,8 @@
+docopt
+Keras
+numpy
+pandas
+scikit-learn
+sklearn
+tensorflow
+gitpython
