@@ -227,20 +227,20 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    MLR_bin_soft, MLP_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
-    MLR_bin_sig, MLP_bin_sig, XGB_bin_sig = n_metric[:, 1, 0, :].T
-    MLR_norm_soft, MLP_norm_soft, XGB_norm_soft = n_metric[:, 0, 1, :].T
-    MLR_norm_sig, MLP_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+    MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
+    MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
+    MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
+    MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
 
-    data = [MLR_bin_soft, MLP_bin_soft, XGB_bin_soft,
-            MLR_bin_sig, MLP_bin_sig, XGB_bin_sig,
-            MLR_norm_soft, MLP_norm_soft, XGB_norm_soft,
-            MLR_norm_sig, MLP_norm_sig, XGB_norm_sig]
+    data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
+            MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
+            MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
+            MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
 
-    names = ['MLR_bin_soft', 'MLP_bin_soft', 'XGB_bin_soft',
-            'MLR_bin_sig', 'MLP_bin_sig', 'XGB_bin_sig',
-            'MLR_norm_soft', 'MLP_norm_soft', 'XGB_norm_soft',
-            'MLR_norm_sig', 'MLP_norm_sig', 'XGB_norm_sig']
+    names = ['MLP_bin_soft', 'MLR_bin_soft', 'XGB_bin_soft',
+            'MLP_norm_soft', 'MLR_norm_soft', 'XGB_norm_soft',
+            'MLP_bin_sig', 'MLR_bin_sig', 'XGB_bin_sig',
+            'MLP_norm_sig', 'MLR_norm_sig', 'XGB_norm_sig']
 
     fig, ax = plt.subplots()
     ax.set_title("Boxplots of {} for {} folds".format(name_metric, n_metric.shape[0]))
