@@ -110,7 +110,8 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
             assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
             n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
-                                                                      indices_per_replicate, rvset_for_this_celltype)
+                                                                        indices_per_replicate, rvset_for_this_celltype,
+                                                                        True)
 
             for repeated_measurements in X_for_this_celltype:
                 X_single.append(repeated_measurements)
@@ -127,7 +128,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         assert np.array(X_single).shape[0] == y_nhot_single.shape[0]
 
     else:
-        n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv)
+        n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv, True)
         y_nhot_single=None
 
     X_single = np.array(X_single)
@@ -177,8 +178,9 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
         data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
         rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
 
-        n_full_samples, X_for_this_celltype = get_data_for_celltype(
-            mixture_celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype)
+        n_full_samples, X_for_this_celltype = get_data_for_celltype(mixture_celltype, data_for_this_celltype,
+                                                                    indices_per_replicate, rvset_for_this_celltype,
+                                                                    True)
 
         for repeated_measurements in X_for_this_celltype:
             X_mixtures.append(repeated_measurements)
@@ -221,7 +223,7 @@ def indices_per_replicate(end_replicate, last_index):
     return indices_per_replicate_set
 
 
-def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype):
+def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype, discard=True):
 
     end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
                      rvset_for_this_celltype[i - 1] > rvset_for_this_celltype[i] or
@@ -234,14 +236,16 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
     for idxs in indices_per_replicate_set:
         candidate_samples = data_for_this_celltype[idxs, :]
 
-        # TODO is make this at least one okay?
-        if np.sum(candidate_samples[:, -1]) < 1 or np.sum(candidate_samples[:, -2]) < 1 \
-                and 'Blank' not in celltype:
-            n_full_samples -= 1
-            n_discarded += 1
+        if discard:
+            # TODO is make this at least one okay?
+            if np.sum(candidate_samples[:, -1]) < 1 or np.sum(candidate_samples[:, -2]) < 1 \
+                    and 'Blank' not in celltype:
+                n_full_samples -= 1
+                n_discarded += 1
+            else:
+                X_for_this_celltype.append(candidate_samples)
         else:
             X_for_this_celltype.append(candidate_samples)
-
 
     # print("{} sample(s) from {}".format(n_discarded, celltype))
 

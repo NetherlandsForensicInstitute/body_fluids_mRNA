@@ -10,9 +10,14 @@ from sklearn.calibration import calibration_curve
 from matplotlib import rc
 
 from rna.analytics import combine_samples
+from rna.input_output import read_df
 # from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from rna.utils import vec2string
 from lir import PavLogLR
+
+## TEMPORARY
+from sklearn.preprocessing import LabelEncoder
+from rna.input_output import get_data_for_celltype, indices_per_replicate
 
 rc('text', usetex=True)
 
@@ -105,6 +110,69 @@ def plot_data(X):
     """
     plt.matshow(combine_samples(X))
     plt.savefig('single_cell_type_measurements_after_QC')
+
+
+def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
+                                 ground_truth_known=True, savefig=None, show=None):
+
+    df, rv = read_df(filename, nreplicates)
+
+    label_encoder = LabelEncoder()
+
+    if single_cell_types:
+        single_cell_types = list(set(single_cell_types))
+        label_encoder.fit(single_cell_types)
+    else:
+        # TODO: Make code clearer (not sure how --> comment Rolf pull request)
+        if not ground_truth_known:
+            raise ValueError('if no cell types are provided, ground truth should be known')
+        # if not provided, learn the cell types from the data
+        all_celltypes = np.array(df.index)
+        for celltype in all_celltypes:
+            if celltype not in single_cell_types and celltype != 'Skin.penile':
+                raise ValueError('unknown cell type: {}'.format(celltype))
+
+        label_encoder.fit(all_celltypes)
+
+    n_per_celltype = dict()
+
+    X_single = []
+    if ground_truth_known:
+        for celltype in list(label_encoder.classes_):
+            data_for_this_celltype = np.array(df.loc[celltype])
+            rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+            assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
+
+            n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
+                                                                        indices_per_replicate, rvset_for_this_celltype,
+                                                                        discard=False)
+
+            n_per_celltype[celltype] = n_full_samples
+
+    y_pos = np.arange(len(n_per_celltype))
+    celltypes = []
+    n_celltype = []
+    for values, keys in n_per_celltype.items():
+        celltypes.append(values)
+        n_celltype.append(keys)
+
+    fig, ax = plt.subplots()
+    plt.barh(y_pos, n_celltype, tick_label=y_pos)
+    labels = [item.get_text() for item in ax.get_yticklabels()]
+    labels[0] = celltypes[0]
+    ax.set_yticklabels(labels)
+    # plt.xticks(y_pos, celltypes)
+    plt.ylabel('Cell types')
+    plt.title('Distribution of samples')
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.show()
+
+    plt.close()
 
 
 def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
