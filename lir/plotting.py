@@ -289,6 +289,8 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
     if show or savefig is None:
         plt.show()
 
+    plt.close()
+
 # TODO: Change this function
 def makeplot_hist_density_avg(probs, calibrators, savefig=None, show=None):
 
