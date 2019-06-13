@@ -102,3 +102,15 @@ def make_nhot_matrix_of_combinations(N):
         return np.flip([int(j) for j in binary]).tolist()
 
     return np.array([int_to_binary(i) for i in range(2**N)])
+
+
+def remove_markers(X):
+    """
+    Removes the gender and control markers.
+    """
+    try:
+        X = X[:, :-4]
+    except IndexError:
+        X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
+
+    return X

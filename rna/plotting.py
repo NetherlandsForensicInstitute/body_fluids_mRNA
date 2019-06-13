@@ -108,14 +108,17 @@ def plot_data(X):
 
 
 def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
-                          title='before', density=False, savefig=None, show=None):
+                          title='before', title2=None, density=True, savefig=None, show=None):
 
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
 
     n_rows = int(n_target_classes / 2)
-    fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-    plt.suptitle('Histogram {} calibration'.format(title))
+    if title == 'after':
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+    else:
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+    plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
 
     j = 0
     k = 0

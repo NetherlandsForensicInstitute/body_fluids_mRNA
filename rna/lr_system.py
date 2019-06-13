@@ -33,6 +33,8 @@ class MarginalMLPClassifier():
         for i, target_class in enumerate(target_classes):
             calibrator = self._calibrator()
             loglrs = np.log10(lrs_per_target_class[:, i])
+            # np.max ensures that the nhot matrix is converted into a nhot list with the
+            # relevant target classes coded as a 1.
             labels = np.max(np.multiply(y_nhot, target_class), axis=1)
             self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
 
@@ -301,8 +303,6 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
             assert prob.shape[1] == target_classes.shape[0]
             prob_target_class = prob[:, i].flatten()
             prob_target_class = np.reshape(prob_target_class, -1, 1)
-            # if probability is exactly 1:
-            prob_target_class = np.where(prob_target_class == 1, 0.9999999999, prob_target_class)
             lrs[:, i] = prob_target_class / (1 - prob_target_class)
 
     lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)

@@ -10,7 +10,8 @@ import pandas as pd
 
 from sklearn.preprocessing import normalize
 
-from rna.analytics import combine_samples, remove_markers
+from rna.analytics import combine_samples
+from rna.utils import remove_markers
 from rna import constants
 
 from sklearn.preprocessing import LabelEncoder

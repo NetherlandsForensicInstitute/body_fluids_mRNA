@@ -3,10 +3,6 @@ Performs project specific.
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.model_selection import train_test_split
 
 from rna.constants import single_cell_types
 
@@ -171,51 +167,6 @@ def get_mixture_columns_for_class(target_class, priors):
         return True
 
     return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
-
-
-# def classify_single(X, y_nhot):
-#     """
-#     Very simple analysis of single cell type classification, useful as
-#     preliminary test.
-#     """
-#     # classify single classes
-#     single_samples = combine_samples(X)
-#     y = from_nhot_to_labels(y_nhot)
-#     print('fitting on {} samples, {} features, {} classes'.format(
-#         X.shape[0],
-#         single_samples.shape[1],
-#         len(set(y)))
-#     )
-#
-#     X_train, X_test, y_train, y_test = train_test_split(single_samples, y, stratify=y)
-#     single_model = MLPClassifier(random_state=0, max_iter=1000)
-#     single_model.fit(X_train, y_train)
-#     y_pred = single_model.predict(X_test)
-#     print('train accuracy for single classes: {}'.format(
-#         accuracy_score(y_test, y_pred))
-#     )
-#
-#     plt.plot(single_model.loss_curve_)
-#     plt.xlabel("Steps")
-#     plt.ylabel("Loss")
-#     plt.show()
-#
-#     # Compute confusion matrix
-#     cnf_matrix = confusion_matrix(y_test, y_pred)
-#     np.set_printoptions(precision=2)
-#     # print(cnf_matrix)
-
-
-def remove_markers(X):
-    """
-    Removes the gender and control markers.
-    """
-    try:
-        X = X[:, :-4]
-    except IndexError:
-        X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
-
-    return X
 
 
 def cllr(lrs, y_nhot, target_class):
