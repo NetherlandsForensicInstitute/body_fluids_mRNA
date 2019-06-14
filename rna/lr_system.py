@@ -15,8 +15,8 @@ from keras.layers import Dense, Dropout
 
 class MarginalMLPClassifier():
 
-    def __init__(self, classifier=MLPClassifier, calibrator=KDECalibrator, activation='relu', random_state=0, max_iter=500, MAX_LR=10):
-        self._classifier = classifier(activation=activation, random_state=random_state, max_iter=max_iter)
+    def __init__(self, calibrator=KDECalibrator, activation='relu', random_state=0, max_iter=500, MAX_LR=10):
+        self._classifier = MLPClassifier(activation=activation, random_state=random_state, max_iter=max_iter)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
@@ -69,11 +69,11 @@ class MarginalMLPClassifier():
 
 class MarginalMLRClassifier():
 
-    def __init__(self, random_state=0, classifier=LogisticRegression, calibrator=KDECalibrator, multi_class='ovr', solver='liblinear', MAX_LR=10):
+    def __init__(self, random_state=0, calibrator=KDECalibrator, multi_class='ovr', solver='liblinear', MAX_LR=10):
         if multi_class == 'ovr':
-            self._classifier = OneVsRestClassifier(classifier(multi_class=multi_class, solver=solver))
+            self._classifier = OneVsRestClassifier(LogisticRegression(multi_class=multi_class, solver=solver))
         else:
-            self._classifier = classifier(random_state=random_state, solver=solver, multi_class=multi_class)
+            self._classifier = LogisticRegression(random_state=random_state, solver=solver, multi_class=multi_class)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
@@ -135,11 +135,11 @@ class MarginalMLRClassifier():
 
 class MarginalXGBClassifier():
 
-    def __init__(self, classifier=XGBClassifier, method='softmax', calibrator=KDECalibrator, MAX_LR=10):
+    def __init__(self, method='softmax', calibrator=KDECalibrator, MAX_LR=10):
         if method == 'softmax':
-            self._classifier = classifier()
+            self._classifier = XGBClassifier()
         elif method == 'sigmoid':
-            self._classifier = OneVsRestClassifier(classifier())
+            self._classifier = OneVsRestClassifier(XGBClassifier())
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR

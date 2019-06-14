@@ -53,22 +53,13 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
             n_replicates = len(sampled_sample)
             sampled.append(sampled_sample[np.random.permutation(n_replicates)])
         # TODO thus lower replicates for more cell types. is this an issue?
-        # print("Smallest replicates:", smallest_replicates)
-        # for sample in sampled:
-        #     print("Length sample in samples:", len(sample))
-        # ---------------------------------------------------
-        # Smallest replicates: 2
-        # Length sample in samples: 4
-        # Length sample in samples: 4
-        # Length sample in samples: 4
-        # Length sample in samples: 2
         smallest_replicates = min([len(sample) for sample in sampled])
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
-            # TODO: Should take same here instead of mean?
-            # combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # TODO: For now chose to take the sum. Perhaps another way to combine the samples?
+            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))

@@ -15,7 +15,7 @@ from rna.utils import vec2string, string2vec, MultiLabelEncoder
 from rna.plotting import plot_histogram_log_lr
 from scratch.plotting import plot_ece
 
-import settings
+import rna.settings as settings
 
 from lir.plotting import makeplot_hist_density
 

@@ -237,10 +237,10 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
             MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
             MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
 
-    names = ['MLP_bin_soft', 'MLR_bin_soft', 'XGB_bin_soft',
-            'MLP_norm_soft', 'MLR_norm_soft', 'XGB_norm_soft',
-            'MLP_bin_sig', 'MLR_bin_sig', 'XGB_bin_sig',
-            'MLP_norm_sig', 'MLR_norm_sig', 'XGB_norm_sig']
+    names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
+            'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
+            'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
+            'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
 
     fig, ax = plt.subplots()
     ax.set_title("Boxplots of {} for {} folds".format(name_metric, n_metric.shape[0]))

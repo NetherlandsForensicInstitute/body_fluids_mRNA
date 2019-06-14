@@ -2,11 +2,10 @@
 Run nfold analysis.
 """
 
-# import settings
-import time
 import os
 
 import numpy as np
+import rna.settings as settings
 
 from sklearn.model_selection import train_test_split
 
@@ -20,152 +19,138 @@ from rna.single_analysis import get_accuracy
 
 from lir.plotting import makeplot_hist_density
 
-BINARIZE = [True, False]
-MARKERS = [True, False]
-LPS = [True, False]
-MODELS = ['MLP', 'MLR', 'XGB']
 
 def nfold_analysis(nfolds, tc):
     from_penile = False
     mle = MultiLabelEncoder(len(single_cell_types))
 
     # ======= Load data =======
-    X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = get_data_per_cell_type(
-        single_cell_types=single_cell_types, markers=settings.markers)
+    X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
+        get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
     # ======= Initialize =======
-    train_accuracy, test_accuracy, test_accuracy_reduced,  mixture_accuracy, single_accuracy, cllr_menstr, cllr_menstr_mixt, cllr_nasal, \
-    cllr_nasal_mixt, cllr_saliva, cllr_saliva_mixt, cllr_skin, cllr_skin_mixt, cllr_vag, cllr_vag_mixt, cllr_vag_menstr, cllr_vag_menstr_reduced, \
-    cllr_vag_menstr_mixt = (np.zeros((nfolds, len(BINARIZE), len(LPS), len(MODELS))) for i in range(18))
+    emtpy_numpy_array = np.zeros((nfolds, len(settings.binarize), len(settings.softmax), len(settings.models)))
+    accuracies, cllr_test, cllr_test_as_mixtures, cllr_mixtures = [dict() for i in range(4)]
+
+    accuracies['train'] = emtpy_numpy_array.copy()
+    accuracies['test'] = emtpy_numpy_array.copy()
+    accuracies['test as mixtures'] = emtpy_numpy_array.copy()
+    accuracies['mixture'] = emtpy_numpy_array.copy()
+    accuracies['single'] = emtpy_numpy_array.copy()
+
+    for target_class in target_classes:
+        target_class_str = vec2string(target_class, label_encoder)
+        cllr_test[target_class_str] = emtpy_numpy_array.copy()
+        cllr_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
+        cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
+
 
     for n in range(nfolds):
-        print("Fold {}".format(n))
 
         # ======= Split data =======
-        X_train_mlr, X_test, y_train_mlr, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
-        X_train, X_calib, y_train, y_calib = train_test_split(X_train_mlr, y_train_mlr, stratify=y_train_mlr, test_size=settings.calibration_size)
+        X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
+        X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
 
-        for i, binarize in enumerate(BINARIZE):
-            print("{} Binarize: {}".format(i, binarize))
+        for i, binarize in enumerate(settings.binarize):
             X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, markers=settings.markers)
 
             # ======= Augment data =======
             X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features, settings.nsamples[0], label_encoder, binarize=binarize, from_penile=from_penile)
-            X_train_augmented_mlr, y_train_nhot_augmented_mlr = augment_data(X_train_mlr, y_train_mlr, n_celltypes, n_features, settings.nsamples[0] + settings.nsamples[1], label_encoder, binarize=binarize, from_penile=from_penile)
             X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features, settings.nsamples[1], label_encoder, binarize=binarize, from_penile=from_penile)
             X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features, settings.nsamples[2], label_encoder, binarize=binarize, from_penile=from_penile)
-            X_test_augmented_reduced, y_test_nhot_augmented_reduced = only_use_same_combinations_as_in_mixtures(X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
+            X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
 
             # ======= Convert data accordingly =======
-            X_test_comb = combine_samples(X_test)
-            X_test_bin = np.where(X_test_comb > 150, 1, 0)
-            X_test_norm = X_test_comb / 1000
+            if binarize:
+                X_test_transformed = np.where(combine_samples(X_test) > 150, 1, 0)
+            else:
+                X_test_transformed = combine_samples(X_test) / 1000
 
-            for j, method in enumerate(LPS):
-                print("{} LPS: {}".format(j, method))
-
-                for k, MODEL in enumerate(MODELS):
-                    print("{} MODEL: {}".format(k, MODEL))
-                    model = model_with_correct_settings(MODEL, method)
+            for j, softmax in enumerate(settings.softmax):
+                for k, models in enumerate(settings.models):
+                    print("Fold {} \n Binarize the data: {} \n Use softmax to calculate probabilities with: {} \n Model: {}".format(n, binarize, softmax, models[0]))
 
                     # ======= Calculate LRs before and after calibration =======
-                    if MODEL != 'MLR':
-                        lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib,  lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                            generate_lrs(model, mle, method, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
-                                         y_calib_nhot_augmented, X_test_augmented, X_test_augmented_reduced, X_mixtures, target_classes)
+                    model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+                    lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+                        perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented,
+                                         y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
+                                         X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
+                                         X_mixtures, target_classes)
 
-                        makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-                                          y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                          label_encoder, savefig='scratch/kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, method, MODEL))
-                    else:
-                        X_calib_augmented_mlr = np.array([])
-                        y_calib_nhot_augmented_mlr = np.array([])
-                        lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib,  lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                            generate_lrs(model, mle, method, X_train_augmented_mlr, y_train_nhot_augmented_mlr, X_calib_augmented_mlr,
-                                         y_calib_nhot_augmented_mlr, X_test_augmented, X_test_augmented_reduced, X_mixtures, target_classes)
+                    # ======= Calculate accuracy =======
+                    accuracies['train'][n, i, j, k] = get_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
+                    accuracies['test'][n, i, j, k] = get_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)
+                    accuracies['test as mixtures'][n, i, j, k] = get_accuracy(model, mle, y_test_as_mixtures_nhot_augmented, X_test_as_mixtures_augmented, target_classes)
+                    accuracies['mixture'][n, i, j, k] = get_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)
+                    accuracies['single'][n, i, j, k] = get_accuracy(model, mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)
 
-                    plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True, savefig='scratch/hist_before_{}_{}_{}_{}'.format(n, binarize, method, MODEL))
-                    plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True, title='after', savefig='scratch/hist_after_{}_{}_{}_{}'.format(n, binarize, method, MODEL))
+                    # ======= Calculate log-likelihood-ratio cost =======
+                    for t, target_class in enumerate(target_classes):
+                        target_class_str = vec2string(target_class, label_encoder)
+                        cllr_test[target_class_str][n, i, j, k] = cllr(lrs_after_calib[:, t], y_test_nhot_augmented, target_class)
+                        cllr_test_as_mixtures[target_class_str][n, i, j, k] = cllr(lrs_test_as_mixtures_after_calib[:, t], y_test_as_mixtures_nhot_augmented, target_class)
+                        cllr_mixtures[target_class_str][n, i, j, k] = cllr(lrs_after_calib_mixt[:, t], y_nhot_mixtures, target_class)
 
 
-                    # ======= Calculate accuracy and Cllr =======
-                    train_accuracy[n, i, j, k] = get_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
-                    test_accuracy[n, i, j, k] = get_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)
-                    test_accuracy_reduced[n, i, j, k] = get_accuracy(model, mle, y_test_nhot_augmented_reduced, X_test_augmented_reduced, target_classes)
-                    mixture_accuracy[n, i, j, k] = get_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)
-                    if binarize == True:
-                        single_accuracy[n, i, j, k] = get_accuracy(model, mle, mle.inv_transform_single(y_test), X_test_bin, target_classes)
-                    else:
-                        single_accuracy[n, i, j, k] = get_accuracy(model, mle, mle.inv_transform_single(y_test), X_test_norm, target_classes)
+    plot_boxplot_of_metric(accuracies['train'], "train accuracy", savefig=os.path.join('scratch', 'boxplot_train_accuracy'))
+    plot_boxplot_of_metric(accuracies['test'], "test accuracy", savefig=os.path.join('scratch', 'boxplot_test_accuracy'))
+    plot_boxplot_of_metric(accuracies['test as mixtures'], "test as mixtures", savefig=os.path.join('scratch', 'boxplot_test_as_mixtures'))
+    plot_boxplot_of_metric(accuracies['mixture'], "mixture accuracy", savefig=os.path.join('scratch', 'boxplot_mixture_accuracy'))
+    plot_boxplot_of_metric(accuracies['single'], "single accuracy", savefig=os.path.join('scratch', 'boxplot_single_accuracy'))
 
-                    cllr_menstr[n, i, j, k] = cllr(lrs_after_calib[:, 0], y_test_nhot_augmented, target_classes[0])
-                    cllr_menstr_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 0], y_nhot_mixtures, target_classes[0])
-                    cllr_nasal[n, i, j, k] = cllr(lrs_after_calib[:, 1], y_test_nhot_augmented, target_classes[1])
-                    cllr_nasal_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 1], y_nhot_mixtures, target_classes[1])
-                    cllr_saliva[n, i, j, k] = cllr(lrs_after_calib[:, 2], y_test_nhot_augmented, target_classes[2])
-                    cllr_saliva_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 2], y_nhot_mixtures, target_classes[2])
-                    cllr_skin[n, i, j, k] = cllr(lrs_after_calib[:, 3], y_test_nhot_augmented, target_classes[3])
-                    cllr_skin_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 3], y_nhot_mixtures, target_classes[3])
-                    cllr_vag[n, i, j, k] = cllr(lrs_after_calib[:, 4], y_test_nhot_augmented, target_classes[4])
-                    cllr_vag_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 4], y_nhot_mixtures, target_classes[4])
-                    cllr_vag_menstr[n, i, j, k] = cllr(lrs_after_calib[:, 5], y_test_nhot_augmented, target_classes[5])
-                    cllr_vag_menstr_reduced[n, i, j, k] = cllr(lrs_reduced_after_calib[:, 5], y_test_nhot_augmented_reduced, target_classes[5])
-                    cllr_vag_menstr_mixt[n, i, j, k] = cllr(lrs_after_calib_mixt[:, 5], y_nhot_mixtures, target_classes[5])
+    for target_class in target_classes:
+        target_class_str = vec2string(target_class, label_encoder)
 
-        end = time.time()
-        print("Execution time fold {} in seconds: {}".format(n, (end - start)))
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
 
-    print("\nMean of (augmented) train accuracy:")
-    print("------------------------------------")
-    print(np.mean(train_accuracy, axis=0)[:, :, :])
+        plot_boxplot_of_metric(cllr_test[target_class_str], "cllr test {}".format(target_class_str),
+                               savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
 
-    print("\nMean of (augmented) test accuracy:")
-    print("------------------------------------")
-    print(np.mean(test_accuracy, axis=0)[:][:][:])
+        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "cllr test as mixtures {}".format(target_class_str),
+                               savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
 
-    print("\nMean of (augmented) test accuracy reduced:")
-    print("------------------------------------")
-    print(np.mean(test_accuracy_reduced, axis=0)[:][:][:])
+        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "cllr mixtures {}".format(target_class_str),
+                               savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
 
-    print("\nMean of (original) mixture accuracy:")
-    print("------------------------------------")
-    print(np.mean(mixture_accuracy, axis=0)[:][:][:])
 
-    print("\nMean of (original) single accuracy:")
-    print("------------------------------------")
-    print(np.mean(single_accuracy, axis=0)[:][:][:])
+def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented, y_train_nhot_augmented,
+                     X_calib_augmented, y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented,
+                     X_test_as_mixtures_augmented, X_mixtures, target_classes):
 
-    print("\nMean of Cllr_vag_menstr:")
-    print("------------------------------------")
-    print(np.mean(cllr_vag_menstr, axis=0)[:][:][:])
+    classifier = models[0]
+    with_calibration = models[1]
 
-    print("\nMean of Cllr_vag_menstr_mixt:")
-    print("------------------------------------")
-    print(np.mean(cllr_vag_menstr_mixt, axis=0)[:][:][:])
+    model = model_with_correct_settings(classifier, softmax)
 
-    plot_boxplot_of_metric(train_accuracy, "train accuracy", savefig='scratch/boxplot_train_accuracy')
-    plot_boxplot_of_metric(test_accuracy, "test accuracy", savefig='scratch/boxplot_test_accuracy')
-    plot_boxplot_of_metric(test_accuracy_reduced, "test accuracy reduced", savefig='scratch/boxplot_test_accuracy_reduced')
-    plot_boxplot_of_metric(mixture_accuracy, "mixture accuracy", savefig='scratch/boxplot_mixture_accuracy')
-    plot_boxplot_of_metric(single_accuracy, "single accuracy", savefig='scratch/boxplot_single_accuracy')
+    if with_calibration: # with calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+                         y_calib_nhot_augmented, X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
 
-    plot_boxplot_of_metric(cllr_menstr, "cllr menstr", savefig='scratch/boxplot_cllr_menstr')
-    plot_boxplot_of_metric(cllr_menstr_mixt, "cllr menstr mixt", savefig='scratch/boxplot_cllr_menstr_mixt')
-    plot_boxplot_of_metric(cllr_nasal, "cllr nasal", savefig='scratch/boxplot_cllr_nasal')
-    plot_boxplot_of_metric(cllr_nasal_mixt, "cllr nasal mixt", savefig='scratch/boxplot_cllr_nasal_mixt')
-    plot_boxplot_of_metric(cllr_saliva, "cllr saliva", savefig='scratch/boxplot_cllr_saliva')
-    plot_boxplot_of_metric(cllr_saliva_mixt, "cllr saliva mixt", savefig='scratch/boxplot_cllr_saliva_mixt')
-    plot_boxplot_of_metric(cllr_skin, "cllr skin", savefig='scratch/boxplot_cllr_skin')
-    plot_boxplot_of_metric(cllr_skin_mixt, "cllr skin mixt", savefig='scratch/boxplot_cllr_skin_mixt')
-    plot_boxplot_of_metric(cllr_vag, "cllr vag", savefig='scratch/boxplot_cllr_vag')
-    plot_boxplot_of_metric(cllr_vag_mixt, "cllr vag_mixt", savefig='scratch/boxplot_cllr_vag_mixt')
-    plot_boxplot_of_metric(cllr_vag_menstr, "cllr vag menstr", savefig='scratch/boxplot_cllr_vag_menstr')
-    plot_boxplot_of_metric(cllr_vag_menstr, "cllr vag menstr reduced", savefig='scratch/boxplot_cllr_vag_menstr_reduced')
-    plot_boxplot_of_metric(cllr_vag_menstr_mixt, "cllr vag menstr mixt", savefig='scratch/boxplot_cllr_vag_menstr_mixt')
+        plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                              savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+        plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                              title='after', savefig=os.path.join('scratch', 'hist_after_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+        makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                          y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                          label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
 
-    print("END")
+    else: # no calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
+                         np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
+                         np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                              savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+
+    return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+           lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
 def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtures):
@@ -183,7 +168,7 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     return X_reduced, y_nhot_reduced
 
 
-def model_with_correct_settings(model_no_settings, probability_calculation_softmax):
+def model_with_correct_settings(model_no_settings, softmax):
     """
     Ensures that the correct model with correct settings is used in the analysis.
     This is based on a string 'model_no_settings' and a boolean deciding how the
@@ -196,34 +181,38 @@ def model_with_correct_settings(model_no_settings, probability_calculation_softm
     :return: model with correct settings
     """
 
-    if model_no_settings == 'MLP' and probability_calculation_softmax: # softmax
-        model = MarginalMLPClassifier()
-    elif model_no_settings == 'MLP' and not probability_calculation_softmax: # sigmoid
-        model = MarginalMLPClassifier(activation='logistic')
+    if model_no_settings == 'MLP':
+        if softmax:
+            model = MarginalMLPClassifier()
+        else:
+            model = MarginalMLPClassifier(activation='logistic')
 
-    elif model_no_settings == 'MLR' and probability_calculation_softmax:
-        model = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
-    elif model_no_settings == 'MLR' and not probability_calculation_softmax:
-        model = MarginalMLRClassifier()
+    elif model_no_settings == 'MLR':
+        if softmax:
+            model = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
+        else:
+            model = MarginalMLRClassifier()
 
-    elif model_no_settings == 'XGB' and probability_calculation_softmax:
-        model = MarginalXGBClassifier()
-    elif model_no_settings == 'XGB' and not probability_calculation_softmax:
-        model = MarginalXGBClassifier(method='sigmoid')
+    elif model_no_settings == 'XGB':
+        if softmax:
+            model = MarginalXGBClassifier()
+        else:
+            model = MarginalXGBClassifier(method='sigmoid')
 
     else:
-        raise ValueError("")
+        raise ValueError("No class exists for this model")
 
     return model
 
-def generate_lrs(model, mle, method, X_train, y_train, X_calib, y_calib, X_test, X_test_reduced, X_mixtures, target_classes):
+
+def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures, target_classes):
     """
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
     model and predict the lrs before and after calibration for both X_test and X_mixtures.
     """
 
-    if method: # y_train must be list with labels
+    if softmax: # y_train must be list with labels
         try:
             y_train = mle.nhot_to_labels(y_train)
         except: # already are labels
@@ -247,14 +236,11 @@ def generate_lrs(model, mle, method, X_train, y_train, X_calib, y_calib, X_test,
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
     lrs_after_calib = model.predict_lrs(X_test, target_classes)
 
-    lrs_reduced_before_calib = model.predict_lrs(X_test_reduced, target_classes, with_calibration=False)
-    lrs_reduced_after_calib = model.predict_lrs(X_test_reduced, target_classes)
+    lrs_reduced_before_calib = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
+    lrs_reduced_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes)
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
     lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes)
 
-    return lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt
-
-
-
-
+    return lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, \
+           lrs_before_calib_mixt, lrs_after_calib_mixt

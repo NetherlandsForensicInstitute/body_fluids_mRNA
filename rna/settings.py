@@ -14,12 +14,15 @@ Options:
     model             The model used for the analysis: 'MLR', 'MLP', 'XGB'
 """
 
-augment=False
-binarize=False
-markers=True
-lps=False
-# cal_probs=False # not incorporated in analysis
+augment=[True]
+binarize=[True,
+          False]
+markers=False
+softmax=[True,
+         False]
 nsamples=(4, 4, 2)
 test_size=0.2
 calibration_size=0.5
-model='MLP'
+models=[['MLP', True],
+        ['MLR', False],
+        ['XGB', True]]
