@@ -1,12 +1,17 @@
 """
 Performs project specific.
 """
+import os
 
 import numpy as np
+from sklearn.metrics import accuracy_score
 
+from lir.plotting import makeplot_hist_density
 from rna.constants import single_cell_types
 
 from lir.lr import calculate_cllr
+from rna.nfold_analysis import model_with_correct_settings
+from rna.plotting import plot_histogram_log_lr
 
 
 def combine_samples(data_for_class):
@@ -58,8 +63,8 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         combined_sample = []
         for i_replicate in range(smallest_replicates):
             # TODO: For now chose to take the sum. Perhaps another way to combine the samples?
-            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
-            # combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
     return combine_samples(np.array(augmented_samples))
@@ -183,3 +188,109 @@ def cllr(lrs, y_nhot, target_class):
         return calculate_cllr(lrs2, lrs1).cllr
     else:
         return 9999.0000
+
+
+def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented, y_train_nhot_augmented,
+                     X_calib_augmented, y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented,
+                     X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist):
+
+    classifier = models[0]
+    with_calibration = models[1]
+
+    model = model_with_correct_settings(classifier, softmax)
+
+    if with_calibration: # with calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+                         y_calib_nhot_augmented, X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        if save_hist:
+            plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+            plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  title='after', savefig=os.path.join('scratch', 'hist_after_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+            makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                              y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                              label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+
+    else: # no calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
+                         np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
+                         np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        if save_hist:
+            plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+
+    return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+           lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt
+
+
+def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures, target_classes):
+    """
+    When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
+    an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
+    model and predict the lrs before and after calibration for both X_test and X_mixtures.
+    """
+
+    if softmax: # y_train must be list with labels
+        try:
+            y_train = mle.nhot_to_labels(y_train)
+        except: # already are labels
+            pass
+    else: # y_train must be nhot encoded labels
+        try:
+            y_train = mle.labels_to_nhot(y_train)
+        except: # already is nhot encoded
+            pass
+        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+        y_train = np.array([np.max(np.array(y_train[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+
+    try: # y_calib must always be nhot encoded
+        y_calib = mle.labels_to_nhot(y_calib)
+    except: # already is nhot encoded
+        pass
+
+    model.fit_classifier(X_train, y_train)
+    model.fit_calibration(X_calib, y_calib, target_classes)
+
+    lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
+    lrs_after_calib = model.predict_lrs(X_test, target_classes)
+
+    lrs_reduced_before_calib = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
+    lrs_reduced_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes)
+
+    lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
+    lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes)
+
+    return lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, \
+           lrs_before_calib_mixt, lrs_after_calib_mixt
+
+
+def get_accuracy(model, mle, y_true, X, target_classes):
+    """
+    Predicts labels and ensures that both the true and predicted labels are nhot encoded.
+    Calculates the accuracy.
+
+    :return: accuracy: the set of labels predicted for a sample must *exactly* match the
+        corresponding set of labels in y_true.
+    """
+
+    y_pred = model._classifier.predict(X)
+
+    try:
+        y_true = mle.labels_to_nhot(y_true)
+    except:
+        pass
+
+    try:
+        y_pred = mle.labels_to_nhot(y_pred)
+    except:
+        pass
+
+    if y_true.shape[1] != target_classes.shape[0] and y_pred.shape[1] == target_classes.shape[0]:
+        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+        y_true = np.array([np.max(np.array(y_true[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+
+    return accuracy_score(y_true, y_pred)

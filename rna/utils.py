@@ -115,3 +115,18 @@ def remove_markers(X):
         X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
     return X
+
+
+def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtures):
+    """
+    Make sure that the combinations of cell types present in the mixtures dataset is the
+    same in the augmented test dataset.
+    """
+
+    unique_mixture_combinations = np.unique(y_nhot_mixtures, axis=0)
+    indices = np.array([np.argwhere(np.all(y_nhot == unique_mixture_combinations[i, :], axis=1)).ravel() for i in range(unique_mixture_combinations.shape[0])]).flatten()
+
+    X_reduced = X_augmented[indices, :]
+    y_nhot_reduced = y_nhot[indices, :]
+
+    return X_reduced, y_nhot_reduced

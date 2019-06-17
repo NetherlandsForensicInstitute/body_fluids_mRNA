@@ -11,8 +11,8 @@ from matplotlib import rc
 
 from rna.analytics import combine_samples
 from rna.input_output import read_df
-# from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
 from rna.utils import vec2string
+
 from lir import PavLogLR
 
 ## TEMPORARY
@@ -226,6 +226,37 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
+
+    """
+    n = 0
+    Binarize = True i = 0
+    Softmax = True j = 0
+    Model = MLP k = 0
+    Model = MLR k = 1
+    Model = XGB k = 2
+
+    Softmax = False j = 1
+    Model = MLP k = 0
+    Model = MLR k = 1
+    Model = XGB k = 2
+
+    Binarize = False i = 1
+    Softmax = True j = 0
+    Model = MLP k = 0
+    Model = MLR k = 1
+    Model = XGB k = 2
+
+    Softmax = False j = 1
+    Model = MLP k = 0
+    Model = MLR k = 1
+    Model = XGb k = 2
+
+    :param n_metric:
+    :param name_metric:
+    :param savefig:
+    :param show:
+    :return:
+    """
 
     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T

@@ -8,8 +8,6 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from sklearn.preprocessing import normalize
-
 from rna.analytics import combine_samples
 from rna.utils import remove_markers
 from rna import constants
@@ -196,7 +194,6 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
     X_mixtures = np.array(X_mixtures)
     X_mixtures = combine_samples(X_mixtures)
     if not binarize:
-        # X_mixtures = normalize(X_mixtures)
         X_mixtures = X_mixtures / 1000
 
     if not markers:

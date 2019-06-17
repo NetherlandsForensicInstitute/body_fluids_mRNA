@@ -4,13 +4,13 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 
+from keras import Input, Model
+from keras.layers import Dense, Dropout
+
 from xgboost import XGBClassifier
 
 from lir import KDECalibrator
 from rna.analytics import get_mixture_columns_for_class
-
-from keras import Input, Model
-from keras.layers import Dense, Dropout
 
 
 class MarginalMLPClassifier():
@@ -309,3 +309,5 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
     lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
 
     return lrs
+
+
