@@ -136,7 +136,6 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
 
     n_per_celltype = dict()
 
-    X_single = []
     if ground_truth_known:
         for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
@@ -227,37 +226,6 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    """
-    n = 0
-    Binarize = True i = 0
-    Softmax = True j = 0
-    Model = MLP k = 0
-    Model = MLR k = 1
-    Model = XGB k = 2
-
-    Softmax = False j = 1
-    Model = MLP k = 0
-    Model = MLR k = 1
-    Model = XGB k = 2
-
-    Binarize = False i = 1
-    Softmax = True j = 0
-    Model = MLP k = 0
-    Model = MLR k = 1
-    Model = XGB k = 2
-
-    Softmax = False j = 1
-    Model = MLP k = 0
-    Model = MLR k = 1
-    Model = XGb k = 2
-
-    :param n_metric:
-    :param name_metric:
-    :param savefig:
-    :param show:
-    :return:
-    """
-
     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
     MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
@@ -274,7 +242,7 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
             'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
 
     fig, ax = plt.subplots()
-    ax.set_title("Boxplots of {} for {} folds".format(name_metric, n_metric.shape[0]))
+    ax.set_title("{} folds".format(n_metric.shape[0]))
     ax.boxplot(data, vert=False)
     ax.set_xlabel(name_metric)
     plt.yticks(list(range(1, len(names)+1)), names)

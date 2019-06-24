@@ -47,64 +47,6 @@ def vec2string(target_class, label_encoder):
     return celltype
 
 
-class MultiLabelEncoder():
-
-    def __init__(self, n_classes):
-        self.n_classes = n_classes
-        self.nhot_of_combinations = make_nhot_matrix_of_combinations(n_classes)
-
-    def nhot_to_labels(self, y_nhot):
-        y = np.array([np.argwhere(np.all(self.nhot_of_combinations == y_nhot[i, :], axis=1)).flatten() for i in range(y_nhot.shape[0])])
-        return y.ravel()
-
-    def labels_to_nhot(self, y):
-        if len(y.shape) == 1 or y.shape[1] == 1:
-            n = y.shape[0]
-            # TODO: FutureWarning: arrays to stack must be passed as a "sequence" ...
-            y_nhot = np.vstack(self.nhot_of_combinations[y[i], :] for i in range(n))
-        return y_nhot
-
-    def transform_single(self, y):
-        """
-        Transforms the MultiLabelEncoded labels into original labels
-        """
-        y = y.reshape(-1, 1)
-        y_transformed = np.zeros_like(y)
-        for label in np.unique(y):
-            y_transformed[np.argwhere(np.all(y == label, axis=1)).flatten()] = np.log2(label)
-
-        return y_transformed
-
-
-    def inv_transform_single(self, y):
-        """
-        Transforms the original labels into the MultiLabelEncoded labels
-        """
-        y_transformed = np.zeros_like(y)
-        for label in np.unique(y):
-            y_transformed[np.argwhere(np.all(y == label, axis=1)).flatten()] = 2 ** label
-
-        return y_transformed
-
-
-def make_nhot_matrix_of_combinations(N):
-    """
-    Makes nhot encoded matrix with all possible combinations of existing
-    single cell types.
-
-    :param N: int
-    :return: 2**N x N nhot encoded matrix
-    """
-
-    def int_to_binary(i):
-        binary = bin(i)[2:]
-        while len(binary) < N:
-            binary = '0' + binary
-        return np.flip([int(j) for j in binary]).tolist()
-
-    return np.array([int_to_binary(i) for i in range(2**N)])
-
-
 def remove_markers(X):
     """
     Removes the gender and control markers.
@@ -115,18 +57,3 @@ def remove_markers(X):
         X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
     return X
-
-
-def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtures):
-    """
-    Make sure that the combinations of cell types present in the mixtures dataset is the
-    same in the augmented test dataset.
-    """
-
-    unique_mixture_combinations = np.unique(y_nhot_mixtures, axis=0)
-    indices = np.array([np.argwhere(np.all(y_nhot == unique_mixture_combinations[i, :], axis=1)).ravel() for i in range(unique_mixture_combinations.shape[0])]).flatten()
-
-    X_reduced = X_augmented[indices, :]
-    y_nhot_reduced = y_nhot[indices, :]
-
-    return X_reduced, y_nhot_reduced

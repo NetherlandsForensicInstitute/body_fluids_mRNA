@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 from sklearn.neural_network import MLPClassifier
@@ -10,7 +12,9 @@ from keras.layers import Dense, Dropout
 from xgboost import XGBClassifier
 
 from lir import KDECalibrator
-from rna.analytics import get_mixture_columns_for_class
+from lir.plotting import makeplot_hist_density
+from rna.analytics import convert_prob_to_marginal_per_class, generate_lrs
+from rna.plotting import plot_histogram_log_lr
 
 
 class MarginalMLPClassifier():
@@ -262,52 +266,75 @@ class MarginalDLClassifier():
         return model
 
 
-def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
+def model_with_correct_settings(model_no_settings, softmax):
     """
-    Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
-    matrix by summing over the probabilities containing the celltype(s) of interest.
+    Ensures that the correct model with correct settings is used in the analysis.
+    This is based on a string 'model_no_settings' and a boolean deciding how the
+    probabilties are calculated 'softmax': either with the softmax
+    function or the sigmoid function.
 
-    :param prob: n_samples x n_mixtures containing the predicted probabilities
-    :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
-    :param MAX_LR: int
-    :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
-    :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
-    :return: n_samples x n_target_classes of probabilities
+    :param model_no_settings: str: model
+    :param softmax: boolean: if True the softmax function is used to
+        calculate the probabilities with.
+    :return: model with correct settings
     """
-    assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
-    assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
-    lrs = np.zeros((len(prob), len(target_classes)))
-    for i, target_class in enumerate(target_classes):
-        assert sum(target_class) > 0, 'No cell type given as target class'
 
-        if prob.shape[1] == 2 ** target_classes.shape[1]: # lps
-            # numerator
-            indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
-            numerator = np.sum(prob[:, indices_of_target_class], axis=1)
+    if model_no_settings == 'MLP':
+        if softmax:
+            model = MarginalMLPClassifier()
+        else:
+            model = MarginalMLPClassifier(activation='logistic')
 
-            # denominator
-            # TODO: Does this work when priors are defined?
-            # TODO: Rewrite with priors.
-            # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
-            all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
-            indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
-            denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
-            lrs[:, i] = numerator/denominator
+    elif model_no_settings == 'MLR':
+        if softmax:
+            model = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
+        else:
+            model = MarginalMLRClassifier()
 
-        else: # sigmoid
-            # TODO: Incorporate priors
-            assert prob.shape[1] == target_classes.shape[0]
-            prob_target_class = prob[:, i].flatten()
-            prob_target_class = np.reshape(prob_target_class, -1, 1)
-            lrs[:, i] = prob_target_class / (1 - prob_target_class)
+    elif model_no_settings == 'XGB':
+        if softmax:
+            model = MarginalXGBClassifier()
+        else:
+            model = MarginalXGBClassifier(method='sigmoid')
 
-    lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
-    lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
+    else:
+        raise ValueError("No class exists for this model")
 
-    return lrs
+    return model
 
 
+def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented, y_train_nhot_augmented,
+                     X_calib_augmented, y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented,
+                     X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=False):
+
+    classifier = models[0]
+    with_calibration = models[1]
+
+    model = model_with_correct_settings(classifier, softmax)
+
+    if with_calibration: # with calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+                         y_calib_nhot_augmented, X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        if save_hist:
+            plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+            plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  title='after', savefig=os.path.join('scratch', 'hist_after_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+            makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                              y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                              label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+
+    else: # no calibration
+        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
+                         np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
+                         np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        if save_hist:
+            plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+
+    return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+           lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt
