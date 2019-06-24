@@ -4,3 +4,6 @@ numpy
 sklearn
 tqdm
 xlrd
+xgboost
+keras
+tensorflow

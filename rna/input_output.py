@@ -8,7 +8,8 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from rna.analytics import combine_samples, remove_markers
+from rna.analytics import combine_samples
+from rna.utils import remove_markers
 from rna import constants
 
 from sklearn.preprocessing import LabelEncoder
@@ -23,6 +24,7 @@ def read_df(filename, nreplicates=None):
     :param nreplicates: number of repeated measurements
     :return: df: pd.DataFrame and rv: pf.DataFrame
     """
+    pd.options.mode.chained_assignment = None # to silence warning
     raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
     try:
         rv = raw_df[['replicate_value']]
@@ -99,14 +101,15 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single=[]
     if ground_truth_known:
-        print("===Removed samples===\n")
+        # print("===Removed samples===\n")
         for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
             rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
             assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
             n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
-                                                                      indices_per_replicate, rvset_for_this_celltype)
+                                                                        indices_per_replicate, rvset_for_this_celltype,
+                                                                        True)
 
             for repeated_measurements in X_for_this_celltype:
                 X_single.append(repeated_measurements)
@@ -114,7 +117,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
         y_nhot_single = np.zeros((len(X_single), n_celltypes))
         end = 0
-        for i, celltype in enumerate(list(label_encoder.classes_)):
+        for celltype in list(label_encoder.classes_):
             i_celltype = label_encoder.transform([celltype])
             begin = end
             end = end + n_per_celltype[celltype]
@@ -123,13 +126,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         assert np.array(X_single).shape[0] == y_nhot_single.shape[0]
 
     else:
-        n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv)
+        n_full_samples, X_single = get_data_for_celltype('Unknown', np.array(df), indices_per_replicate, rv, True)
         y_nhot_single=None
 
     X_single = np.array(X_single)
 
     if not markers:
         X_single = remove_markers(X_single)
+        n_features = n_features-4
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, list(df.columns), list(df.index)
@@ -172,8 +176,9 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
         data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
         rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
 
-        n_full_samples, X_for_this_celltype = get_data_for_celltype(
-            mixture_celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype)
+        n_full_samples, X_for_this_celltype = get_data_for_celltype(mixture_celltype, data_for_this_celltype,
+                                                                    indices_per_replicate, rvset_for_this_celltype,
+                                                                    True)
 
         for repeated_measurements in X_for_this_celltype:
             X_mixtures.append(repeated_measurements)
@@ -188,6 +193,8 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
 
     X_mixtures = np.array(X_mixtures)
     X_mixtures = combine_samples(X_mixtures)
+    if not binarize:
+        X_mixtures = X_mixtures / 1000
 
     if not markers:
         X_mixtures = remove_markers(X_mixtures)
@@ -213,7 +220,7 @@ def indices_per_replicate(end_replicate, last_index):
     return indices_per_replicate_set
 
 
-def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype):
+def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype, discard=True):
 
     end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
                      rvset_for_this_celltype[i - 1] > rvset_for_this_celltype[i] or
@@ -226,16 +233,18 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
     for idxs in indices_per_replicate_set:
         candidate_samples = data_for_this_celltype[idxs, :]
 
-        # TODO is make this at least one okay?
-        if np.sum(candidate_samples[:, -1]) < 1 or np.sum(candidate_samples[:, -2]) < 1 \
-                and 'Blank' not in celltype:
-            n_full_samples -= 1
-            n_discarded += 1
+        if discard:
+            # TODO is make this at least one okay?
+            if np.sum(candidate_samples[:, -1]) < 1 or np.sum(candidate_samples[:, -2]) < 1 \
+                    and 'Blank' not in celltype:
+                n_full_samples -= 1
+                n_discarded += 1
+            else:
+                X_for_this_celltype.append(candidate_samples)
         else:
             X_for_this_celltype.append(candidate_samples)
 
-
-    print("{} sample(s) from {}".format(n_discarded, celltype))
+    # print("{} sample(s) from {}".format(n_discarded, celltype))
 
     return n_full_samples, X_for_this_celltype
 

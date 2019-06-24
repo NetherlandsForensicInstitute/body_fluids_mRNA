@@ -7,10 +7,19 @@ import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
+from matplotlib import rc
+
 from rna.analytics import combine_samples
-from rna.lr_system import convert_prob_per_mixture_to_marginal_per_class
+from rna.input_output import read_df
 from rna.utils import vec2string
+
 from lir import PavLogLR
+
+## TEMPORARY
+from sklearn.preprocessing import LabelEncoder
+from rna.input_output import get_data_for_celltype, indices_per_replicate
+
+rc('text', usetex=True)
 
 # TODO: Make this function work (?)
 def plot_for_experimental_mixture_data(X_mixtures,
@@ -103,45 +112,150 @@ def plot_data(X):
     plt.savefig('single_cell_type_measurements_after_QC')
 
 
-def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
-                          title='before', density=False, savefig=None, show=None):
+def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
+                                 ground_truth_known=True, savefig=None, show=None):
 
-    loglrs = np.log10(lrs)
-    n_target_classes = len(target_classes)
+    df, rv = read_df(filename, nreplicates)
 
-    plt.subplots(int(n_target_classes / 2), 2, figsize=(9, int(9 / 4 * n_target_classes)), sharey='row')
-    plt.suptitle('Histogram {} calibration'.format(title))
-    for i, target_class in enumerate(target_classes):
+    label_encoder = LabelEncoder()
 
-        celltype = vec2string(target_class, label_encoder)
+    if single_cell_types:
+        single_cell_types = list(set(single_cell_types))
+        label_encoder.fit(single_cell_types)
+    else:
+        # TODO: Make code clearer (not sure how --> comment Rolf pull request)
+        if not ground_truth_known:
+            raise ValueError('if no cell types are provided, ground truth should be known')
+        # if not provided, learn the cell types from the data
+        all_celltypes = np.array(df.index)
+        for celltype in all_celltypes:
+            if celltype not in single_cell_types and celltype != 'Skin.penile':
+                raise ValueError('unknown cell type: {}'.format(celltype))
 
-        loglrs1 = np.multiply(loglrs[:, i], np.max(np.multiply(y_nhot, target_class), axis=1))
-        loglrs2 = np.multiply(loglrs[:, i], 1-np.max(np.multiply(y_nhot, target_class), axis=1))
+        label_encoder.fit(all_celltypes)
 
-        # delete zeros
-        loglrs1 = np.delete(loglrs1, np.where(loglrs1 == -0.0))
-        loglrs2 = np.delete(loglrs2, np.where(loglrs2 == 0.0))
+    n_per_celltype = dict()
 
-        plt.subplot(int(n_target_classes / 2), 2, i + 1)
-        plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label='h1', alpha=0.5)
-        plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label='h2', alpha=0.5)
+    if ground_truth_known:
+        for celltype in list(label_encoder.classes_):
+            data_for_this_celltype = np.array(df.loc[celltype])
+            rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+            assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
-        plt.title(celltype)
-        # if title == 'after':
-        #     outer_lik = max(abs(np.min(loglrs)), abs(nqp.max(loglrs)))
-        #     plt.xlim(-(outer_lik + 0.05), (outer_lik + 0.05))
-        if density:
-            plt.ylabel("Density")
-        else:
-            plt.ylabel("Frequency")
-        plt.xlabel("10logLR")
-        plt.legend(loc=9)
+            n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
+                                                                        indices_per_replicate, rvset_for_this_celltype,
+                                                                        discard=False)
+
+            n_per_celltype[celltype] = n_full_samples
+
+    y_pos = np.arange(len(n_per_celltype))
+    celltypes = []
+    n_celltype = []
+    for values, keys in n_per_celltype.items():
+        celltypes.append(values)
+        n_celltype.append(keys)
+
+    fig, ax = plt.subplots()
+    plt.barh(y_pos, n_celltype, tick_label=y_pos)
+    labels = [item.get_text() for item in ax.get_yticklabels()]
+    labels[0] = celltypes[0]
+    ax.set_yticklabels(labels)
+    # plt.xticks(y_pos, celltypes)
+    plt.ylabel('Cell types')
+    plt.title('Distribution of samples')
 
     if savefig is not None:
         plt.tight_layout()
         plt.savefig(savefig)
+        plt.close()
     if show or savefig is None:
         plt.show()
+
+    plt.close()
+
+
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
+                          title='before', title2=None, density=True, savefig=None, show=None):
+
+    loglrs = np.log10(lrs)
+    n_target_classes = len(target_classes)
+
+    n_rows = int(n_target_classes / 2)
+    if title == 'after':
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+    else:
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+    plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
+
+    j = 0
+    k = 0
+
+    for i, target_class in enumerate(target_classes):
+
+        celltype = vec2string(target_class, label_encoder)
+
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+
+        axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+        axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+        axs[j, k].set_title(celltype)
+
+        if (i % 2) == 0:
+            k = 1
+        else:
+            k = 0
+            j = j + 1
+
+    fig.text(0.5, 0.04, "10logLR", ha='center')
+    if density:
+        fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+    else:
+        fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, 'center right')
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.show()
+
+
+def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
+
+    MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
+    MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
+    MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
+    MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+
+    data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
+            MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
+            MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
+            MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
+
+    names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
+            'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
+            'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
+            'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
+
+    fig, ax = plt.subplots()
+    ax.set_title("{} folds".format(n_metric.shape[0]))
+    ax.boxplot(data, vert=False)
+    ax.set_xlabel(name_metric)
+    plt.yticks(list(range(1, len(names)+1)), names)
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.show()
+
+    plt.close(fig)
+
 
 # TODO: Make function work
 def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):

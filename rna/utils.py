@@ -24,36 +24,6 @@ def string2vec(list_of_strings, label_encoder):
     return target_classes
 
 
-def from_nhot_to_labels(y_nhot):
-    """
-    Converts nhot encoded matrix into list with labels for unique rows.
-
-    :param y_nhot: nhot encoded matrix
-    :return: list of length N_samples
-    """
-
-    unique_labels = np.flip(np.unique(y_nhot, axis=0), axis=1)
-    if np.array_equal(np.sum(unique_labels, axis=1), np.ones(y_nhot.shape[1])):
-        y = np.argmax(y_nhot, axis=1)
-    elif unique_labels.shape[0] == 2 ** unique_labels.shape[1]:
-        # assumes that the nhot encoded matrix first row consists of zero's
-        # and a 1 is added each row starting from the right.
-        y = []
-        for i in range(unique_labels.shape[0]):
-            y += [i] * np.where(np.all(y_nhot == unique_labels[i], axis=1))[0].shape[0]
-    elif unique_labels.shape[0] == 7:
-        # mixtures
-        unique_labels = np.unique(y_nhot, axis=0)
-        y = np.zeros((y_nhot.shape[0], 1))
-        for i in range(unique_labels.shape[0]):
-            index = sum([2 ** int(idx) for idx in np.argwhere(unique_labels[i] == 1)])
-            y[np.where(np.all(y_nhot == unique_labels[i], axis=1))[0], :] = index
-    else:
-        raise ValueError("Cannot convert {} encoded matrix into labels.".format(y_nhot))
-
-    return y
-
-
 def vec2string(target_class, label_encoder):
     """
     Converts a vector of 0s and 1s into a string being one cell type or combined cell types.
@@ -77,13 +47,13 @@ def vec2string(target_class, label_encoder):
     return celltype
 
 
-def print_settings(settings):
-    # print("augment : {}".format(settings.augment))
-    print("binarize : {}".format(settings.binarize))
-    print("markers : {}".format(settings.markers))
-    # print("lps : {}".format(settings.binarize))
-    print("nsamples : {}".format(settings.nsamples))
-    print("test_size : {}".format(settings.test_size))
-    print("calibration_size : {}".format(settings.calibration_size))
-    # print("model : {}".format(settings.binarize))
+def remove_markers(X):
+    """
+    Removes the gender and control markers.
+    """
+    try:
+        X = X[:, :-4]
+    except IndexError:
+        X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
+    return X
