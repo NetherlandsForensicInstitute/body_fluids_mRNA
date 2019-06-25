@@ -16,10 +16,10 @@ if __name__ == '__main__':
     # plot_distribution_of_samples(single_cell_types=single_cell_types, show=True)
 
     # assume that this is what comes from the GUI
-    target_classes_str = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa', 'Vaginal.mucosa and/or Menstrual.secretion']
+    target_classes_str = ['Skin', 'Vaginal.mucosa and/or Menstrual.secretion']
 
     start = time.time()
-    nfold_analysis(nfolds=10, tc=target_classes_str)
+    nfold_analysis(nfolds=3, tc=target_classes_str)
     end = time.time()
 
     print("Execution time in seconds:", end - start)

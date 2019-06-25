@@ -51,11 +51,12 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     return combine_samples(np.array(augmented_samples))
 
 
-def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
-                 label_encoder, binarize=False, from_penile=False):
+def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, priors=None, binarize=False,
+                 from_penile=False):
     """
     Generate data for the power set of single cell types
 
+    :param priors:
     :param X: n_samples x n_measurements per sample x n_markers array of measurements
     :param y_nhot: n_samples x n_celltypes_with_penile array of int labels of which
         cell type was measured
@@ -70,6 +71,11 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
                 which single cell type it was made up of. Does not contain column for penile skin
     """
 
+    if priors is None: # uniform priors
+        priors = [1] * n_celltypes
+
+    assert len(priors) == n_celltypes, "Not all cell types are given a prior value"
+
     if X.size == 0:
         # This is the case when calibration_size = 0.0, this is an implicit way to
         # ensure that calibration is not performed.
@@ -78,27 +84,40 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
 
     else:
         X_augmented = np.zeros((0, n_features))
-        y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
-                                     n_celltypes), dtype=int)
+        # TODO: only works when one cell type is more/less likely
+        N_SAMPLES = np.sum(np.unique(priors) * N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes * (1 / len(np.unique(priors))), dtype=int)
+        y_nhot_augmented = np.zeros((N_SAMPLES, n_celltypes), dtype=int)
 
-        # for each possible combination augment N_SAMPLES_PER_COMBINATION
+        begin = 0
         for i in range(2 ** n_celltypes):
             binary = bin(i)[2:]
             while len(binary) < n_celltypes:
                 binary = '0' + binary
 
+            # figure out which classes will be in the combination each iteration
             classes_in_current_mixture = []
             for i_celltype in range(len(label_encoder.classes_)):
                 if binary[-i_celltype - 1] == '1':
                     classes_in_current_mixture.append(i_celltype)
-                    y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
             if from_penile:
                 # also (always) add penile skin samples. the index for penile is n_celltypes
-                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
                 classes_in_current_mixture.append(n_celltypes)
+            # get to know how many augmented samples needed
+            try:
+                Np = np.max([priors[class_in_mixture] for class_in_mixture in classes_in_current_mixture])
+            except:
+                Np = 1
 
-            X_augmented = np.append(X_augmented, construct_random_samples(
-                X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+            end = begin + N_SAMPLES_PER_COMBINATION * Np
+            for i_celltype in range(len(label_encoder.classes_)):
+                if binary[-i_celltype - 1] == '1':
+                    y_nhot_augmented[begin:end, i_celltype] = 1
+            if from_penile:
+                y_nhot_augmented[begin:end, n_celltypes] = 1
+
+            X_augmented = np.append(X_augmented, construct_random_samples(X, y, end-begin, classes_in_current_mixture,
+                                                                          n_features), axis=0)
+            begin = end
 
         if binarize:
             X_augmented = np.where(X_augmented > 150, 1, 0)
@@ -173,10 +192,11 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     """
 
     unique_mixture_combinations = np.unique(y_nhot_mixtures, axis=0)
-    indices = np.array([np.argwhere(np.all(y_nhot == unique_mixture_combinations[i, :], axis=1)).ravel()
-                        for i in range(unique_mixture_combinations.shape[0])]).flatten()
+    indices = [np.argwhere(np.all(y_nhot == unique_mixture_combinations[i, :], axis=1)).tolist() for i in range(unique_mixture_combinations.shape[0])]
+    indices_flatter = [val for sublist in indices for val in sublist]
+    indices_flattened = [val for sublist in indices_flatter for val in sublist]
 
-    X_reduced = X_augmented[indices, :]
-    y_nhot_reduced = y_nhot[indices, :]
+    X_reduced = X_augmented[indices_flattened, :]
+    y_nhot_reduced = y_nhot[indices_flattened, :]
 
     return X_reduced, y_nhot_reduced

@@ -57,9 +57,15 @@ def nfold_analysis(nfolds, tc):
             X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, markers=settings.markers)
 
             # ======= Augment data =======
-            X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features, settings.nsamples[0], label_encoder, binarize=binarize, from_penile=from_penile)
-            X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features, settings.nsamples[1], label_encoder, binarize=binarize, from_penile=from_penile)
-            X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features, settings.nsamples[2], label_encoder, binarize=binarize, from_penile=from_penile)
+            X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
+                                                                     settings.nsamples[0], label_encoder, settings.priors,
+                                                                     binarize=binarize, from_penile=from_penile)
+            X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
+                                                                     settings.nsamples[1], label_encoder, settings.priors,
+                                                                     binarize=binarize, from_penile=from_penile)
+            X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
+                                                                   settings.nsamples[2], label_encoder, settings.priors,
+                                                                   binarize=binarize, from_penile=from_penile)
             X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
 
             # ======= Convert data accordingly =======
