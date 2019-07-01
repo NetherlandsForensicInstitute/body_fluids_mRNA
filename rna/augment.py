@@ -24,12 +24,13 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     :return: n x n_features array
     """
     if len(classes_to_include) == 0:
-        return np.zeros((n, n_features))
+        return np.zeros((n, n_features)), np.zeros((n, n_features))
     data_for_class=[]
     for clas in classes_to_include:
         data_for_class.append(X[np.argwhere(np.array(y) == clas)[:, 0]])
 
-    augmented_samples = []
+    augmented_samples_sum = []
+    augmented_samples_mean = []
     for i in range(n):
         sampled = []
         for j, clas in enumerate(classes_to_include):
@@ -41,18 +42,22 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         # TODO thus lower replicates for more cell types. is this an issue?
         smallest_replicates = min([len(sample) for sample in sampled])
 
-        combined_sample = []
+        combined_sample_sum = []
+        combined_sample_mean = []
         for i_replicate in range(smallest_replicates):
-            # TODO: For now chose to take the sum. Perhaps another way to combine the samples?
-            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
-            # combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample_sum.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample_mean.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
-        augmented_samples.append(combined_sample)
-    return combine_samples(np.array(augmented_samples))
+        augmented_samples_sum.append(combined_sample_sum)
+        augmented_samples_mean.append(combined_sample_mean)
+
+    samples_sum = combine_samples(np.array(augmented_samples_sum))
+    samples_mean = combine_samples(np.array(augmented_samples_mean))
+    return samples_sum, samples_mean
 
 
-def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
-                 label_encoder, binarize=False, from_penile=False):
+def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, binarize=False,
+                 from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -70,42 +75,36 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION,
                 which single cell type it was made up of. Does not contain column for penile skin
     """
 
-    if X.size == 0:
-        # This is the case when calibration_size = 0.0, this is an implicit way to
-        # ensure that calibration is not performed.
-        X_augmented=None
-        y_nhot_augmented=np.zeros((0, n_celltypes))
+    X_augmented_sum = np.zeros((0, n_features))
+    X_augmented_mean = np.zeros((0, n_features))
+    y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
+                                 n_celltypes), dtype=int)
 
-    else:
-        X_augmented = np.zeros((0, n_features))
-        y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
-                                     n_celltypes), dtype=int)
+    # for each possible combination augment N_SAMPLES_PER_COMBINATION
+    for i in range(2 ** n_celltypes):
+        binary = bin(i)[2:]
+        while len(binary) < n_celltypes:
+            binary = '0' + binary
 
-        # for each possible combination augment N_SAMPLES_PER_COMBINATION
-        for i in range(2 ** n_celltypes):
-            binary = bin(i)[2:]
-            while len(binary) < n_celltypes:
-                binary = '0' + binary
+        classes_in_current_mixture = []
+        for i_celltype in range(len(label_encoder.classes_)):
+            if binary[-i_celltype - 1] == '1':
+                classes_in_current_mixture.append(i_celltype)
+                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
+        if from_penile:
+            # also (always) add penile skin samples. the index for penile is n_celltypes
+            y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
+            classes_in_current_mixture.append(n_celltypes)
 
-            classes_in_current_mixture = []
-            for i_celltype in range(len(label_encoder.classes_)):
-                if binary[-i_celltype - 1] == '1':
-                    classes_in_current_mixture.append(i_celltype)
-                    y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, i_celltype] = 1
-            if from_penile:
-                # also (always) add penile skin samples. the index for penile is n_celltypes
-                y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
-                classes_in_current_mixture.append(n_celltypes)
+        samples_sum, samples_mean = construct_random_samples(X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features)
 
-            X_augmented = np.append(X_augmented, construct_random_samples(
-                X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features), axis=0)
+        X_augmented_sum = np.append(X_augmented_sum, samples_sum, axis=0)
+        X_augmented_mean = np.append(X_augmented_mean, samples_mean, axis=0)
 
-        if binarize:
-            X_augmented = np.where(X_augmented > 150, 1, 0)
-        else: # normalize
-            X_augmented = X_augmented / 1000
+        X_augmented_sum_bin = np.where(X_augmented_sum > 150, 1, 0)
+        X_augmented_mean_bin = np.where(X_augmented_mean > 150, 1, 0)
 
-    return X_augmented, y_nhot_augmented[:, :n_celltypes]
+    return X_augmented_sum, X_augmented_sum_bin, X_augmented_mean, X_augmented_mean_bin, y_nhot_augmented[:, :n_celltypes]
 
 
 class MultiLabelEncoder():
