@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.calibration import calibration_curve
 
 from matplotlib import rc
+from collections import OrderedDict
 
 from rna.analytics import combine_samples
 from rna.input_output import read_df
@@ -134,7 +135,7 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
 
         label_encoder.fit(all_celltypes)
 
-    n_per_celltype = dict()
+    n_per_celltype = OrderedDict()
 
     if ground_truth_known:
         for celltype in list(label_encoder.classes_):
@@ -152,17 +153,18 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
     celltypes = []
     n_celltype = []
     for values, keys in n_per_celltype.items():
+        values = values.replace(".", " ")
         celltypes.append(values)
         n_celltype.append(keys)
+    cmap = plt.get_cmap("tab10")
+    colors = cmap(np.arange(8))
 
     fig, ax = plt.subplots()
-    plt.barh(y_pos, n_celltype, tick_label=y_pos)
-    labels = [item.get_text() for item in ax.get_yticklabels()]
-    labels[0] = celltypes[0]
-    ax.set_yticklabels(labels)
-    # plt.xticks(y_pos, celltypes)
+    plt.barh(y_pos, n_celltype, tick_label=y_pos, color=colors)
+    plt.gca().invert_yaxis()
+    ax.set_yticklabels(celltypes)
     plt.ylabel('Cell types')
-    plt.title('Distribution of samples')
+    plt.xlabel('Number of samples')
 
     if savefig is not None:
         plt.tight_layout()
@@ -173,6 +175,55 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
 
     plt.close()
 
+    return label_encoder
+
+
+def plot_distribution_of_mixture_samples(savefig=None, show=None):
+    df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx')
+    mixture_celltypes = np.array(df.index)
+    mixture_label_encoder = LabelEncoder()
+    mixture_label_encoder.fit(mixture_celltypes)
+
+    n_per_mixture_celltype = OrderedDict()
+
+    for mixture_celltype in list(mixture_label_encoder.classes_):
+        data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
+        rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
+
+        n_full_samples, X_for_this_celltype = get_data_for_celltype(mixture_celltype, data_for_this_celltype,
+                                                                    indices_per_replicate, rvset_for_this_celltype,
+                                                                    discard=False)
+
+        n_per_mixture_celltype[mixture_celltype] = n_full_samples
+
+        # celltypes = mixture_celltype.split('+')
+    print(n_per_mixture_celltype)
+    y_pos = np.arange(len(n_per_mixture_celltype))
+    celltypes = []
+    n_celltype = []
+    for values, keys in n_per_mixture_celltype.items():
+        values = values.replace(".", " ")
+        values = values.replace('+', " and ")
+        celltypes.append(values)
+        n_celltype.append(keys)
+    cmap = plt.get_cmap("tab10")
+    colors = cmap(np.arange(7))
+
+    fig, ax = plt.subplots()
+    plt.barh(y_pos, n_celltype, tick_label=y_pos, color=colors)
+    plt.gca().invert_yaxis()
+    ax.set_yticklabels(celltypes)
+    plt.ylabel('Cell types')
+    plt.xlabel('Number of samples')
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.show()
+
+    plt.close()
 
 def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
                           title='before', title2=None, density=True, savefig=None, show=None):
