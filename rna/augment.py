@@ -43,8 +43,8 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            # TODO: For now chose to take the sum. Perhaps another way to combine the samples?
-            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # TODO: For now chose to take the max. Perhaps another way to combine the samples?
+            combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             # combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
