@@ -84,23 +84,29 @@ def nfold_analysis(nfolds, tc):
                                 perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented,
                                                  y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                                                  X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                                                 X_mixtures, target_classes)
+                                                 X_mixtures, target_classes, save_hist=True)
                         else:
                             y_train_transformed = mle.inv_transform_single(y_train)
+                            y_train_transformed = mle.labels_to_nhot(y_train_transformed)
                             y_calib_transformed = mle.inv_transform_single(y_calib)
+                            y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
                             model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
                             lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
                                 perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
                                                  y_train_transformed, X_calib_transformed, y_calib_transformed, X_test_augmented,
-                                                 y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+                                                 y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=True)
 
 
                         # ======= Calculate accuracy =======
-                        accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
+                        if settings.augment:
+                            accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
+                        else:
+                            accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_transformed, X_train_transformed, target_classes)
                         accuracies['test'][n, i, j, k] = calculate_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)
                         accuracies['test as mixtures'][n, i, j, k] = calculate_accuracy(model, mle, y_test_as_mixtures_nhot_augmented, X_test_as_mixtures_augmented, target_classes)
                         accuracies['mixture'][n, i, j, k] = calculate_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)
                         accuracies['single'][n, i, j, k] = calculate_accuracy(model, mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)
+
 
                         # ======= Calculate log-likelihood-ratio cost =======
                         for t, target_class in enumerate(target_classes):
