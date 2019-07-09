@@ -24,7 +24,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     :return: n x n_features array
     """
     if len(classes_to_include) == 0:
-        return np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features))
+        return np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features))
     data_for_class=[]
     for clas in classes_to_include:
         data_for_class.append(X[np.argwhere(np.array(y) == clas)[:, 0]])
@@ -32,6 +32,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     augmented_samples_sum = []
     augmented_samples_mean = []
     augmented_samples_max = []
+    augmented_samples_binary = []
     for i in range(n):
         sampled = []
         for j, clas in enumerate(classes_to_include):
@@ -43,23 +44,39 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         # TODO thus lower replicates for more cell types. is this an issue?
         smallest_replicates = min([len(sample) for sample in sampled])
 
+        # when binarize before sampling
+        sampled_binary = [np.where(sampled[i] > 150, 1 , 0) for i in range(len(sampled))]
+
         combined_sample_sum = []
         combined_sample_mean = []
         combined_sample_max = []
+        combined_sample_binary = []
         for i_replicate in range(smallest_replicates):
             combined_sample_sum.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             combined_sample_mean.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             combined_sample_max.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample_binary.append(np.max(np.array([sample[i_replicate] for sample in sampled_binary]), axis=0))
 
         augmented_samples_sum.append(combined_sample_sum)
         augmented_samples_mean.append(combined_sample_mean)
         augmented_samples_max.append(combined_sample_max)
+        augmented_samples_binary.append(combined_sample_binary)
 
     samples_sum = combine_samples(np.array(augmented_samples_sum))
-    samples_mean = combine_samples(np.array(augmented_samples_mean))
-    samples_max = combine_samples(np.array(augmented_samples_max))
+    augmented_samples_sum_bin = [[np.where(augmented_samples_sum[i][j] > 150, 1, 0) for j in range(len(augmented_samples_sum[i]))] for i in range(len(augmented_samples_sum))]
+    samples_sum_bin = combine_samples(np.array(augmented_samples_sum_bin))
 
-    return samples_sum, samples_mean, samples_max
+    samples_mean = combine_samples(np.array(augmented_samples_mean))
+    augmented_samples_mean_bin = [[np.where(augmented_samples_mean[i][j] > 150, 1, 0) for j in range(len(augmented_samples_mean[i]))] for i in range(len(augmented_samples_mean))]
+    samples_mean_bin = combine_samples(np.array(augmented_samples_mean_bin))
+
+    samples_max = combine_samples(np.array(augmented_samples_max))
+    augmented_samples_max_bin = [[np.where(augmented_samples_max[i][j] > 150, 1, 0) for j in range(len(augmented_samples_max[i]))] for i in range(len(augmented_samples_max))]
+    samples_max_bin = combine_samples(np.array(augmented_samples_max_bin))
+
+    samples_binary = combine_samples(np.array(augmented_samples_binary))
+
+    return samples_sum, samples_sum_bin, samples_mean, samples_mean_bin, samples_max, samples_max_bin, samples_binary
 
 
 def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, from_penile=False):
@@ -81,8 +98,16 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     """
 
     X_augmented_sum = np.zeros((0, n_features))
+    X_augmented_sum_bin = np.zeros((0, n_features))
+
     X_augmented_mean = np.zeros((0, n_features))
+    X_augmented_mean_bin = np.zeros((0, n_features))
+
     X_augmented_max = np.zeros((0, n_features))
+    X_augmented_max_bin = np.zeros((0, n_features))
+
+    X_augmented_binary = np.zeros((0, n_features))
+
     y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
                                  n_celltypes), dtype=int)
 
@@ -102,18 +127,24 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
             y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
             classes_in_current_mixture.append(n_celltypes)
 
-        samples_sum, samples_mean, samples_max = construct_random_samples(X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features)
+        samples_sum, samples_sum_bin, \
+        samples_mean, samples_mean_bin, \
+        samples_max, samples_max_bin, \
+            samples_binary = construct_random_samples(X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features)
 
         X_augmented_sum = np.append(X_augmented_sum, samples_sum, axis=0)
-        X_augmented_mean = np.append(X_augmented_mean, samples_mean, axis=0)
-        X_augmented_max = np.append(X_augmented_max, samples_max, axis=0)
+        X_augmented_sum_bin = np.append(X_augmented_sum_bin, samples_sum_bin, axis=0)
 
-        X_augmented_sum_bin = np.where(X_augmented_sum > 150, 1, 0)
-        X_augmented_mean_bin = np.where(X_augmented_mean > 150, 1, 0)
-        X_augmented_max_bin = np.where(X_augmented_max > 150, 1, 0)
+        X_augmented_mean = np.append(X_augmented_mean, samples_mean, axis=0)
+        X_augmented_mean_bin = np.append(X_augmented_mean_bin, samples_mean_bin, axis=0)
+
+        X_augmented_max = np.append(X_augmented_max, samples_max, axis=0)
+        X_augmented_max_bin = np.append(X_augmented_max_bin, samples_max_bin, axis=0)
+
+        X_augmented_binary = np.append(X_augmented_binary, samples_binary, axis=0)
 
     return X_augmented_sum, X_augmented_sum_bin, X_augmented_mean, X_augmented_mean_bin,\
-           X_augmented_max, X_augmented_max_bin, y_nhot_augmented[:, :n_celltypes]
+           X_augmented_max, X_augmented_max_bin, X_augmented_binary, y_nhot_augmented[:, :n_celltypes]
 
 
 class MultiLabelEncoder():
