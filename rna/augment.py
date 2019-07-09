@@ -24,13 +24,14 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
     :return: n x n_features array
     """
     if len(classes_to_include) == 0:
-        return np.zeros((n, n_features)), np.zeros((n, n_features))
+        return np.zeros((n, n_features)), np.zeros((n, n_features)), np.zeros((n, n_features))
     data_for_class=[]
     for clas in classes_to_include:
         data_for_class.append(X[np.argwhere(np.array(y) == clas)[:, 0]])
 
     augmented_samples_sum = []
     augmented_samples_mean = []
+    augmented_samples_max = []
     for i in range(n):
         sampled = []
         for j, clas in enumerate(classes_to_include):
@@ -44,20 +45,24 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
 
         combined_sample_sum = []
         combined_sample_mean = []
+        combined_sample_max = []
         for i_replicate in range(smallest_replicates):
             combined_sample_sum.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             combined_sample_mean.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            combined_sample_max.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples_sum.append(combined_sample_sum)
         augmented_samples_mean.append(combined_sample_mean)
+        augmented_samples_max.append(combined_sample_max)
 
     samples_sum = combine_samples(np.array(augmented_samples_sum))
     samples_mean = combine_samples(np.array(augmented_samples_mean))
-    return samples_sum, samples_mean
+    samples_max = combine_samples(np.array(augmented_samples_max))
+
+    return samples_sum, samples_mean, samples_max
 
 
-def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, binarize=False,
-                 from_penile=False):
+def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, from_penile=False):
     """
     Generate data for the power set of single cell types
 
@@ -77,6 +82,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     X_augmented_sum = np.zeros((0, n_features))
     X_augmented_mean = np.zeros((0, n_features))
+    X_augmented_max = np.zeros((0, n_features))
     y_nhot_augmented = np.zeros((2 ** n_celltypes * N_SAMPLES_PER_COMBINATION,
                                  n_celltypes), dtype=int)
 
@@ -96,15 +102,18 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
             y_nhot_augmented[i * N_SAMPLES_PER_COMBINATION:(i + 1) * N_SAMPLES_PER_COMBINATION, n_celltypes] = 1
             classes_in_current_mixture.append(n_celltypes)
 
-        samples_sum, samples_mean = construct_random_samples(X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features)
+        samples_sum, samples_mean, samples_max = construct_random_samples(X, y, N_SAMPLES_PER_COMBINATION, classes_in_current_mixture, n_features)
 
         X_augmented_sum = np.append(X_augmented_sum, samples_sum, axis=0)
         X_augmented_mean = np.append(X_augmented_mean, samples_mean, axis=0)
+        X_augmented_max = np.append(X_augmented_max, samples_max, axis=0)
 
         X_augmented_sum_bin = np.where(X_augmented_sum > 150, 1, 0)
         X_augmented_mean_bin = np.where(X_augmented_mean > 150, 1, 0)
+        X_augmented_max_bin = np.where(X_augmented_max > 150, 1, 0)
 
-    return X_augmented_sum, X_augmented_sum_bin, X_augmented_mean, X_augmented_mean_bin, y_nhot_augmented[:, :n_celltypes]
+    return X_augmented_sum, X_augmented_sum_bin, X_augmented_mean, X_augmented_mean_bin,\
+           X_augmented_max, X_augmented_max_bin, y_nhot_augmented[:, :n_celltypes]
 
 
 class MultiLabelEncoder():
