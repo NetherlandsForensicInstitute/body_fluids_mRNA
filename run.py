@@ -2,6 +2,7 @@ import time
 
 from rna.nfold_analysis import nfold_analysis
 
+
 ## TEMPORARY
 import os
 from rna.plotting import plot_distribution_of_samples, plot_distribution_of_mixture_samples
@@ -16,6 +17,7 @@ if __name__ == '__main__':
     # TODO: finish making this plot
     # plot_distribution_of_samples(single_cell_types=single_cell_types, savefig=os.path.join('Plots', 'distribution_of_samples_singles_data'))
     plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
+
 
     # assume that this is what comes from the GUI
     target_classes_str = ['Menstrual.secretion', 'Nasal.mucosa', 'Saliva', 'Skin', 'Vaginal.mucosa', 'Vaginal.mucosa and/or Menstrual.secretion']
