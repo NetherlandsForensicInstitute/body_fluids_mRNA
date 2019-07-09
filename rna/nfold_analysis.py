@@ -93,7 +93,9 @@ def nfold_analysis(nfolds, tc):
                                                  X_mixtures, target_classes)
                         else:
                             y_train_transformed = mle.inv_transform_single(y_train)
+                            y_train_transformed = mle.labels_to_nhot(y_train_transformed)
                             y_calib_transformed = mle.inv_transform_single(y_calib)
+                            y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
                             model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
                             lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
                                 perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
@@ -102,7 +104,10 @@ def nfold_analysis(nfolds, tc):
 
 
                         # ======= Calculate accuracy =======
-                        accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
+                        if settings.augment:
+                            accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_nhot_augmented, X_train_augmented, target_classes)
+                        else:
+                            accuracies['train'][n, i, j, k] = calculate_accuracy(model, mle, y_train_transformed, X_train_transformed, target_classes)
                         accuracies['test'][n, i, j, k] = calculate_accuracy(model, mle, y_test_nhot_augmented, X_test_augmented, target_classes)
                         accuracies['test as mixtures'][n, i, j, k] = calculate_accuracy(model, mle, y_test_as_mixtures_nhot_augmented, X_test_as_mixtures_augmented, target_classes)
                         accuracies['mixture'][n, i, j, k] = calculate_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)
