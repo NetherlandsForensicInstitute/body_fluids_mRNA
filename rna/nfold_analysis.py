@@ -100,7 +100,7 @@ def nfold_analysis(nfolds, tc):
                             lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
                                 perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
                                                  y_train_transformed, X_calib_transformed, y_calib_transformed, X_test_augmented,
-                                                 y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+                                                 y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=True)
 
 
                         # ======= Calculate accuracy =======
@@ -112,6 +112,7 @@ def nfold_analysis(nfolds, tc):
                         accuracies['test as mixtures'][n, i, j, k] = calculate_accuracy(model, mle, y_test_as_mixtures_nhot_augmented, X_test_as_mixtures_augmented, target_classes)
                         accuracies['mixture'][n, i, j, k] = calculate_accuracy(model, mle, y_nhot_mixtures, X_mixtures, target_classes)
                         accuracies['single'][n, i, j, k] = calculate_accuracy(model, mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)
+
 
                         # ======= Calculate log-likelihood-ratio cost =======
                         for t, target_class in enumerate(target_classes):
@@ -139,11 +140,11 @@ def nfold_analysis(nfolds, tc):
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
-        plot_boxplot_of_metric(cllr_test[target_class_str], "cllr".format(target_class_str),
+        plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str),
                                savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "cllr".format(target_class_str),
+        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str),
                                savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "cllr".format(target_class_str),
+        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str),
                                savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
