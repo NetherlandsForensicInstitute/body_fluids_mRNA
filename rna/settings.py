@@ -15,7 +15,7 @@ Options:
                       otherwise no calibration.
 """
 
-augment=False # or True
+augment=False
 binarize=[True, False]
 markers=False
 softmax=[True, False]
