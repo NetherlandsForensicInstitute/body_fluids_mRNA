@@ -13,15 +13,15 @@ Options:
                       If no separate data for calibration set to 0.0
     model, bool       The model used for the analysis: 'MLR', 'MLP', 'XGB'. If boolean is True then perform with calibration
                       otherwise no calibration.
-    priors            List
+    priors            List of length of number of single cell types
 """
 
 augment=True
 binarize=[True, False]
 markers=False
 softmax=[True, False]
-nsamples=(50, 50, 25)
+nsamples=(5, 5, 2)
 test_size=0.2
 calibration_size=0.5
 models=[['MLP', True], ['MLR', False], ['XGB', True]]
-priors=[10, 1, 1, 1, 1, 1, 1, 1]
+priors=[1, 10, 10, 10, 10, 10, 10, 10]

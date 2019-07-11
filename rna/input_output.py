@@ -2,11 +2,12 @@
 Reads and manipulates datasets.
 """
 
-
-from collections import Counter
+import os
 
 import numpy as np
 import pandas as pd
+
+from collections import Counter
 
 from rna.analytics import combine_samples
 from rna.utils import remove_markers
@@ -24,6 +25,8 @@ def read_df(filename, nreplicates=None):
     :param nreplicates: number of repeated measurements
     :return: df: pd.DataFrame and rv: pf.DataFrame
     """
+    os.chdir('/Users/Naomi/Documents/Documenten - MacBook Pro van Naomi/statistical_science/jaar_2/internship/method')
+
     pd.options.mode.chained_assignment = None # to silence warning
     raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
     try:

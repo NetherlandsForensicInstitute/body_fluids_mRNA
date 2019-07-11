@@ -44,10 +44,10 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
 
         combined_sample = []
         for i_replicate in range(smallest_replicates):
-            # TODO: For now chose to take the max. Perhaps another way to combine the samples?
-            # combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # TODO: Best way to combine the samples?
+            combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
             # combined_sample.append(np.mean(np.array([sample[i_replicate] for sample in sampled]), axis=0))
-            combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
+            # combined_sample.append(np.sum(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
         augmented_samples.append(combined_sample)
 
@@ -87,6 +87,13 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     assert len(priors) == n_celltypes, "Not all cell types are given a prior value"
 
+    # !only works with two unique priors values!
+    counts = {priors.count(value): value for value in list(set(priors))}
+    value_relevant_prior = counts[1]
+    index_of_relevant_prior = priors.index(value_relevant_prior)
+    counts.pop(1)
+    value_other_priors = list(counts.values())[0]
+
     if X.size == 0:
         # This is the case when calibration_size = 0.0, this is an implicit way to
         # ensure that calibration is not performed.
@@ -113,11 +120,12 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
             if from_penile:
                 # also (always) add penile skin samples. the index for penile is n_celltypes
                 classes_in_current_mixture.append(n_celltypes)
-            # get to know how many augmented samples needed
-            try:
-                Np = np.max([priors[class_in_mixture] for class_in_mixture in classes_in_current_mixture])
-            except:
-                Np = 1
+
+            # if the cell type is in the classes_in_current_mixture
+            if index_of_relevant_prior in classes_in_current_mixture:
+                Np = value_relevant_prior
+            else:
+                Np = value_other_priors
 
             end = begin + N_SAMPLES_PER_COMBINATION * Np
             for i_celltype in range(len(label_encoder.classes_)):
@@ -126,8 +134,9 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
             if from_penile:
                 y_nhot_augmented[begin:end, n_celltypes] = 1
 
-            X_augmented = np.append(X_augmented, construct_random_samples(X, y, end-begin,
-                                                                          classes_in_current_mixture, n_features, binarize=binarize), axis=0)
+            X_augmented = np.append(X_augmented,
+                                    construct_random_samples(X, y, end - begin, classes_in_current_mixture, n_features,
+                                                             binarize=binarize), axis=0)
             begin = end
 
         if not binarize:
