@@ -15,23 +15,27 @@ def test_augment_data(priors, y_nhot):
     """
 
     occurrence_celltypes = np.sum(y_nhot, axis=0)
-    counts = {priors.count(value) : value for value in list(set(priors))}
-    relevant_prior = counts[1]
-    counts.pop(1)
-    value_other_priors = list(counts.values())[0]
+    if np.all(np.where(priors == 1)) or priors is None:
+        assert all(occurrence == occurrence_celltypes.tolist()[0] for occurrence in occurrence_celltypes.tolist())
 
-    index_of_relevant_prior = priors.index(relevant_prior)
-    occurrence_of_relevant_prior = occurrence_celltypes[index_of_relevant_prior]
-
-    relative_occurrence_of_relevant_celltype = float(occurrence_of_relevant_prior / y_nhot.shape[0])
-    relative_occurrence_without_celltype = float((y_nhot.shape[0] - occurrence_of_relevant_prior) / y_nhot.shape[0])
-
-    if relevant_prior != 1:
-        assert round(relative_occurrence_of_relevant_celltype, 5) == \
-               round(relative_occurrence_without_celltype * relevant_prior, 5)
     else:
-        assert round(relative_occurrence_of_relevant_celltype * value_other_priors, 5) == \
-               round(relative_occurrence_without_celltype, 5)
+        counts = {priors.count(value) : value for value in list(set(priors))}
+        relevant_prior = counts[1]
+        counts.pop(1)
+        value_other_priors = list(counts.values())[0]
+
+        index_of_relevant_prior = priors.index(relevant_prior)
+        occurrence_of_relevant_prior = occurrence_celltypes[index_of_relevant_prior]
+
+        relative_occurrence_of_relevant_celltype = float(occurrence_of_relevant_prior / y_nhot.shape[0])
+        relative_occurrence_without_celltype = float((y_nhot.shape[0] - occurrence_of_relevant_prior) / y_nhot.shape[0])
+
+        if relevant_prior != 1:
+            assert round(relative_occurrence_of_relevant_celltype, 5) == \
+                   round(relative_occurrence_without_celltype * relevant_prior, 5)
+        else:
+            assert round(relative_occurrence_of_relevant_celltype * value_other_priors, 5) == \
+                   round(relative_occurrence_without_celltype, 5)
 
 
 if __name__ == '__main__':
@@ -44,14 +48,20 @@ if __name__ == '__main__':
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
-    priors = [[10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
+    N_SAMPLES_PER_COMBINATION = [5, 10, 20, 30]
+    priors = [None,                             # uniform prior
+              [1, 1, 1, 1, 1, 1, 1, 1],         # uniform prior, differently written
+              [10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
               [1, 1, 1, 7, 1, 1, 1, 1],         # cell type 4 occurs 7 times more often
               [1, 10, 10, 10, 10, 10, 10, 10],  # cell type 1 occurs 10 times less often
               [7, 7, 7, 7, 7, 1, 7, 7]]         # cell type 6 occurs 7 times less often
 
-    for prior in priors:
-        X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
-                                                             settings.nsamples[0], label_encoder, prior,
-                                                             binarize=settings.binarize, from_penile=from_penile)
+    for N_SAMPLES in N_SAMPLES_PER_COMBINATION:
+        print(N_SAMPLES)
+        for prior in priors:
+            X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
+                                                                 N_SAMPLES, label_encoder, prior,
+                                                                 binarize=settings.binarize, from_penile=from_penile)
+            test_augment_data(prior, y_nhot_augmented)
 
-        test_augment_data(prior, y_nhot_augmented)
+    print("No assertion errors occurred.")

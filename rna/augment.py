@@ -88,11 +88,14 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     assert len(priors) == n_celltypes, "Not all cell types are given a prior value"
 
     # !only works with two unique priors values!
-    counts = {priors.count(value): value for value in list(set(priors))}
-    value_relevant_prior = counts[1]
-    index_of_relevant_prior = priors.index(value_relevant_prior)
-    counts.pop(1)
-    value_other_priors = list(counts.values())[0]
+    if np.all(np.where(priors == 1)) or priors is None:
+        pass
+    else:
+        counts = {priors.count(value): value for value in list(set(priors))}
+        value_relevant_prior = counts[1]
+        index_of_relevant_prior = priors.index(value_relevant_prior)
+        counts.pop(1)
+        value_other_priors = list(counts.values())[0]
 
     if X.size == 0:
         # This is the case when calibration_size = 0.0, this is an implicit way to
@@ -122,10 +125,13 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
                 classes_in_current_mixture.append(n_celltypes)
 
             # if the cell type is in the classes_in_current_mixture
-            if index_of_relevant_prior in classes_in_current_mixture:
-                Np = value_relevant_prior
-            else:
-                Np = value_other_priors
+            try:
+                if index_of_relevant_prior in classes_in_current_mixture:
+                    Np = value_relevant_prior
+                else:
+                    Np = value_other_priors
+            except: # in the uniform case
+                Np = 1
 
             end = begin + N_SAMPLES_PER_COMBINATION * Np
             for i_celltype in range(len(label_encoder.classes_)):
