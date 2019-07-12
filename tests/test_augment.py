@@ -15,7 +15,7 @@ def test_augment_data(priors, y_nhot):
     """
 
     occurrence_celltypes = np.sum(y_nhot, axis=0)
-    if np.all(np.where(priors == 1)) or priors is None:
+    if len(np.unique(priors)) == 1 or priors is None:
         assert all(occurrence == occurrence_celltypes.tolist()[0] for occurrence in occurrence_celltypes.tolist())
 
     else:

@@ -87,9 +87,9 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     assert len(priors) == n_celltypes, "Not all cell types are given a prior value"
 
-    # !only works with two unique priors values!
-    if np.all(np.where(priors == 1)) or priors is None:
+    if len(np.unique(priors)) == 1 or priors is None:
         pass
+    # !only works with two unique priors values!
     else:
         counts = {priors.count(value): value for value in list(set(priors))}
         value_relevant_prior = counts[1]
@@ -105,7 +105,6 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     else:
         X_augmented = np.zeros((0, n_features))
-        # TODO: only works when one cell type is more/less likely
         N_SAMPLES = np.sum(np.unique(priors) * N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes * (1 / len(np.unique(priors))), dtype=int)
         y_nhot_augmented = np.zeros((N_SAMPLES, n_celltypes), dtype=int)
 
@@ -178,7 +177,6 @@ class MultiLabelEncoder():
             y_transformed[np.argwhere(np.all(y == label, axis=1)).flatten()] = np.log2(label)
 
         return y_transformed
-
 
     def inv_transform_single(self, y):
         """
