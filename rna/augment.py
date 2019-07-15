@@ -63,14 +63,17 @@ def construct_random_samples(X, y, n, classes_to_include, n_features):
         augmented_samples_binary.append(combined_sample_binary)
 
     samples_sum = combine_samples(np.array(augmented_samples_sum))
+    samples_sum = samples_sum / 1000
     augmented_samples_sum_bin = [[np.where(augmented_samples_sum[i][j] > 150, 1, 0) for j in range(len(augmented_samples_sum[i]))] for i in range(len(augmented_samples_sum))]
     samples_sum_bin = combine_samples(np.array(augmented_samples_sum_bin))
 
     samples_mean = combine_samples(np.array(augmented_samples_mean))
+    samples_mean = samples_mean / 1000
     augmented_samples_mean_bin = [[np.where(augmented_samples_mean[i][j] > 150, 1, 0) for j in range(len(augmented_samples_mean[i]))] for i in range(len(augmented_samples_mean))]
     samples_mean_bin = combine_samples(np.array(augmented_samples_mean_bin))
 
     samples_max = combine_samples(np.array(augmented_samples_max))
+    samples_max = samples_max / 1000
     augmented_samples_max_bin = [[np.where(augmented_samples_max[i][j] > 150, 1, 0) for j in range(len(augmented_samples_max[i]))] for i in range(len(augmented_samples_max))]
     samples_max_bin = combine_samples(np.array(augmented_samples_max_bin))
 
