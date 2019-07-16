@@ -166,13 +166,13 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
     lrs_after_calib = model.predict_lrs(X_test, target_classes)
 
-    lrs_reduced_before_calib = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
-    lrs_reduced_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes)
+    lrs_test_as_mixtures_before_calib = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
+    lrs_test_as_mixtures_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes)
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
     lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes)
 
-    return lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, \
+    return lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, \
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
