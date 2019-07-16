@@ -81,20 +81,23 @@ def plot_distribution_bin(savefig=None, show=None):
                              X_augmented_mean_bin[indices_celltype, i],
                              X_augmented_max_bin[indices_celltype, i]])
 
-            delta_r_sum = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_sum_bin[indices_celltype, i] ** 2)
-            delta_r_mean = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_mean_bin[indices_celltype, i] ** 2)
-            delta_r_max = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_max_bin[indices_celltype, i] ** 2)
+            # delta_r_sum = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_sum_bin[indices_celltype, i] ** 2)
+            # delta_r_mean = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_mean_bin[indices_celltype, i] ** 2)
+            # delta_r_max = np.sqrt(X_augmented_binary[indices_celltype, i] ** 2 - X_augmented_max_bin[indices_celltype, i] ** 2)
+            #
+            # deviation_sum = np.sum(delta_r_sum) / np.sum(X_augmented_binary[indices_celltype, i])
+            # deviation_mean = np.sum(delta_r_mean) / np.sum(X_augmented_binary[indices_celltype, i])
+            # deviation_max = np.sum(delta_r_max) / np.sum(X_augmented_binary[indices_celltype, i])
 
-            deviation_sum = np.sum(delta_r_sum) / np.sum(X_augmented_binary[indices_celltype, i])
-            deviation_mean = np.sum(delta_r_mean) / np.sum(X_augmented_binary[indices_celltype, i])
-            deviation_max = np.sum(delta_r_max) / np.sum(X_augmented_binary[indices_celltype, i])
+            # labels = ['binary', 'sum ; {}'.format(deviation_sum), 'mean ; {:1.2f}'.format(deviation_mean), 'max ; {}'.format(deviation_max)]
 
-            labels = ['binary', 'sum ; {}'.format(deviation_sum), 'mean ; {:1.2f}'.format(deviation_mean), 'max ; {}'.format(deviation_max)]
+            labels = ['binary', 'sum', 'mean', 'max']
 
             plt.hist(data.T, density=True, histtype='bar', color=colors, label=labels)
             plt.xticks(fontsize=5)
             plt.yticks(fontsize=5)
-            plt.legend(prop={'size': 6})
+            if i == 0:
+                plt.legend(prop={'size': 6})
             plt.title(present_markers[i], fontsize=10)
 
         single_cell_type = single_cell_type.replace(".", "_")
@@ -175,10 +178,10 @@ def plot_distribution_ori(savefig=None, show=None):
 
 
 if __name__ == '__main__':
-    plot_distribution_original_datasets(savefig=os.path.join('Plots', 'distribution_of_singles_dataset'))
-    plot_distribution_original_datasets(savefig=os.path.join('Plots', 'distribution_of_mixtures_dataset'), singles=False)
+    # plot_distribution_original_datasets(savefig=os.path.join('Plots', 'distribution_of_singles_dataset'))
+    # plot_distribution_original_datasets(savefig=os.path.join('Plots', 'distribution_of_mixtures_dataset'), singles=False)
     plot_distribution_bin(savefig=os.path.join('Plots', 'distribution_of_binary'))
-    plot_distribution_all(savefig=os.path.join('Plots', 'distribution_of_all'))
-    plot_distribution_ori(savefig=os.path.join('Plots', 'distribution_of_ori'))
+    # plot_distribution_all(savefig=os.path.join('Plots', 'distribution_of_all'))
+    # plot_distribution_ori(savefig=os.path.join('Plots', 'distribution_of_ori'))
 
 
