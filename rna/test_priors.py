@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import rna.settings as settings
 
 from collections import OrderedDict
-from tqdm import tqdm
 
 from sklearn.model_selection import train_test_split
 
@@ -33,19 +32,19 @@ def test_priors(nfolds, tc):
     target_classes = string2vec(tc, label_encoder)
 
     for n in range(nfolds):
-        start = time.time()
 
         # ======= Split data =======
         X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
         X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
 
         lrs_for_model = OrderedDict()
-        for i, binarize in enumerate(tqdm(settings.binarize)):
+        for i, binarize in enumerate(settings.binarize):
             X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, markers=settings.markers)
 
             # ======= Augment data for all priors =======
             augmented_data = OrderedDict()
-            for p, priors in enumerate(tqdm(settings.priors)):
+            for p, priors in enumerate(settings.priors):
+                print("Priors for augmenting data: {}".format(priors))
 
                 augmented_data[str(priors)] = augment_splitted_data(X_calib, X_test, X_train, binarize, from_penile,
                                                                     label_encoder, n_celltypes, n_features, priors,
@@ -61,42 +60,38 @@ def test_priors(nfolds, tc):
             #     X_calib_transformed = combine_samples(X_calib) / 1000
             #     X_test_transformed = combine_samples(X_test) / 1000
 
-            for j, softmax in enumerate(tqdm(settings.softmax)):
-                try:
-                    for k, models in enumerate(tqdm(settings.models)):
-                        time.sleep(3)
-                        # print("Fold {} \n Binarize the data: {} \n Use softmax to calculate probabilities with: {} \n Model: {}".format(n, binarize, softmax, models[0]))
+            for j, softmax in enumerate(settings.softmax):
+                for k, models in enumerate(settings.models):
+                    start = time.time()
+                    print("Fold {} \n Binarize the data: {} \n Use softmax to calculate probabilities with: {} \n Model: {}".format(n, binarize, softmax, models[0]))
 
-                        # ======= Calculate LRs before and after calibration =======
-                        if settings.augment:
-                            lrs_before_calib, lrs_after_calib, \
-                            lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, \
-                            lrs_before_calib_mixt, lrs_after_calib_mixt = calculate_lrs_for_different_priors(
-                                augmented_data, X_mixtures, n, binarize, softmax, models, mle, label_encoder, target_classes)
+                    # ======= Calculate LRs before and after calibration =======
+                    if settings.augment:
+                        lrs_before_calib, lrs_after_calib, \
+                        lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, \
+                        lrs_before_calib_mixt, lrs_after_calib_mixt = calculate_lrs_for_different_priors(
+                            augmented_data, X_mixtures, n, binarize, softmax, models, mle, label_encoder, target_classes)
 
-                        key_name = str(binarize) + '_' + str(softmax) + '_' + str(models[0])
-                        lrs_for_model[key_name] = LrsAfterCalib(lrs_after_calib, lrs_test_as_mixtures_after_calib, lrs_after_calib_mixt)
+                    key_name = str(binarize) + '_' + str(softmax) + '_' + str(models[0])
+                    lrs_for_model[key_name] = LrsAfterCalib(lrs_after_calib, lrs_test_as_mixtures_after_calib, lrs_after_calib_mixt)
 
-                        ### UNTIL HERE
-                        # else:
-                        #     y_train_transformed = mle.inv_transform_single(y_train)
-                        #     y_train_transformed = mle.labels_to_nhot(y_train_transformed)
-                        #     y_calib_transformed = mle.inv_transform_single(y_calib)
-                        #     y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
-                        #     model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
-                        #     lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                        #         perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
-                        #                          y_train_transformed, X_calib_transformed, y_calib_transformed, X_test_augmented,
-                        #                          y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=True)
-                except:
-                    # this is when the probabilities are calculated with the softmax function and the original data
-                    # is used to train the models with.
-                    continue
 
-        end = time.time()
-        print("Execution time in seconds: {}".format(end - start))
+                    ### UNTIL HERE
+                    # else:
+                    #     y_train_transformed = mle.inv_transform_single(y_train)
+                    #     y_train_transformed = mle.labels_to_nhot(y_train_transformed)
+                    #     y_calib_transformed = mle.inv_transform_single(y_calib)
+                    #     y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
+                    #     model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+                    #     lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+                    #         perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
+                    #                          y_train_transformed, X_calib_transformed, y_calib_transformed, X_test_augmented,
+                    #                          y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=True)
 
-        plot_scatterplot_lrs(lrs_for_model)
+                    end = time.time()
+                    print("Execution time in seconds: {}".format(end - start))
+
+        plot_scatterplot_lrs(lrs_for_model, label_encoder, savefig=os.path.join('Plots', 'LRs_for_different_priors'))
 
 
 class AugmentedData():
@@ -158,7 +153,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, n, binarize, 
 
     for i, (key, data) in enumerate(augmented_data.items()):
         if key != 'None':
-
+            print(" Prior: {}".format(key))
             X_train_augmented = data.X_train_augmented
             y_train_nhot_augmented = data.y_train_nhot_augmented
             X_calib_augmented = data.X_calib_augmented
@@ -183,13 +178,13 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, n, binarize, 
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
-def plot_scatterplot_lrs(lrs, savefig=None, show=None):
+def plot_scatterplot_lrs(lrs, label_encoder, savefig=None, show=None):
 
     for method, data in lrs.items():
         fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
-        plot_scatterplot_lr(data.lrs_after_calib, axs1)
-        plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, axs2)
-        plot_scatterplot_lr(data.lrs_after_calib_mixt, axs3)
+        plot_scatterplot_lr(data.lrs_after_calib, label_encoder, axs1, title='augmented test')
+        plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, axs2, title='test as mixtures')
+        plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, axs3, title='mixtures')
 
         if savefig is not None:
             plt.tight_layout()
@@ -200,7 +195,7 @@ def plot_scatterplot_lrs(lrs, savefig=None, show=None):
             plt.show()
 
 
-def plot_scatterplot_lr(lrs, ax=None):
+def plot_scatterplot_lr(lrs, label_encoder, ax=None, title=None):
     ax = ax
 
     min_vals = []
@@ -216,10 +211,37 @@ def plot_scatterplot_lr(lrs, ax=None):
 
     ax.scatter(loglrs[priors[0]], loglrs[priors[1]], s=3)
     ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+    ax.set_title(title)
     ax.set_xlim(min(min_vals), max(max_vals))
     ax.set_ylim(min(min_vals), max(max_vals))
-    ax.set_xlabel("log10(LR) {}".format(priors[0]))
-    ax.set_ylabel("log10(LR) {}".format(priors[1]))
+
+    ax.set_xlabel("10logLR {}".format(prior2string(priors[0], label_encoder)))
+    ax.set_ylabel("10logLR {}".format(prior2string(priors[1], label_encoder)))
 
     return ax
 
+
+def prior2string(prior, label_encoder):
+
+    # convert string into list of integers
+    prior = prior.strip('][').split(', ')
+    prior = [int(prior[i]) for i in range(len(prior))]
+
+    if len(np.unique(prior)) == 1:
+        return 'Uniform'
+
+    else:
+        counts = {prior.count(value): value for value in list(set(prior))}
+        value_relevant_prior = counts[1]
+        index_of_relevant_prior = prior.index(value_relevant_prior)
+        counts.pop(1)
+        value_other_priors = list(counts.values())[0]
+
+        if value_relevant_prior > value_other_priors:
+            difference = 'more'
+        elif value_relevant_prior < value_other_priors:
+            difference = 'less'
+
+        name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
+
+        return '{} {}x {} likely'.format(name, value_relevant_prior, difference)

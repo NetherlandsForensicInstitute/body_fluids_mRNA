@@ -17,13 +17,13 @@ Options:
 """
 
 augment=True
-binarize=[True]
+binarize=[True, False]
 markers=False
-softmax=[True]
-nsamples=(5, 5, 2)
+softmax=[True, False]
+nsamples=(25, 25, 10)
 test_size=0.2
 calibration_size=0.5
-models=[['MLR', False], ['XGB', True]]
+models=[['MLP', True], ['MLR', False], ['XGB', True]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1],
         [10, 1, 1, 1, 1, 1, 1, 1],
         None]
