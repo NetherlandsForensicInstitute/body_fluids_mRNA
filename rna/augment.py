@@ -88,12 +88,13 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     assert len(priors) == n_celltypes, "Not all cell types are given a prior value"
 
     if len(np.unique(priors)) == 1:
-        pass
+        ratio_relevant_prior = 0.5
+        ratio_other_priors = 0.5
     # !only works with two unique priors values!
     else:
         counts = {priors.count(value): value for value in list(set(priors))}
         value_relevant_prior = counts[1]
-        ratio_relevant_prior = (value_relevant_prior - 1) /value_relevant_prior
+        ratio_relevant_prior = (value_relevant_prior - 1) / value_relevant_prior
         index_of_relevant_prior = priors.index(value_relevant_prior)
 
         counts.pop(1)
@@ -109,8 +110,9 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     else:
         X_augmented = np.zeros((0, n_features))
-        N_SAMPLES = np.sum(2 * N_SAMPLES_PER_COMBINATION * ratio_relevant_prior * (2 ** n_celltypes-1) +
-                           2 * N_SAMPLES_PER_COMBINATION * ratio_other_priors * 2 ** (n_celltypes-1), dtype=int)
+        N_SAMPLES = int(2 * N_SAMPLES_PER_COMBINATION * ratio_relevant_prior * (2 ** (n_celltypes-1)) + \
+                    2 * N_SAMPLES_PER_COMBINATION * ratio_other_priors * 2 ** ((n_celltypes-1)))
+        assert N_SAMPLES == N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes
         # N_SAMPLES = np.sum(np.unique(priors) * N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes * (1 / len(np.unique(priors))), dtype=int)
         y_nhot_augmented = np.zeros((N_SAMPLES, n_celltypes), dtype=int)
 
