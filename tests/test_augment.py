@@ -49,9 +49,7 @@ if __name__ == '__main__':
     target_classes = string2vec(tc, label_encoder)
 
     N_SAMPLES_PER_COMBINATION = [5, 10, 20, 30]
-    priors = [None,                             # uniform prior
-              [1, 1, 1, 1, 1, 1, 1, 1],         # uniform prior, differently written
-              [10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
+    priors = [[10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
               [1, 1, 1, 7, 1, 1, 1, 1],         # cell type 4 occurs 7 times more often
               [1, 10, 10, 10, 10, 10, 10, 10],  # cell type 1 occurs 10 times less often
               [7, 7, 7, 7, 7, 1, 7, 7]]         # cell type 6 occurs 7 times less often
