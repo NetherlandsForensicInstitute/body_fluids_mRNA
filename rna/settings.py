@@ -15,11 +15,11 @@ Options:
                       otherwise no calibration.
 """
 
-augment=False
+augment=True
 binarize=[True, False]
 markers=False
-softmax=[True, False]
-nsamples=(50, 50, 25)
+softmax=[False]
+nsamples=(5, 5, 2)
 test_size=0.2
 calibration_size=0.5
-models=[['MLP', True], ['MLR', False], ['XGB', True]]
+models=[['DL', True], ['MLP', True], ['MLR', False], ['XGB', True]]

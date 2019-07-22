@@ -85,7 +85,11 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
 
         else: # sigmoid
             # TODO: Incorporate priors
-            assert prob.shape[1] == target_classes.shape[0]
+            # assert prob.shape[1] == target_classes.shape[0]
+            # with DL model:
+            np.multiply(prob, target_class)
+
+            # when separate target classes:
             prob_target_class = prob[:, i].flatten()
             prob_target_class = np.reshape(prob_target_class, -1, 1)
             lrs[:, i] = prob_target_class / (1 - prob_target_class)
@@ -152,8 +156,8 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
             y_train = mle.labels_to_nhot(y_train)
         except: # already is nhot encoded
             pass
-        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
-        y_train = np.array([np.max(np.array(y_train[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        # indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+        # y_train = np.array([np.max(np.array(y_train[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
     try: # y_calib must always be nhot encoded
         y_calib = mle.labels_to_nhot(y_calib)

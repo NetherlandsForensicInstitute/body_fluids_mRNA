@@ -194,20 +194,17 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, units=80, n_classes=8, n_features=19):
+    def __init__(self, units=80, n_classes=8, n_features=15, calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
         self.n_features = n_features
         self._classifier = self.create_model()
+        self._calibrator = calibrator
+        self._calibrators_per_target_class = {}
+        self.MAX_LR = MAX_LR
 
-    def fit_classifier(self, X, y):
-        model = self.create_model()
-        model.fit_generator(X, epochs=2, validation_data=validation_gen,
-                            callbacks=callbacks, verbose=1, shuffle=False)
 
-        return self.model
-
-    def build_model(self, units: int, n_classes: int, n_features: int) -> Model:
+    def build_model(self, units, n_classes, n_features):
         """
         Builds deep learning model
 
@@ -238,7 +235,7 @@ class MarginalDLClassifier():
         return model
 
 
-    def compile_model(self, model: Model, optimizer: str = "adam", loss: str = "binary_crossentropy") -> None:
+    def compile_model(self, model, optimizer="adam", loss="binary_crossentropy"):
         """
         compile a keras model using an optimizer and a loss function
 
@@ -249,7 +246,7 @@ class MarginalDLClassifier():
         model.compile(optimizer=optimizer, loss=loss)
 
 
-    def create_model(self) -> Model:
+    def create_model(self):
         """
         Create keras/tf model based on the number of classes, features and the the number of units in the model
 
@@ -264,6 +261,32 @@ class MarginalDLClassifier():
         self.compile_model(model)
 
         return model
+
+
+    def fit_classifier(self, X, y):
+        self._classifier.fit(X, y)
+
+    def fit_calibration(self, X, y_nhot, target_classes):
+        """
+        Makes calibrated model for each target class
+        """
+        lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
+
+        for i, target_class in enumerate(target_classes):
+            calibrator = self._calibrator()
+            loglrs = np.log10(lrs_per_target_class[:, i])
+            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+
+
+    def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True):
+        assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
+        assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
+
+        ypred_proba = self._classifier.predict(X)
+        lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
+                                                                  priors_numerator, priors_denominator)
+
 
 
 def model_with_correct_settings(model_no_settings, softmax):
@@ -296,6 +319,12 @@ def model_with_correct_settings(model_no_settings, softmax):
             model = MarginalXGBClassifier()
         else:
             model = MarginalXGBClassifier(method='sigmoid')
+
+    elif model_no_settings == 'DL':
+        if softmax:
+            pass
+        else:
+            model = MarginalDLClassifier()
 
     else:
         raise ValueError("No class exists for this model")

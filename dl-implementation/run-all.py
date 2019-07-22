@@ -102,18 +102,20 @@ def main(arguments: dict, config: dict, logdir: str) -> None:
     :param logdir: path that is used to store logging
     """
     # create train and validation genrators
-    train_gen, validation_gen = create_generators(arguments, config)
+    # train_gen, validation_gen = create_generators(arguments, config)
     # create model
-    model = create_model(arguments=arguments, config=config, n_classes=train_gen.n_classes)
+    model = create_model(arguments=arguments, config=config, n_classes=???)
     # log model
-    logger.info("==Model==")
-    model.summary(print_fn=lambda x: logger.info(x))
+    # logger.info("==Model==")
+    # model.summary(print_fn=lambda x: logger.info(x))
     # create callbacks
-    callbacks = create_callbacks(int(arguments['--batch']), validation_gen, logdir)
+    # callbacks = create_callbacks(int(arguments['--batch']), validation_gen, logdir)
 
     # fit model
-    model.fit_generator(train_gen, epochs=int(arguments["--epochs"]), validation_data=validation_gen,
-                        callbacks=callbacks, verbose=1, shuffle=False)
+    model.fit(x, y, batch_size)
+    # model.fit_generator(train_gen, epochs=int(arguments["--epochs"]), validation_data=validation_gen,
+    #                     callbacks=callbacks, verbose=1, shuffle=False)
+    model.predict()
     # store final model.
     model.save(join(LOGDIR, 'model.hdf5'))
 
