@@ -48,15 +48,17 @@ if __name__ == '__main__':
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
-    N_SAMPLES_PER_COMBINATION = [5, 10, 20, 30]
-    priors = [[10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
-              [1, 1, 1, 7, 1, 1, 1, 1],         # cell type 4 occurs 7 times more often
+    N_SAMPLES_PER_COMBINATION = [11, 22, 33]
+    priors = [[1, 1, 1, 1, 1, 1, 1, 1],         # uniform priors
+              [10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
+              # [1, 1, 1, 7, 1, 1, 1, 1],         # cell type 4 occurs 7 times more often
               [1, 10, 10, 10, 10, 10, 10, 10],  # cell type 1 occurs 10 times less often
               [7, 7, 7, 7, 7, 1, 7, 7]]         # cell type 6 occurs 7 times less often
 
     for N_SAMPLES in N_SAMPLES_PER_COMBINATION:
         print(N_SAMPLES)
         for prior in priors:
+            print(prior)
             X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
                                                                  N_SAMPLES, label_encoder, prior,
                                                                  binarize=settings.binarize, from_penile=from_penile)
