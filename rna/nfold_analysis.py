@@ -121,24 +121,24 @@ def nfold_analysis(nfolds, tc):
         end = time.time()
         print("Execution time in seconds: {}".format(end - start))
 
-    plot_boxplot_of_metric(accuracies['train'], "accuracy", savefig=os.path.join('scratch', 'boxplot_train_accuracy'))
-    plot_boxplot_of_metric(accuracies['test'], "accuracy", savefig=os.path.join('scratch', 'boxplot_test_accuracy'))
-    plot_boxplot_of_metric(accuracies['test as mixtures'], "accuracy", savefig=os.path.join('scratch', 'boxplot_test_as_mixtures'))
-    plot_boxplot_of_metric(accuracies['mixture'], "accuracy", savefig=os.path.join('scratch', 'boxplot_mixture_accuracy'))
-    plot_boxplot_of_metric(accuracies['single'], "accuracy", savefig=os.path.join('scratch', 'boxplot_single_accuracy'))
-
-    for target_class in target_classes:
-        target_class_str = vec2string(target_class, label_encoder)
-
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
-
-        plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str),
-                               savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str),
-                               savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str),
-                               savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+    # plot_boxplot_of_metric(accuracies['train'], "accuracy", savefig=os.path.join('scratch', 'boxplot_train_accuracy'))
+    # plot_boxplot_of_metric(accuracies['test'], "accuracy", savefig=os.path.join('scratch', 'boxplot_test_accuracy'))
+    # plot_boxplot_of_metric(accuracies['test as mixtures'], "accuracy", savefig=os.path.join('scratch', 'boxplot_test_as_mixtures'))
+    # plot_boxplot_of_metric(accuracies['mixture'], "accuracy", savefig=os.path.join('scratch', 'boxplot_mixture_accuracy'))
+    # plot_boxplot_of_metric(accuracies['single'], "accuracy", savefig=os.path.join('scratch', 'boxplot_single_accuracy'))
+    #
+    # for target_class in target_classes:
+    #     target_class_str = vec2string(target_class, label_encoder)
+    #
+    #     target_class_save = target_class_str.replace(" ", "_")
+    #     target_class_save = target_class_save.replace(".", "_")
+    #     target_class_save = target_class_save.replace("/", "_")
+    #
+    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str),
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str),
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str),
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))

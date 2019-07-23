@@ -194,17 +194,22 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, units=80, n_classes=8, n_features=15, calibrator=KDECalibrator, MAX_LR=10):
+    def __init__(self, units=80, n_classes=8, n_features=15, activation_layer='sigmoid',
+                 optimizer="adam", loss="binary_crossentropy",
+                 calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
         self.n_features = n_features
+        self.activation_layer = activation_layer
+        self.optimizer = optimizer
+        self.loss = loss
         self._classifier = self.create_model()
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
 
 
-    def build_model(self, units, n_classes, n_features):
+    def build_model(self, units, n_classes, n_features, activation_layer):
         """
         Builds deep learning model
 
@@ -227,7 +232,7 @@ class MarginalDLClassifier():
         cnn = Dense(units, activation="sigmoid")(cnn)
 
         # output layer (corresponding to the number of classes)
-        y = Dense(n_classes, activation="sigmoid")(cnn)
+        y = Dense(n_classes, activation=activation_layer)(cnn)
 
         # define inputs and outputs of the model
         model = Model(inputs=x, outputs=y)
@@ -235,7 +240,7 @@ class MarginalDLClassifier():
         return model
 
 
-    def compile_model(self, model, optimizer="adam", loss="binary_crossentropy"):
+    def compile_model(self, model, optimizer, loss):
         """
         compile a keras model using an optimizer and a loss function
 
@@ -256,9 +261,9 @@ class MarginalDLClassifier():
         :return: A compiled keras model
         """
         # build model
-        model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features)
+        model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features, activation_layer=self.activation_layer)
         # compile model
-        self.compile_model(model)
+        self.compile_model(model, optimizer=self.optimizer, loss=self.loss)
 
         return model
 
@@ -287,15 +292,23 @@ class MarginalDLClassifier():
         lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
                                                                   priors_numerator, priors_denominator)
 
+        if with_calibration:
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrators_per_target_class[str(target_class)]
+                loglrs_per_target_class = np.log10(lrs_per_target_class)
+                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+
+        return lrs_per_target_class
 
 
-def model_with_correct_settings(model_no_settings, softmax):
+def model_with_correct_settings(model_no_settings, softmax, n_classes):
     """
     Ensures that the correct model with correct settings is used in the analysis.
     This is based on a string 'model_no_settings' and a boolean deciding how the
     probabilties are calculated 'softmax': either with the softmax
     function or the sigmoid function.
 
+    :param n_classes:
     :param model_no_settings: str: model
     :param softmax: boolean: if True the softmax function is used to
         calculate the probabilities with.
@@ -324,7 +337,8 @@ def model_with_correct_settings(model_no_settings, softmax):
         if softmax:
             pass
         else:
-            model = MarginalDLClassifier()
+            model = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
+                                         optimizer="adam", loss="binary_crossentropy")
 
     else:
         raise ValueError("No class exists for this model")
@@ -339,7 +353,7 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
     classifier = models[0]
     with_calibration = models[1]
 
-    model = model_with_correct_settings(classifier, softmax)
+    model = model_with_correct_settings(classifier, softmax, target_classes.shape[0])
 
     if with_calibration: # with calibration
         lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
