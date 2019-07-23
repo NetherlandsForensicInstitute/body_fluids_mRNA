@@ -305,7 +305,7 @@ def model_with_correct_settings(model_no_settings, softmax):
 
 def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented, y_train_nhot_augmented,
                      X_calib_augmented, y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented,
-                     X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=False):
+                     X_test_as_mixtures_augmented, X_mixtures, target_classes, name, save_hist=False):
 
     classifier = models[0]
     with_calibration = models[1]
@@ -319,14 +319,15 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
 
         if save_hist:
             plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
-                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}_{}'.format(n, binarize, softmax, classifier, name)))
             plot_histogram_log_lr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
-                                  title='after', savefig=os.path.join('scratch', 'hist_after_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+                                  title='after', savefig=os.path.join('scratch', 'hist_after_{}_{}_{}_{}_{}'.format(n, binarize, softmax, classifier, name)))
             makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                               y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                              label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+                              label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}_{}'.format(n, binarize, softmax, classifier, name)))
 
     else: # no calibration
+        # TODO: data MLR is trained on is twice as large, is that a problem?
         lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
                          np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
@@ -334,7 +335,7 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
 
         if save_hist:
             plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
-                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
+                                  savefig=os.path.join('scratch', 'hist_before_{}_{}_{}_{}_{}'.format(n, binarize, softmax, classifier, name)))
 
     return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
            lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt

@@ -180,41 +180,54 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
 
-    n_rows = int(n_target_classes / 2)
-    if title == 'after':
-        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-    else:
-        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-    plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
-
-    j = 0
-    k = 0
-
-    for i, target_class in enumerate(target_classes):
-
-        celltype = vec2string(target_class, label_encoder)
-
-        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-
-        axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-        axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-        axs[j, k].set_title(celltype)
-
-        if (i % 2) == 0:
-            k = 1
+    if n_target_classes > 1:
+        n_rows = int(n_target_classes / 2)
+        if title == 'after':
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
         else:
-            k = 0
-            j = j + 1
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+        plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
 
-    fig.text(0.5, 0.04, "10logLR", ha='center')
-    if density:
-        fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-    else:
-        fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+        j = 0
+        k = 0
 
-    handles, labels = axs[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, 'center right')
+        for i, target_class in enumerate(target_classes):
+
+            celltype = vec2string(target_class, label_encoder)
+
+            loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+            loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+
+            if n_target_classes > 1:
+                axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+                axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+                axs[j, k].set_title(celltype)
+
+                if (i % 2) == 0:
+                    k = 1
+                else:
+                    k = 0
+                    j = j + 1
+
+                fig.text(0.5, 0.04, "10logLR", ha='center')
+                if density:
+                    fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+                else:
+                    fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+                handles, labels = axs[0, 0].get_legend_handles_labels()
+                fig.legend(handles, labels, 'center right')
+
+            else:
+                plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+                plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+                plt.title(celltype)
+                plt.legend()
+                plt.xlabel("10logLR")
+                if density:
+                    plt.ylabel("Density")
+                else:
+                    plt.ylabel("Frequency")
 
     if savefig is not None:
         plt.tight_layout()
@@ -224,22 +237,55 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
         plt.show()
 
 
+# def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
+#
+#     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
+#     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
+#     MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
+#     MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+#
+#     data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
+#             MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
+#             MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
+#             MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
+#
+#     names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
+#             'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
+#             'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
+#             'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
+#
+#     fig, ax = plt.subplots()
+#     ax.set_title("{} folds".format(n_metric.shape[0]))
+#     ax.boxplot(data, vert=False)
+#     ax.set_xlabel(name_metric)
+#     plt.yticks(list(range(1, len(names)+1)), names)
+#
+#     if savefig is not None:
+#         plt.tight_layout()
+#         plt.savefig(savefig)
+#         plt.close()
+#     if show or savefig is None:
+#         plt.show()
+#
+#     plt.close(fig)
+
+
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
-    MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
-    MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
-    MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+    MLR_bin_soft_priorunif = n_metric[:, 0, 0, 0, 0]
+    MLR_bin_soft_priorother = n_metric[:, 0, 0, 0, 1]
+    MLR_bin_sig_priorunif = n_metric[:, 0, 1, 0, 0]
+    MLR_bin_sig_priorother = n_metric[:, 0, 1, 0, 1]
 
-    data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
-            MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
-            MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
-            MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
+    data = [MLR_bin_soft_priorunif,
+            MLR_bin_soft_priorother,
+            MLR_bin_sig_priorunif,
+            MLR_bin_sig_priorother]
 
-    names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
-            'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
-            'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
-            'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
+    names = ['MLR bin soft priorunif',
+             'MLR bin soft priorother',
+             'MLR bin sig priorunif',
+             'MLR bin sig priorother']
 
     fig, ax = plt.subplots()
     ax.set_title("{} folds".format(n_metric.shape[0]))
