@@ -18,8 +18,8 @@ Options:
 augment=True
 binarize=[True, False]
 markers=False
-softmax=[False]
+softmax=[True, False]
 nsamples=(5, 5, 2)
 test_size=0.2
 calibration_size=0.5
-models=[['DL', True], ['MLP', True], ['MLR', False], ['XGB', True]]
+models=[['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]]

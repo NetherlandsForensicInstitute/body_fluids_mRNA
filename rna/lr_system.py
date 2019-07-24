@@ -26,6 +26,9 @@ class MarginalMLPClassifier():
         self.MAX_LR = MAX_LR
 
     def fit_classifier(self, X, y):
+        if self._classifier.activation == 'logistic':
+            if y.shape[1] == 1:
+                y = np.ravel(y)
         self._classifier.fit(X, y)
 
     def fit_calibration(self, X, y_nhot, target_classes):
@@ -194,8 +197,7 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, units=80, n_classes=8, n_features=15, activation_layer='sigmoid',
-                 optimizer="adam", loss="binary_crossentropy",
+    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=80, n_features=15,
                  calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
@@ -203,6 +205,7 @@ class MarginalDLClassifier():
         self.activation_layer = activation_layer
         self.optimizer = optimizer
         self.loss = loss
+        self.epochs = epochs
         self._classifier = self.create_model()
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
@@ -269,7 +272,8 @@ class MarginalDLClassifier():
 
 
     def fit_classifier(self, X, y):
-        self._classifier.fit(X, y)
+        self._classifier.fit(X, y, self.epochs)
+
 
     def fit_calibration(self, X, y_nhot, target_classes):
         """
@@ -335,10 +339,11 @@ def model_with_correct_settings(model_no_settings, softmax, n_classes):
 
     elif model_no_settings == 'DL':
         if softmax:
-            pass
+            model = MarginalDLClassifier(n_classes=2 ** 8, activation_layer='softmax',
+                                         optimizer="adam", loss="categorical_crossentropy", epochs=20)
         else:
             model = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
-                                         optimizer="adam", loss="binary_crossentropy")
+                                         optimizer="adam", loss="binary_crossentropy", epochs=15)
 
     else:
         raise ValueError("No class exists for this model")
@@ -353,7 +358,7 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
     classifier = models[0]
     with_calibration = models[1]
 
-    model = model_with_correct_settings(classifier, softmax, target_classes.shape[0])
+    model = model_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
 
     if with_calibration: # with calibration
         lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \

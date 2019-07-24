@@ -1,11 +1,11 @@
 """
 Performs project specific.
 """
-
+import keras
 import numpy as np
 from sklearn.metrics import accuracy_score
 
-from rna.constants import single_cell_types
+from rna.constants import single_cell_types, nhot_matrix_all_combinations
 
 from lir.lr import calculate_cllr
 
@@ -85,9 +85,16 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
 
         else: # sigmoid
             # TODO: Incorporate priors
-            prob_target_class = prob[:, i].flatten()
-            prob_target_class = np.reshape(prob_target_class, -1, 1)
-            lrs[:, i] = prob_target_class / (1 - prob_target_class)
+            if len(target_classes) > 1:
+                prob_target_class = prob[:, i].flatten()
+                prob_target_class = np.reshape(prob_target_class, -1, 1)
+                lrs[:, i] = prob_target_class / (1 - prob_target_class)
+            else:  # when one target class it predicts either if it's the label
+                # or if it's not the label.
+                try:
+                    lrs[:, i] = prob[:, 1] / prob[:, 0]
+                except:
+                    lrs[:, i] = np.reshape((prob / (1 - prob)), -1)
 
     lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
     lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
@@ -146,6 +153,10 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
             y_train = mle.nhot_to_labels(y_train)
         except: # already are labels
             pass
+        # for DL model y_train must always be nhot encoded
+        # TODO: Find better solution
+        if isinstance(model._classifier, keras.engine.training.Model):
+            y_train = np.eye(2 ** 8)[y_train]
     else: # y_train must be nhot encoded labels
         try:
             y_train = mle.labels_to_nhot(y_train)
@@ -205,6 +216,14 @@ def calculate_accuracy(model, mle, y_true, X, target_classes):
     """
 
     y_pred = model._classifier.predict(X)
+    if isinstance(model._classifier, keras.engine.training.Model):
+        # when the model predicts probabilities rather than classes
+        if y_pred.shape[1] == 2 ** 8:
+            unique_vectors = np.flip(np.unique(nhot_matrix_all_combinations, axis=0), axis=1)
+            y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in range(unique_vectors.shape[1])]).T
+            y_pred = np.where(y_pred > 0.5, 1, 0)
+        else:
+            y_pred = np.where(y_pred > 0.5, 1, 0)
 
     try:
         y_true = mle.labels_to_nhot(y_true)
@@ -216,10 +235,14 @@ def calculate_accuracy(model, mle, y_true, X, target_classes):
     except:
         pass
 
+    if len(y_pred.shape) == 1:
+        y_pred = y_pred.reshape(len(y_pred), 1)
+
     if y_true.shape[1] != target_classes.shape[0] and y_pred.shape[1] == target_classes.shape[0]:
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
         y_true = np.array([np.max(np.array(y_true[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
+    # TODO: return accuracy per target class
     return accuracy_score(y_true, y_pred)
 
 

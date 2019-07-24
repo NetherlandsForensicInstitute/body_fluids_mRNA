@@ -277,25 +277,36 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
 
         calibrators[str(target_class)].transform(X)
 
-        axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-        axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
-        axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
-        axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
-        axs[j, k].set_title(celltype)
+        if len(target_classes) == 2:
+            axs[i].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[i].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[i].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+            axs[i].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+            axs[i].set_title(celltype)
 
-        if (i % 2) == 0:
-            k = 1
+            handles, labels = axs[0].get_legend_handles_labels()
         else:
-            k = 0
-            j = j + 1
+            axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+            axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+            axs[j, k].set_title(celltype)
+    
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            handles, labels = axs[0, 0].get_legend_handles_labels()
 
     fig.text(0.5, 0.04, '10logLR', ha='center')
     fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
 
-    handles, labels = axs[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
+        plt.tight_layout()
         plt.savefig(savefig)
     if show or savefig is None:
         plt.show()

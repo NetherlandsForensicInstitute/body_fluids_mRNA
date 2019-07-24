@@ -197,15 +197,24 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
         loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
         loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-        axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-        axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-        axs[j, k].set_title(celltype)
+        if len(target_classes) == 2:
+            axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[i].set_title(celltype)
 
-        if (i % 2) == 0:
-            k = 1
+            handles, labels = axs[0].get_legend_handles_labels()
         else:
-            k = 0
-            j = j + 1
+            axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[j, k].set_title(celltype)
+
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            handles, labels = axs[0, 0].get_legend_handles_labels()
 
     fig.text(0.5, 0.04, "10logLR", ha='center')
     if density:
@@ -213,7 +222,6 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
     else:
         fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
 
-    handles, labels = axs[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
@@ -226,20 +234,20 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
-    MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
-    MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
-    MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+    MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft = n_metric[:, 0, 0, :].T
+    MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft = n_metric[:, 1, 0, :].T
+    MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig = n_metric[:, 0, 1, :].T
+    MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig = n_metric[:, 1, 1, :].T
 
-    data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
-            MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
-            MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
-            MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
+    data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft,
+            MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft,
+            MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig,
+            MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig]
 
-    names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
-            'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
-            'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
-            'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
+    names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft', 'DL bin soft',
+            'MLP norm soft', 'MLR norm soft', 'XGB norm soft', 'DL norm soft',
+            'MLP bin sig', 'MLR bin sig', 'XGB bin sig', 'DL bin sig',
+            'MLP norm sig', 'MLR norm sig', 'XGB norm sig', 'DL norm sig']
 
     fig, ax = plt.subplots()
     ax.set_title("{} folds".format(n_metric.shape[0]))
