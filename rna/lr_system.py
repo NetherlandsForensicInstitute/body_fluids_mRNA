@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 
 from keras import Input, Model
+from keras.regularizers import l2
 from keras.layers import Dense, Dropout
 
 from xgboost import XGBClassifier
@@ -197,7 +198,7 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=80, n_features=15,
+    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=60, n_features=15,
                  calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
@@ -267,12 +268,12 @@ class MarginalDLClassifier():
         model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features, activation_layer=self.activation_layer)
         # compile model
         self.compile_model(model, optimizer=self.optimizer, loss=self.loss)
-
+        model.summary()
         return model
 
 
     def fit_classifier(self, X, y):
-        self._classifier.fit(X, y, self.epochs)
+        self._classifier.fit(X, y, epochs=self.epochs)
 
 
     def fit_calibration(self, X, y_nhot, target_classes):
@@ -361,9 +362,10 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
     model = model_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
 
     if with_calibration: # with calibration
-        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+        model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(model, mle, softmax, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
-                         y_calib_nhot_augmented, X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+                         y_calib_nhot_augmented, X_test_augmented, X_test_as_mixtures_augmented, X_mixtures,
+                         target_classes, y_test_nhot_augmented)
 
         if save_hist:
             plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,
@@ -375,10 +377,11 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
                               label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}'.format(n, binarize, softmax, classifier)))
 
     else: # no calibration
-        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+        model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
                          np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
-                         np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes)
+                         np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
+                         y_test_nhot_augmented)
 
         if save_hist:
             plot_histogram_log_lr(lrs_before_calib, y_test_nhot_augmented, target_classes, label_encoder, density=True,

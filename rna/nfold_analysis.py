@@ -86,7 +86,8 @@ def nfold_analysis(nfolds, tc):
                             perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented,
                                              y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                                             X_mixtures, target_classes, save_hist=True)
+                                             X_mixtures, target_classes)
+
                     else:
                         y_train_transformed = mle.inv_transform_single(y_train)
                         y_train_transformed = mle.labels_to_nhot(y_train_transformed)
@@ -127,14 +128,14 @@ def nfold_analysis(nfolds, tc):
     # plot_boxplot_of_metric(accuracies['mixture'], "accuracy")
     # plot_boxplot_of_metric(accuracies['single'], "accuracy")
 
-    for target_class in target_classes:
-        target_class_str = vec2string(target_class, label_encoder)
-
-        plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str))
-
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str))
-
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str))
+    # for target_class in target_classes:
+    #     target_class_str = vec2string(target_class, label_encoder)
+    #
+    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str))
+    #
+    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str))
+    #
+    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str))
 
 
 

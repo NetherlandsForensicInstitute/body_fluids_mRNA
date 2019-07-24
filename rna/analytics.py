@@ -141,11 +141,13 @@ def get_mixture_columns_for_class(target_class, priors):
     return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
 
 
-def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures, target_classes):
+def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures,
+                 target_classes, y_test):
     """
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
     model and predict the lrs before and after calibration for both X_test and X_mixtures.
+    :param y_test:
     """
 
     if softmax: # y_train must be list with labels
@@ -170,6 +172,9 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
     except: # already is nhot encoded
         pass
 
+
+    test_dl_model(model, X_train, y_train, X_test, y_test, target_classes)
+
     model.fit_classifier(X_train, y_train)
     model.fit_calibration(X_calib, y_calib, target_classes)
 
@@ -182,7 +187,7 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
     lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes)
 
-    return lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, \
+    return model, lrs_before_calib, lrs_after_calib, lrs_reduced_before_calib, lrs_reduced_after_calib, \
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
@@ -247,4 +252,19 @@ def calculate_accuracy(model, mle, y_true, X, target_classes):
 
 
 
+import matplotlib.pyplot as plt
 
+def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
+
+    indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+    y_test = np.array([np.max(np.array(y_test[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+
+    history = model._classifier.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30)
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
