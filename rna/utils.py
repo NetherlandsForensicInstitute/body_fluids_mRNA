@@ -57,3 +57,17 @@ def remove_markers(X):
         X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
 
     return X
+
+
+def bool2str_binarize(binarize):
+    if binarize == True:
+        return 'bin'
+    elif binarize == False:
+        return 'norm'
+
+
+def bool2str_softmax(softmax):
+    if softmax == True:
+        return 'soft'
+    elif softmax == False:
+        return 'sig'

@@ -262,11 +262,13 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
     X = X.reshape(-1, 1)
 
     n_target_classes = len(target_classes)
-    n_rows = int(n_target_classes / 2)
-    fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True)
 
-    j = 0
-    k = 0
+    if len(target_classes) > 1:
+        n_rows = int(n_target_classes / 2)
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True)
+
+        j = 0
+        k = 0
 
     for i, target_class in enumerate(target_classes):
 
@@ -277,25 +279,50 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
 
         calibrators[str(target_class)].transform(X)
 
-        axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-        axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
-        axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
-        axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
-        axs[j, k].set_title(celltype)
+        if n_target_classes == 1:
+            plt.hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            plt.hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            plt.plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+            plt.plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+            plt.title(celltype)
+            plt.legend()
 
-        if (i % 2) == 0:
-            k = 1
+        elif n_target_classes == 2:
+            axs[i].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[i].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[i].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+            axs[i].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+            axs[i].set_title(celltype)
+
+            handles, labels = axs[0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.04, '10logLR', ha='center')
+            fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
+
         else:
-            k = 0
-            j = j + 1
+            axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+            axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+            axs[j, k].set_title(celltype)
+    
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
 
-    fig.text(0.5, 0.04, '10logLR', ha='center')
-    fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+            handles, labels = axs[0, 0].get_legend_handles_labels()
 
-    handles, labels = axs[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, 'center right')
+            fig.text(0.5, 0.04, '10logLR', ha='center')
+            fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
+        plt.tight_layout()
         plt.savefig(savefig)
     if show or savefig is None:
         plt.show()

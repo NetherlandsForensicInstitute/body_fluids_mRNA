@@ -174,8 +174,8 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
     plt.close()
 
 
-def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
-                          title='before', title2=None, density=True, savefig=None, show=None):
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='before', density=True,
+                          savefig=None, show=None):
 
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
@@ -186,48 +186,59 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
         else:
             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-        plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
+        plt.suptitle('Histogram {} calibration'.format(title))
 
         j = 0
         k = 0
 
-        for i, target_class in enumerate(target_classes):
+    for i, target_class in enumerate(target_classes):
 
-            celltype = vec2string(target_class, label_encoder)
+        celltype = vec2string(target_class, label_encoder)
 
-            loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-            loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-            if n_target_classes > 1:
-                axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                axs[j, k].set_title(celltype)
+        if n_target_classes == 1:
+            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            plt.title(celltype)
+            plt.legend()
 
-                if (i % 2) == 0:
-                    k = 1
-                else:
-                    k = 0
-                    j = j + 1
+        elif n_target_classes == 2:
+            axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[i].set_title(celltype)
 
-                fig.text(0.5, 0.04, "10logLR", ha='center')
-                if density:
-                    fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-                else:
-                    fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+            handles, labels = axs[0].get_legend_handles_labels()
 
-                handles, labels = axs[0, 0].get_legend_handles_labels()
-                fig.legend(handles, labels, 'center right')
-
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
             else:
-                plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                plt.title(celltype)
-                plt.legend()
-                plt.xlabel("10logLR")
-                if density:
-                    plt.ylabel("Density")
-                else:
-                    plt.ylabel("Frequency")
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
+
+        elif n_target_classes > 2:
+            axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[j, k].set_title(celltype)
+
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            handles, labels = axs[0, 0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
         plt.tight_layout()
@@ -239,20 +250,20 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
 # def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 #
-#     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft = n_metric[:, 0, 0, :].T
-#     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft = n_metric[:, 1, 0, :].T
-#     MLP_bin_sig, MLR_bin_sig, XGB_bin_sig = n_metric[:, 0, 1, :].T
-#     MLP_norm_sig, MLR_norm_sig, XGB_norm_sig = n_metric[:, 1, 1, :].T
+#     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft = n_metric[:, 0, 0, :].T
+#     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft = n_metric[:, 1, 0, :].T
+#     MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig = n_metric[:, 0, 1, :].T
+#     MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig = n_metric[:, 1, 1, :].T
 #
-#     data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft,
-#             MLP_norm_soft, MLR_norm_soft, XGB_norm_soft,
-#             MLP_bin_sig, MLR_bin_sig, XGB_bin_sig,
-#             MLP_norm_sig, MLR_norm_sig, XGB_norm_sig]
+#     data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft,
+#             MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft,
+#             MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig,
+#             MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig]
 #
-#     names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft',
-#             'MLP norm soft', 'MLR norm soft', 'XGB norm soft',
-#             'MLP bin sig', 'MLR bin sig', 'XGB bin sig',
-#             'MLP norm sig', 'MLR norm sig', 'XGB norm sig']
+#     names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft', 'DL bin soft',
+#             'MLP norm soft', 'MLR norm soft', 'XGB norm soft', 'DL norm soft',
+#             'MLP bin sig', 'MLR bin sig', 'XGB bin sig', 'DL bin sig',
+#             'MLP norm sig', 'MLR norm sig', 'XGB norm sig', 'DL norm sig']
 #
 #     fig, ax = plt.subplots()
 #     ax.set_title("{} folds".format(n_metric.shape[0]))
@@ -270,6 +281,7 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 #     plt.close(fig)
 
 
+# TODO: Make function work
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
     MLR_bin_soft_priorunif = n_metric[:, 0, 0, 0, 0]

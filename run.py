@@ -8,6 +8,7 @@ if __name__ == '__main__':
     from_penile = False
     retrain = True
 
+    # assume that this is what comes from the GUI
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
 
     start = time.time()

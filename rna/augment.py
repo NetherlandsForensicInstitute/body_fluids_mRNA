@@ -172,9 +172,11 @@ class MultiLabelEncoder():
 
     def labels_to_nhot(self, y):
         if len(y.shape) == 1 or y.shape[1] == 1:
-            n = y.shape[0]
-            # TODO: FutureWarning: arrays to stack must be passed as a "sequence" ...
-            y_nhot = np.vstack(self.nhot_of_combinations[y[i], :] for i in range(n))
+            if not np.all(np.unique(y) == [0, 1]): # this when the model predicts one target class in hot encoded, but
+                # it is seen as a list of labels being predicted.
+                n = y.shape[0]
+                # TODO: FutureWarning: arrays to stack must be passed as a "sequence" ...
+                y_nhot = np.vstack(self.nhot_of_combinations[y[i], :] for i in range(n))
         return y_nhot
 
     def transform_single(self, y):
