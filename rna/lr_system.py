@@ -484,7 +484,7 @@ def perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_a
 
     else: # no calibration
         # TODO: data MLR is trained on is twice as large, is that a problem?
-        lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+        model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(model, mle, softmax, np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
                          np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
                          np.array([]), X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
