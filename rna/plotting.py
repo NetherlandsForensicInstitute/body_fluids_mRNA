@@ -174,21 +174,22 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
     plt.close()
 
 
-def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
-                          title='before', title2=None, density=True, savefig=None, show=None):
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='before', density=True,
+                          savefig=None, show=None):
 
     loglrs = np.log10(lrs)
-    n_target_classes = len(target_classes)
 
-    n_rows = int(n_target_classes / 2)
-    if title == 'after':
-        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-    else:
-        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-    plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
+    if len(target_classes) > 1:
+        n_target_classes = len(target_classes)
+        n_rows = int(n_target_classes / 2)
+        if title == 'after':
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+        else:
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+        plt.suptitle('Histogram {} calibration: {}'.format(title, title2))
 
-    j = 0
-    k = 0
+        j = 0
+        k = 0
 
     for i, target_class in enumerate(target_classes):
 
@@ -197,12 +198,27 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
         loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
         loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-        if len(target_classes) == 2:
+        if len(target_classes) == 1:
+            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            plt.title(celltype)
+            plt.legend()
+
+        elif len(target_classes) == 2:
             axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
             axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
             axs[i].set_title(celltype)
 
             handles, labels = axs[0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
+
         else:
             axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
             axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
@@ -216,13 +232,13 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 
             handles, labels = axs[0, 0].get_legend_handles_labels()
 
-    fig.text(0.5, 0.04, "10logLR", ha='center')
-    if density:
-        fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-    else:
-        fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
 
-    fig.legend(handles, labels, 'center right')
+            fig.legend(handles, labels, 'center right')
 
     if savefig is not None:
         plt.tight_layout()

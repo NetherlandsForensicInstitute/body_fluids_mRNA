@@ -11,15 +11,15 @@ Options:
     test_size         The size of the test data depending on total size of the data. The size of the train data = 1 - test_size.
     calibration_size  The size of the calibration depending on the size of the residual train data.
                       If no separate data for calibration set to 0.0
-    model, bool       The model used for the analysis: 'MLR', 'MLP', 'XGB'. If boolean is True then perform with calibration
+    model, bool       The model used for the analysis: 'MLR', 'MLP', 'XGB', 'DL'. If boolean is True then perform with calibration
                       otherwise no calibration.
 """
 
 augment=True
-binarize=[False]
+binarize=[True, False]
 markers=False
-softmax=[False]
-nsamples=(50, 50, 25)
+softmax=[True, False]
+nsamples=(5, 5, 2)
 test_size=0.2
 calibration_size=0.5
-models=[['DL', True]]
+models=[['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]]

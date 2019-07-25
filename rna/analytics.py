@@ -153,27 +153,31 @@ def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test
     if softmax: # y_train must be list with labels
         try:
             y_train = mle.nhot_to_labels(y_train)
+            y_test = mle.nhot_to_labels(y_test)
         except: # already are labels
             pass
         # for DL model y_train must always be nhot encoded
         # TODO: Find better solution
         if isinstance(model._classifier, keras.engine.training.Model):
             y_train = np.eye(2 ** 8)[y_train]
+            y_test = np.eye(2 ** 8)[y_test]
     else: # y_train must be nhot encoded labels
         try:
             y_train = mle.labels_to_nhot(y_train)
+            y_test = mle.labels_to_nhot(y_test)
         except: # already is nhot encoded
             pass
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
         y_train = np.array([np.max(np.array(y_train[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        y_test = np.array([np.max(np.array(y_test[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
     try: # y_calib must always be nhot encoded
         y_calib = mle.labels_to_nhot(y_calib)
     except: # already is nhot encoded
         pass
 
-
-    test_dl_model(model, X_train, y_train, X_test, y_test, target_classes)
+    ## TO TEST DL --> CAN BE REMOVED LATER ON. Should then also remove y_test !
+    # test_dl_model(model, X_train, y_train, X_test, y_test, target_classes)
 
     model.fit_classifier(X_train, y_train)
     model.fit_calibration(X_calib, y_calib, target_classes)
@@ -211,7 +215,7 @@ def cllr(lrs, y_nhot, target_class):
         return 9999.0000
 
 
-def calculate_accuracy(model, mle, y_true, X, target_classes):
+def calculate_accuracy_all_target_classes(model, mle, y_true, X, target_classes):
     """
     Predicts labels and ensures that both the true and predicted labels are nhot encoded.
     Calculates the accuracy.
@@ -222,7 +226,8 @@ def calculate_accuracy(model, mle, y_true, X, target_classes):
 
     y_pred = model._classifier.predict(X)
     if isinstance(model._classifier, keras.engine.training.Model):
-        # when the model predicts probabilities rather than classes
+        # when the model predicts probabilities rather than the binary classes
+        # this is only the case for the DL model
         if y_pred.shape[1] == 2 ** 8:
             unique_vectors = np.flip(np.unique(nhot_matrix_all_combinations, axis=0), axis=1)
             y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in range(unique_vectors.shape[1])]).T
@@ -243,23 +248,31 @@ def calculate_accuracy(model, mle, y_true, X, target_classes):
     if len(y_pred.shape) == 1:
         y_pred = y_pred.reshape(len(y_pred), 1)
 
-    if y_true.shape[1] != target_classes.shape[0] and y_pred.shape[1] == target_classes.shape[0]:
-        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
-        y_true = np.array([np.max(np.array(y_true[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+    indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+    y_true = np.array([np.max(np.array(y_true[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+    if y_pred.shape[1] != len(target_classes):
+        y_pred = np.array([np.max(np.array(y_pred[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
-    # TODO: return accuracy per target class
-    return accuracy_score(y_true, y_pred)
+    accuracy_scores = []
+    for t, target_class in enumerate(target_classes):
+        accuracy_scores.append(accuracy_score(y_true[:, t], y_pred[:, t]))
+
+    return accuracy_scores
 
 
-
+## TO TEST DL --> CAN BE REMOVED LATER ON
 import matplotlib.pyplot as plt
-
 def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
 
-    indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
-    y_test = np.array([np.max(np.array(y_test[:, indices[i]]), axis=1) for i in range(len(indices))]).T
-
     history = model._classifier.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30)
+
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
 
     plt.plot(history.history['loss'])
     plt.plot(history.history['val_loss'])
