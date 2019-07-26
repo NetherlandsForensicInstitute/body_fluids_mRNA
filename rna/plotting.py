@@ -281,35 +281,56 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
 #     plt.close(fig)
 
 
-# TODO: Make function work
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
-    MLR_bin_soft_priorunif = n_metric[:, 0, 0, 0, 0]
-    MLR_bin_soft_priorother = n_metric[:, 0, 0, 0, 1]
-    MLR_bin_sig_priorunif = n_metric[:, 0, 1, 0, 0]
-    MLR_bin_sig_priorother = n_metric[:, 0, 1, 0, 1]
+    MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif = n_metric[:, 0, 0, :, 0].T
+    MLP_bin_soft_priorother, MLR_bin_soft_priorother, XGB_bin_soft_priorother, DL_bin_soft_priorother = n_metric[:, 0, 0, :, 1].T
+    MLP_norm_soft_priorunif, MLR_norm_soft_priorunif, XGB_norm_soft_priorunif, DL_norm_soft_priorunif = n_metric[:, 1, 0, :, 0].T
+    MLP_norm_soft_priorother, MLR_norm_soft_priorother, XGB_norm_soft_priorother, DL_norm_soft_priorother = n_metric[:, 1, 0, :, 1].T
+    MLP_bin_sig_priorunif, MLR_bin_sig_priorunif, XGB_bin_sig_priorunif, DL_bin_sig_priorunif = n_metric[:, 0, 1, :, 0].T
+    MLP_bin_sig_priorother, MLR_bin_sig_priorother, XGB_bin_sig_priorother, DL_bin_sig_priorother = n_metric[:, 0, 1, :, 1].T
+    MLP_norm_sig_priorunif, MLR_norm_sig_priorunif, XGB_norm_sig_priorunif, DL_norm_sig_priorunif = n_metric[:, 1, 1, :, 0].T
+    MLP_norm_sig_priorother, MLR_norm_sig_priorother, XGB_norm_sig_priorother, DL_norm_sig_priorother = n_metric[:, 1, 1, :, 0].T
 
-    data = [MLR_bin_soft_priorunif,
-            MLR_bin_soft_priorother,
-            MLR_bin_sig_priorunif,
-            MLR_bin_sig_priorother]
+    data = [MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif,
+            MLP_bin_soft_priorother, MLR_bin_soft_priorother, XGB_bin_soft_priorother, DL_bin_soft_priorother,
+            MLP_norm_soft_priorunif, MLR_norm_soft_priorunif, XGB_norm_soft_priorunif, DL_norm_soft_priorunif,
+            MLP_norm_soft_priorother, MLR_norm_soft_priorother, XGB_norm_soft_priorother, DL_norm_soft_priorother,
+            MLP_bin_sig_priorunif, MLR_bin_sig_priorunif, XGB_bin_sig_priorunif, DL_bin_sig_priorunif,
+            MLP_bin_sig_priorother, MLR_bin_sig_priorother, XGB_bin_sig_priorother, DL_bin_sig_priorother,
+            MLP_norm_sig_priorunif, MLR_norm_sig_priorunif, XGB_norm_sig_priorunif, DL_norm_sig_priorunif,
+            MLP_norm_sig_priorother, MLR_norm_sig_priorother, XGB_norm_sig_priorother, DL_norm_sig_priorother]
 
-    names = ['MLR bin soft priorunif',
-             'MLR bin soft priorother',
-             'MLR bin sig priorunif',
-             'MLR bin sig priorother']
+    names = ['MLP bin soft priorunif', 'MLR bin soft priorunif', 'XGB bin soft priorunif', 'DL bin soft priorunif',
+            'MLP bin soft priorother', 'MLR bin soft priorother', 'XGB bin soft priorother', 'DL bin soft priorother',
+            'MLP norm soft priorunif', 'MLR norm soft priorunif', 'XGB norm soft priorunif', 'DL norm soft priorunif',
+            'MLP norm soft priorother', 'MLR norm soft priorother', 'XGB norm soft priorother', 'DL norm soft priorother',
+            'MLP bin sig priorunif', 'MLR bin sig priorunif', 'XGB bin sig priorunif', 'DL bin sig priorunif',
+            'MLP bin sig priorother', 'MLR bin sig priorother', 'XGB bin sig priorother', 'DL bin sig priorother',
+            'MLP norm sig priorunif', 'MLR norm sig priorunif', 'XGB norm sig priorunif', 'DL norm sig priorunif',
+            'MLP norm sig priorother', 'MLR norm sig priorother', 'XGB norm sig priorother', 'DL norm sig priorother']
 
-    fig, ax = plt.subplots()
-    ax.set_title("{} folds".format(n_metric.shape[0]))
-    ax.boxplot(data, vert=False)
-    ax.set_xlabel(name_metric)
-    plt.yticks(list(range(1, len(names)+1)), names)
+    fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True)
+    fig.suptitle("{} folds".format(n_metric.shape[0]))
+    axes[0].boxplot(data[0:8], vert=False)
+    axes[0].set_yticklabels(names[0:8])
+
+    axes[1].boxplot(data[8:17], vert=False)
+    axes[1].set_yticklabels(names[8:17])
+
+    axes[2].boxplot(data[17:24], vert=False)
+    axes[2].set_yticklabels(names[17:24])
+
+    axes[3].boxplot(data[24:32], vert=False)
+    axes[3].set_yticklabels(names[24:32])
+    axes[3].set_xlabel(name_metric)
 
     if savefig is not None:
         plt.tight_layout()
         plt.savefig(savefig)
         plt.close()
     if show or savefig is None:
+        plt.tight_layout()
         plt.show()
 
     plt.close(fig)
