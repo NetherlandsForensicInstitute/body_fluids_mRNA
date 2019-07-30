@@ -1,6 +1,7 @@
 """
 Performs project specific.
 """
+
 import keras
 import numpy as np
 from sklearn.metrics import accuracy_score
@@ -280,3 +281,5 @@ def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     plt.show()
+
+

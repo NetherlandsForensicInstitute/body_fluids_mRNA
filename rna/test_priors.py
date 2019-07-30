@@ -3,11 +3,8 @@
 """
 
 import os
-import time
 
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 import rna.settings as settings
 
 from collections import OrderedDict
@@ -15,12 +12,12 @@ from collections import OrderedDict
 from sklearn.model_selection import train_test_split
 
 from rna.analytics import cllr, combine_samples, calculate_accuracy_all_target_classes
-from rna.augment import augment_data, MultiLabelEncoder, only_use_same_combinations_as_in_mixtures
-from rna.lr_system import perform_analysis
+from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
+from rna.lr_system import perform_analysis
 from rna.utils import vec2string, string2vec
-from rna.plotting import plot_boxplot_of_metric
+from rna.plotting import plot_boxplot_of_metric, plot_scatterplot_lrs
 
 
 def test_priors(nfolds, tc):
@@ -133,7 +130,7 @@ def test_priors(nfolds, tc):
                                 augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].X_test_as_mixtures_augmented, target_classes)[t]
                             accuracies_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
                                 model[str_prior], mle, y_nhot_mixtures, X_mixtures, target_classes)[t]
-                            accuracies_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_single[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
                                 model[str_prior], mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)[t]
 
                             cllr_test[target_class_str][n, i, j, k, p] = cllr(
@@ -143,31 +140,27 @@ def test_priors(nfolds, tc):
                             cllr_mixtures[target_class_str][n, i, j, k, p] = cllr(
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
 
-        plot_scatterplot_lrs(lrs_for_model, label_encoder, y_nhot_mixtures, target_classes)
+        plot_scatterplot_lrs(lrs_for_model, label_encoder, y_nhot_mixtures, target_classes, savefig='LRs_for_different_priors')
 
-    plot_boxplot_of_metric(accuracies_test['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy")
+    plot_boxplot_of_metric(accuracies_train['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
+                           savefig=os.path.join('scratch', 'boxplot_accuracy_train'))
+    plot_boxplot_of_metric(accuracies_test['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
+                           savefig=os.path.join('scratch', 'boxplot_accuracy_test'))
+    plot_boxplot_of_metric(accuracies_test_as_mixtures['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
+                           savefig=os.path.join('scratch', 'boxplot_accuracy_test_as_mixtures'))
+    plot_boxplot_of_metric(accuracies_mixtures['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
+                           savefig=os.path.join('scratch', 'boxplot_accuracy_mixtures'))
+    plot_boxplot_of_metric(accuracies_single['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
+                           savefig=os.path.join('scratch', 'boxplot_accuracy_single'))
 
-    # for target_class in target_classes:
-    #     target_class_str = vec2string(target_class, label_encoder)
-    #
-    #     target_class_save = target_class_str.replace(" ", "_")
-    #     target_class_save = target_class_save.replace(".", "_")
-    #     target_class_save = target_class_save.replace("/", "_")
-    #
-    #     # TODO: Untill here
-    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr",
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr".format(target_class_str),
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr".format(target_class_str),
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr".format(target_class_str),
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+    plot_boxplot_of_metric(cllr_test['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "Cllr",
+                           savefig=os.path.join('scratch', 'boxplot_cllr_test'))
+    plot_boxplot_of_metric(cllr_test_as_mixtures['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "Cllr",
+                           savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures'))
+    plot_boxplot_of_metric(cllr_mixtures['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "Cllr",
+                           savefig=os.path.join('scratch', 'boxplot_cllr_mixtures'))
 
-
+# TODO: Want to change to dict?
 class AugmentedData():
 
     def __init__(self, X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
@@ -181,7 +174,7 @@ class AugmentedData():
         self.X_test_as_mixtures_augmented = X_test_as_mixtures_augmented
         self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
 
-
+# TODO: Want to change to dict?
 class LrsAfterCalib():
 
     def __init__(self, lrs_after_calib, y_test_nhot_augmented, lrs_test_as_mixtures_after_calib,
@@ -193,25 +186,32 @@ class LrsAfterCalib():
         self.lrs_after_calib_mixt = lrs_after_calib_mixt
 
 
-def augment_splitted_data(X_calib, X_test, X_train, binarize, from_penile, label_encoder, n_celltypes, n_features,
-                          priors, y_calib, y_nhot_mixtures, y_test, y_train, class_to_save):
+def prior2string(prior, label_encoder):
 
-    X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
-                                                             settings.nsamples[0], label_encoder, priors,
-                                                             binarize=binarize, from_penile=from_penile)
-    X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
-                                                             settings.nsamples[1], label_encoder, priors,
-                                                             binarize=binarize, from_penile=from_penile)
-    X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
-                                                           settings.nsamples[2], label_encoder, priors,
-                                                           binarize=binarize, from_penile=from_penile)
-    X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
-        X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
+    # convert string into list of integers
+    prior = prior.strip('][').split(', ')
+    prior = [int(prior[i]) for i in range(len(prior))]
 
-    class_to_return = class_to_save(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
-           X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented)
+    if len(np.unique(prior)) == 1:
+        return 'Uniform'
 
-    return class_to_return
+    else:
+        counts = {prior.count(value): value for value in list(set(prior))}
+        value_relevant_prior = counts[1]
+        index_of_relevant_prior = prior.index(value_relevant_prior)
+        counts.pop(1)
+        value_other_priors = list(counts.values())[0]
+
+        if value_relevant_prior > value_other_priors:
+            difference = 'more'
+            value = value_relevant_prior
+        elif value_relevant_prior < value_other_priors:
+            difference = 'less'
+            value = value_other_priors
+
+        name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
+
+        return '{} {}x {} likely'.format(name, value, difference)
 
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, n, binarize, softmax, models, mle, label_encoder,
@@ -244,7 +244,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, n, binarize, 
             perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented,
                              y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                             X_mixtures, target_classes, name=key, save_hist=False)
+                             X_mixtures, target_classes, name=key, save_hist=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i
@@ -257,81 +257,3 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, n, binarize, 
     return model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
            lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib,y_test_as_mixtures_nhot_augmented, \
            lrs_before_calib_mixt, lrs_after_calib_mixt
-
-
-def plot_scatterplot_lrs(lrs, label_encoder, y_nhot_mixtures, target_classes, show=None, savefig=None):
-
-    for method, data in lrs.items():
-
-        fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
-        plot_scatterplot_lr(data.lrs_after_calib, label_encoder, data.y_test_nhot_augmented, target_classes, ax=axs1,
-                            title='augmented test')
-        plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, data.y_test_as_mixtures_nhot_augmented,
-                            target_classes, ax=axs2, title='test as mixtures')
-        plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
-                            target_classes, ax=axs3, title='mixtures')
-
-        if savefig is not None:
-            plt.tight_layout()
-            plt.savefig(savefig + '_' + method)
-            plt.close()
-        if show or savefig is None:
-            plt.tight_layout()
-            plt.show()
-
-
-def plot_scatterplot_lr(lrs, label_encoder, y_nhot, target_classes, ax=None, title=None):
-
-    ax = ax
-    min_vals = []
-    max_vals = []
-    loglrs = OrderedDict()
-
-    for prior, lr in lrs.items():
-        loglrs[prior] = np.log10(lr)
-        min_vals.append(np.min(np.log10(lr)))
-        max_vals.append(np.max(np.log10(lr)))
-    diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
-    priors = list(lrs.keys())
-
-    target_class = np.reshape(target_classes, -1, 1)
-    labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-
-    colors=['orange' if l == 1.0 else 'blue' for l in labels]
-
-    ax.scatter(loglrs[priors[0]], loglrs[priors[1]], s=3, color=colors, alpha=0.5)
-    ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-    ax.set_title(title)
-    ax.set_xlim(min(min_vals), max(max_vals))
-    ax.set_ylim(min(min_vals), max(max_vals))
-
-    ax.set_xlabel("10logLR {}".format(prior2string(priors[0], label_encoder)))
-    ax.set_ylabel("10logLR {}".format(prior2string(priors[1], label_encoder)))
-
-    return ax
-
-
-def prior2string(prior, label_encoder):
-
-    # convert string into list of integers
-    prior = prior.strip('][').split(', ')
-    prior = [int(prior[i]) for i in range(len(prior))]
-
-    if len(np.unique(prior)) == 1:
-        return 'Uniform'
-
-    else:
-        counts = {prior.count(value): value for value in list(set(prior))}
-        value_relevant_prior = counts[1]
-        index_of_relevant_prior = prior.index(value_relevant_prior)
-        counts.pop(1)
-        value_other_priors = list(counts.values())[0]
-
-        if value_relevant_prior > value_other_priors:
-            difference = 'more'
-        elif value_relevant_prior < value_other_priors:
-            difference = 'less'
-
-        name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
-
-        return '{} {}x {} likely'.format(name, value_relevant_prior, difference)

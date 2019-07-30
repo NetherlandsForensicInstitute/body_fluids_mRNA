@@ -253,7 +253,7 @@ class MarginalDLClassifier():
         :param optimizer: a string or optimizer class that is supported by keras
         :param loss: a string or loss class that is supported by keras
         """
-        model.compile(optimizer=optimizer, loss=loss, metrics=['acc'])
+        model.compile(optimizer=optimizer, loss=loss)
 
 
     def create_model(self):

@@ -4,6 +4,7 @@ Both functions to augment data and to manipulate augmented data.
 
 import numpy as np
 
+from rna import settings as settings
 from rna.analytics import combine_samples
 
 
@@ -234,3 +235,24 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     y_nhot_reduced = y_nhot[indices_flattened, :]
 
     return X_reduced, y_nhot_reduced
+
+
+def augment_splitted_data(X_calib, X_test, X_train, binarize, from_penile, label_encoder, n_celltypes, n_features,
+                          priors, y_calib, y_nhot_mixtures, y_test, y_train, class_to_save):
+
+    X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
+                                                             settings.nsamples[0], label_encoder, priors,
+                                                             binarize=binarize, from_penile=from_penile)
+    X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
+                                                             settings.nsamples[1], label_encoder, priors,
+                                                             binarize=binarize, from_penile=from_penile)
+    X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
+                                                           settings.nsamples[2], label_encoder, priors,
+                                                           binarize=binarize, from_penile=from_penile)
+    X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
+        X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
+
+    class_to_return = class_to_save(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
+           X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented)
+
+    return class_to_return

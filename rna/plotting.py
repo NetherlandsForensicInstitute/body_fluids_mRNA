@@ -1,16 +1,18 @@
 """
 Plotting functions.
 """
+from collections import OrderedDict
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
 
-from matplotlib import rc
+from matplotlib import rc, pyplot as plt
 
 from rna.analytics import combine_samples
 from rna.input_output import read_df
+from rna.test_priors import prior2string
 from rna.utils import vec2string
 
 from lir import PavLogLR
@@ -248,39 +250,6 @@ def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
         plt.show()
 
 
-# def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
-#
-#     MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft = n_metric[:, 0, 0, :].T
-#     MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft = n_metric[:, 1, 0, :].T
-#     MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig = n_metric[:, 0, 1, :].T
-#     MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig = n_metric[:, 1, 1, :].T
-#
-#     data = [MLP_bin_soft, MLR_bin_soft, XGB_bin_soft, DL_bin_soft,
-#             MLP_norm_soft, MLR_norm_soft, XGB_norm_soft, DL_norm_soft,
-#             MLP_bin_sig, MLR_bin_sig, XGB_bin_sig, DL_bin_sig,
-#             MLP_norm_sig, MLR_norm_sig, XGB_norm_sig, DL_norm_sig]
-#
-#     names = ['MLP bin soft', 'MLR bin soft', 'XGB bin soft', 'DL bin soft',
-#             'MLP norm soft', 'MLR norm soft', 'XGB norm soft', 'DL norm soft',
-#             'MLP bin sig', 'MLR bin sig', 'XGB bin sig', 'DL bin sig',
-#             'MLP norm sig', 'MLR norm sig', 'XGB norm sig', 'DL norm sig']
-#
-#     fig, ax = plt.subplots()
-#     ax.set_title("{} folds".format(n_metric.shape[0]))
-#     ax.boxplot(data, vert=False)
-#     ax.set_xlabel(name_metric)
-#     plt.yticks(list(range(1, len(names)+1)), names)
-#
-#     if savefig is not None:
-#         plt.tight_layout()
-#         plt.savefig(savefig)
-#         plt.close()
-#     if show or savefig is None:
-#         plt.show()
-#
-#     plt.close(fig)
-
-
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
     MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif = n_metric[:, 0, 0, :, 0].T
@@ -292,34 +261,34 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
     MLP_norm_sig_priorunif, MLR_norm_sig_priorunif, XGB_norm_sig_priorunif, DL_norm_sig_priorunif = n_metric[:, 1, 1, :, 0].T
     MLP_norm_sig_priorother, MLR_norm_sig_priorother, XGB_norm_sig_priorother, DL_norm_sig_priorother = n_metric[:, 1, 1, :, 0].T
 
-    data = [MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif,
-            MLP_bin_soft_priorother, MLR_bin_soft_priorother, XGB_bin_soft_priorother, DL_bin_soft_priorother,
-            MLP_norm_soft_priorunif, MLR_norm_soft_priorunif, XGB_norm_soft_priorunif, DL_norm_soft_priorunif,
-            MLP_norm_soft_priorother, MLR_norm_soft_priorother, XGB_norm_soft_priorother, DL_norm_soft_priorother,
-            MLP_bin_sig_priorunif, MLR_bin_sig_priorunif, XGB_bin_sig_priorunif, DL_bin_sig_priorunif,
-            MLP_bin_sig_priorother, MLR_bin_sig_priorother, XGB_bin_sig_priorother, DL_bin_sig_priorother,
-            MLP_norm_sig_priorunif, MLR_norm_sig_priorunif, XGB_norm_sig_priorunif, DL_norm_sig_priorunif,
-            MLP_norm_sig_priorother, MLR_norm_sig_priorother, XGB_norm_sig_priorother, DL_norm_sig_priorother]
+    data = [MLP_bin_soft_priorunif, MLP_bin_soft_priorother, MLR_bin_soft_priorunif, MLR_bin_soft_priorother,
+            XGB_bin_soft_priorunif, XGB_bin_soft_priorother, DL_bin_soft_priorunif, DL_bin_soft_priorother,
+            MLP_norm_soft_priorunif, MLP_norm_soft_priorother, MLR_norm_soft_priorunif, MLR_norm_soft_priorother,
+            XGB_norm_soft_priorunif, XGB_norm_soft_priorother, DL_norm_soft_priorunif, DL_norm_soft_priorother,
+            MLP_bin_sig_priorunif, MLP_bin_sig_priorother, MLR_bin_sig_priorunif, MLR_bin_sig_priorother,
+            XGB_bin_sig_priorunif, XGB_bin_sig_priorother, DL_bin_sig_priorunif, DL_bin_sig_priorother,
+            MLP_norm_sig_priorunif, MLP_norm_sig_priorother, MLR_norm_sig_priorunif, MLR_norm_sig_priorother,
+            XGB_norm_sig_priorunif, XGB_norm_sig_priorother, DL_norm_sig_priorunif, DL_norm_sig_priorother]
 
-    names = ['MLP bin soft priorunif', 'MLR bin soft priorunif', 'XGB bin soft priorunif', 'DL bin soft priorunif',
-            'MLP bin soft priorother', 'MLR bin soft priorother', 'XGB bin soft priorother', 'DL bin soft priorother',
-            'MLP norm soft priorunif', 'MLR norm soft priorunif', 'XGB norm soft priorunif', 'DL norm soft priorunif',
-            'MLP norm soft priorother', 'MLR norm soft priorother', 'XGB norm soft priorother', 'DL norm soft priorother',
-            'MLP bin sig priorunif', 'MLR bin sig priorunif', 'XGB bin sig priorunif', 'DL bin sig priorunif',
-            'MLP bin sig priorother', 'MLR bin sig priorother', 'XGB bin sig priorother', 'DL bin sig priorother',
-            'MLP norm sig priorunif', 'MLR norm sig priorunif', 'XGB norm sig priorunif', 'DL norm sig priorunif',
-            'MLP norm sig priorother', 'MLR norm sig priorother', 'XGB norm sig priorother', 'DL norm sig priorother']
+    names = ['MLP bin soft priorunif', 'MLP bin soft priorother', 'MLR bin soft priorunif', 'MLR bin soft priorother',
+             'XGB bin soft priorunif', 'XGB bin soft priorother', 'DL bin soft priorunif', 'DL bin soft priorother',
+             'MLP norm soft priorunif', 'MLP norm soft priorother', 'MLR norm soft priorunif', 'MLR norm soft priorother',
+             'XGB norm soft priorunif', 'XGB norm soft priorother', 'DL norm soft priorunif', 'DL norm soft priorother'
+             'MLP bin sig priorunif', 'MLP bin sig priorother', 'MLR bin sig priorunif', 'MLR bin sig priorother',
+             'XGB bin sig priorunif', 'XGB bin sig priorother', 'DL bin sig priorunif', 'DL bin sig priorother',
+             'MLP norm sig priorunif', 'MLP norm sig priorother', 'MLR norm sig priorunif', 'MLR norm sig priorother',
+             'XGB norm sig priorunif', 'XGB norm sig priorother', 'DL norm sig priorunif', 'DL norm sig priorother']
 
     fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True)
     fig.suptitle("{} folds".format(n_metric.shape[0]))
     axes[0].boxplot(data[0:8], vert=False)
     axes[0].set_yticklabels(names[0:8])
 
-    axes[1].boxplot(data[8:17], vert=False)
-    axes[1].set_yticklabels(names[8:17])
+    axes[1].boxplot(data[8:16], vert=False)
+    axes[1].set_yticklabels(names[8:16])
 
-    axes[2].boxplot(data[17:24], vert=False)
-    axes[2].set_yticklabels(names[17:24])
+    axes[2].boxplot(data[16:24], vert=False)
+    axes[2].set_yticklabels(names[16:24])
 
     axes[3].boxplot(data[24:32], vert=False)
     axes[3].set_yticklabels(names[24:32])
@@ -405,3 +374,55 @@ def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen
         plt.savefig(path)
 
     plt.close(fig)
+
+
+def plot_scatterplot_lrs(lrs, label_encoder, y_nhot_mixtures, target_classes, show=None, savefig=None):
+
+    for method, data in lrs.items():
+
+        fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
+        plot_scatterplot_lr(data.lrs_after_calib, label_encoder, data.y_test_nhot_augmented, target_classes, ax=axs1,
+                            title='augmented test')
+        plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, data.y_test_as_mixtures_nhot_augmented,
+                            target_classes, ax=axs2, title='test as mixtures')
+        plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
+                            target_classes, ax=axs3, title='mixtures')
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + method)
+            plt.close()
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+
+def plot_scatterplot_lr(lrs, label_encoder, y_nhot, target_classes, ax=None, title=None):
+
+    ax = ax
+    min_vals = []
+    max_vals = []
+    loglrs = OrderedDict()
+
+    for prior, lr in lrs.items():
+        loglrs[prior] = np.log10(lr)
+        min_vals.append(np.min(np.log10(lr)))
+        max_vals.append(np.max(np.log10(lr)))
+    diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
+    priors = list(lrs.keys())
+
+    target_class = np.reshape(target_classes, -1, 1)
+    labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+    colors=['orange' if l == 1.0 else 'blue' for l in labels]
+
+    ax.scatter(loglrs[priors[0]], loglrs[priors[1]], s=3, color=colors, alpha=0.5)
+    ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+    ax.set_title(title)
+    ax.set_xlim(min(min_vals), max(max_vals))
+    ax.set_ylim(min(min_vals), max(max_vals))
+
+    ax.set_xlabel("10logLR {}".format(prior2string(priors[0], label_encoder)))
+    ax.set_ylabel("10logLR {}".format(prior2string(priors[1], label_encoder)))
+
+    return ax
