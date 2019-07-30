@@ -90,10 +90,10 @@ def nfold_analysis(nfolds, tc):
                     if settings.augment:
                         model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
                         lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                            perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_augmented,
-                                             y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
-                                             X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                                             X_mixtures, target_classes, 'uniform')
+                            perform_analysis(softmax, models, mle, X_train_augmented, y_train_nhot_augmented,
+                                             X_calib_augmented, y_calib_nhot_augmented, X_test_augmented,
+                                             y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
+                                             target_classes)
                     else:
                         y_train_transformed = mle.inv_transform_single(y_train)
                         y_train_transformed = mle.labels_to_nhot(y_train_transformed)
@@ -101,10 +101,10 @@ def nfold_analysis(nfolds, tc):
                         y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
                         model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
                         lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                            perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
-                                             y_train_transformed, X_calib_transformed, y_calib_transformed,
-                                             X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                                             X_mixtures, target_classes, 'uniform', save_hist=True)
+                            perform_analysis(softmax, models, mle, X_train_transformed, y_train_transformed,
+                                             X_calib_transformed, y_calib_transformed, X_test_augmented,
+                                             y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
+                                             target_classes)
 
 
                     # ======= Calculate accuracy and log-likelihood-ratio cost =======

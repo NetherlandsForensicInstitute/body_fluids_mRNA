@@ -19,10 +19,10 @@ Options:
 augment=True
 binarize=[True, False]
 markers=False
-softmax=[True, False]
-nsamples=(22, 22, 11)
+softmax=[False]
+nsamples=(11, 11, 11)
 test_size=0.2
 calibration_size=0.5
-models=[['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]]
+models=[['MLP', True], ['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1],
         [1, 10, 10, 10, 10, 10, 10, 10]]
