@@ -12,12 +12,13 @@ from collections import OrderedDict
 
 from sklearn.model_selection import train_test_split
 
-from rna.analytics import cllr, combine_samples, calculate_accuracy_all_target_classes
+from rna.analytics import combine_samples
 from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.lr_system import perform_analysis
 from rna.utils import vec2string, string2vec
+from rna.plotting import plot_scatterplot_lrs
 
 
 def test_priors(nfolds, tc):
@@ -143,12 +144,12 @@ def test_priors(nfolds, tc):
                     #         cllr_mixtures[target_class_str][n, i, j, k, p] = cllr(
                     #             lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
 
-        # plot_scatterplot_lrs(lrs_for_model, label_encoder, y_nhot_mixtures, target_classes, savefig='LRs_for_different_priors')
         lrs_for_model_per_fold[str(n)] = lrs_for_model
 
     lrs_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold)
-    plots_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                            savefig=os.path.join('scratch', 'histogram_lrs_after_calib'))
+    plot_scatterplot_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                         savefig=os.path.join('scratch', 'LRs_for_different_priors'))
+    # plots_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
 
 
     plot_boxplot_of_metric(accuracies_train['Menstrual.secretion and/or Vaginal.mucosa'][:, :, :, :, :], "accuracy",
@@ -193,34 +194,6 @@ class LrsAfterCalib():
         self.lrs_test_as_mixtures_after_calib = lrs_test_as_mixtures_after_calib
         self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
         self.lrs_after_calib_mixt = lrs_after_calib_mixt
-
-
-def prior2string(prior, label_encoder):
-
-    # convert string into list of integers
-    prior = prior.strip('][').split(', ')
-    prior = [int(prior[i]) for i in range(len(prior))]
-
-    if len(np.unique(prior)) == 1:
-        return 'Uniform'
-
-    else:
-        counts = {prior.count(value): value for value in list(set(prior))}
-        value_relevant_prior = counts[1]
-        index_of_relevant_prior = prior.index(value_relevant_prior)
-        counts.pop(1)
-        value_other_priors = list(counts.values())[0]
-
-        if value_relevant_prior > value_other_priors:
-            difference = 'more'
-            value = value_relevant_prior
-        elif value_relevant_prior < value_other_priors:
-            difference = 'less'
-            value = value_other_priors
-
-        name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
-
-        return '{} {}x {} likely'.format(name, value, difference)
 
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, softmax, models, mle, target_classes):

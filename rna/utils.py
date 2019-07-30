@@ -71,3 +71,31 @@ def bool2str_softmax(softmax):
         return 'soft'
     elif softmax == False:
         return 'sig'
+
+
+def prior2string(prior, label_encoder):
+
+    # convert string into list of integers
+    prior = prior.strip('][').split(', ')
+    prior = [int(prior[i]) for i in range(len(prior))]
+
+    if len(np.unique(prior)) == 1:
+        return 'Uniform'
+
+    else:
+        counts = {prior.count(value): value for value in list(set(prior))}
+        value_relevant_prior = counts[1]
+        index_of_relevant_prior = prior.index(value_relevant_prior)
+        counts.pop(1)
+        value_other_priors = list(counts.values())[0]
+
+        if value_relevant_prior > value_other_priors:
+            difference = 'more'
+            value = value_relevant_prior
+        elif value_relevant_prior < value_other_priors:
+            difference = 'less'
+            value = value_other_priors
+
+        name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
+
+        return '{} {}x {} likely'.format(name, value, difference)

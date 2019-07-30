@@ -12,8 +12,7 @@ from matplotlib import rc, pyplot as plt
 
 from rna.analytics import combine_samples
 from rna.input_output import read_df
-from rna.test_priors import prior2string
-from rna.utils import vec2string
+from rna.utils import vec2string, prior2string
 
 from lir import PavLogLR
 
@@ -376,47 +375,73 @@ def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen
     plt.close(fig)
 
 
-def plot_scatterplot_lrs(lrs, label_encoder, y_nhot_mixtures, target_classes, show=None, savefig=None):
+def plot_scatterplot_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None, savefig=None):
 
-    for method, data in lrs.items():
+    methods_no_prior = []
+    for method in lrs_for_all_methods.keys():
+        methods_no_prior.append(method.split('[')[0])
+    methods_no_prior = np.unique(methods_no_prior).tolist()
 
-        fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
-        plot_scatterplot_lr(data.lrs_after_calib, label_encoder, data.y_test_nhot_augmented, target_classes, ax=axs1,
+    test_dict = {}
+    for method in methods_no_prior:
+        for names in lrs_for_all_methods.keys():
+            if method in names:
+                if method in test_dict:
+                    test_dict[method].update({names: (lrs_for_all_methods[names], y_nhot_for_all_methods[names])})
+                else:
+                    test_dict[method] = {names: (lrs_for_all_methods[names], y_nhot_for_all_methods[names])}
+
+    for keys, values in test_dict.items():
+        fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
+        plot_scatterplot_lr(values, target_classes, label_encoder, ax=axs1,
                             title='augmented test')
-        plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, data.y_test_as_mixtures_nhot_augmented,
-                            target_classes, ax=axs2, title='test as mixtures')
-        plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
-                            target_classes, ax=axs3, title='mixtures')
+
+    # for method, data in lrs.items():
+
+        # fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
+        # plot_scatterplot_lr(data.lrs_after_calib, label_encoder, data.y_test_nhot_augmented, target_classes, ax=axs1,
+        #                     title='augmented test')
+        # plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, data.y_test_as_mixtures_nhot_augmented,
+        #                     target_classes, ax=axs2, title='test as mixtures')
+        # plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
+        #                     target_classes, ax=axs3, title='mixtures')
 
         if savefig is not None:
             plt.tight_layout()
-            plt.savefig(savefig + '_' + method)
+            plt.savefig(savefig + '_' + keys)
             plt.close()
         if show or savefig is None:
             plt.tight_layout()
             plt.show()
 
 
-def plot_scatterplot_lr(lrs, label_encoder, y_nhot, target_classes, ax=None, title=None):
+def plot_scatterplot_lr(values, target_classes, label_encoder, ax=None, title=None):
 
     ax = ax
+    full_name = []
+    priors = []
+    for prior in list(values.keys()):
+        full_name.append(prior)
+        priors.append('[' + prior.split('[')[1])
+
     min_vals = []
     max_vals = []
     loglrs = OrderedDict()
-
-    for prior, lr in lrs.items():
-        loglrs[prior] = np.log10(lr)
-        min_vals.append(np.min(np.log10(lr)))
-        max_vals.append(np.max(np.log10(lr)))
+    y_nhot = OrderedDict()
+    for method, data in values.items():
+        loglrs[method] = np.log10(data[0])
+        y_nhot[method] = data[1]
+        min_vals.append(np.min(np.log10(data[0])))
+        max_vals.append(np.max(np.log10(data[0])))
+    assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
     diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
-    priors = list(lrs.keys())
 
     target_class = np.reshape(target_classes, -1, 1)
-    labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+    labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
     colors=['orange' if l == 1.0 else 'blue' for l in labels]
 
-    ax.scatter(loglrs[priors[0]], loglrs[priors[1]], s=3, color=colors, alpha=0.5)
+    ax.scatter(loglrs[full_name[0]], loglrs[full_name[1]], s=3, color=colors, alpha=0.5)
     ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
     ax.set_title(title)
     ax.set_xlim(min(min_vals), max(max_vals))
