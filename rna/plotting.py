@@ -198,7 +198,7 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
     names = ['MLP bin soft priorunif', 'MLP bin soft priorother', 'MLR bin soft priorunif', 'MLR bin soft priorother',
              'XGB bin soft priorunif', 'XGB bin soft priorother', 'DL bin soft priorunif', 'DL bin soft priorother',
              'MLP norm soft priorunif', 'MLP norm soft priorother', 'MLR norm soft priorunif', 'MLR norm soft priorother',
-             'XGB norm soft priorunif', 'XGB norm soft priorother', 'DL norm soft priorunif', 'DL norm soft priorother'
+             'XGB norm soft priorunif', 'XGB norm soft priorother', 'DL norm soft priorunif', 'DL norm soft priorother',
              'MLP bin sig priorunif', 'MLP bin sig priorother', 'MLR bin sig priorunif', 'MLR bin sig priorother',
              'XGB bin sig priorunif', 'XGB bin sig priorother', 'DL bin sig priorunif', 'DL bin sig priorother',
              'MLP norm sig priorunif', 'MLP norm sig priorother', 'MLR norm sig priorunif', 'MLR norm sig priorother',
@@ -230,78 +230,78 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
     plt.close(fig)
 
 
-def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='before', density=True,
-                          savefig=None, show=None):
-
-    loglrs = np.log10(lrs)
-    n_target_classes = len(target_classes)
-
-    if n_target_classes > 1:
-        n_rows = int(n_target_classes / 2)
-        if title == 'after':
-            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-        else:
-            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-        plt.suptitle('Histogram {} calibration'.format(title))
-
-        j = 0
-        k = 0
-
-    for i, target_class in enumerate(target_classes):
-
-        celltype = vec2string(target_class, label_encoder)
-
-        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-
-        if n_target_classes == 1:
-            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            plt.title(celltype)
-            plt.legend()
-
-        elif n_target_classes == 2:
-            axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            axs[i].set_title(celltype)
-
-            handles, labels = axs[0].get_legend_handles_labels()
-
-            fig.text(0.5, 0.04, "10logLR", ha='center')
-            if density:
-                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-            else:
-                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
-
-            fig.legend(handles, labels, 'center right')
-
-        elif n_target_classes > 2:
-            axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            axs[j, k].set_title(celltype)
-
-            if (i % 2) == 0:
-                k = 1
-            else:
-                k = 0
-                j = j + 1
-
-            handles, labels = axs[0, 0].get_legend_handles_labels()
-
-            fig.text(0.5, 0.04, "10logLR", ha='center')
-            if density:
-                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-            else:
-                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
-
-            fig.legend(handles, labels, 'center right')
-
-    if savefig is not None:
-        plt.tight_layout()
-        plt.savefig(savefig)
-        plt.close()
-    if show or savefig is None:
-        plt.show()
+# def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='before', density=True,
+#                           savefig=None, show=None):
+#
+#     loglrs = np.log10(lrs)
+#     n_target_classes = len(target_classes)
+#
+#     if n_target_classes > 1:
+#         n_rows = int(n_target_classes / 2)
+#         if title == 'after':
+#             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+#         else:
+#             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+#         plt.suptitle('Histogram {} calibration'.format(title))
+#
+#         j = 0
+#         k = 0
+#
+#     for i, target_class in enumerate(target_classes):
+#
+#         celltype = vec2string(target_class, label_encoder)
+#
+#         loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+#         loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+#
+#         if n_target_classes == 1:
+#             plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+#             plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+#             plt.title(celltype)
+#             plt.legend()
+#
+#         elif n_target_classes == 2:
+#             axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+#             axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+#             axs[i].set_title(celltype)
+#
+#             handles, labels = axs[0].get_legend_handles_labels()
+#
+#             fig.text(0.5, 0.04, "10logLR", ha='center')
+#             if density:
+#                 fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+#             else:
+#                 fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+#
+#             fig.legend(handles, labels, 'center right')
+#
+#         elif n_target_classes > 2:
+#             axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+#             axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+#             axs[j, k].set_title(celltype)
+#
+#             if (i % 2) == 0:
+#                 k = 1
+#             else:
+#                 k = 0
+#                 j = j + 1
+#
+#             handles, labels = axs[0, 0].get_legend_handles_labels()
+#
+#             fig.text(0.5, 0.04, "10logLR", ha='center')
+#             if density:
+#                 fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+#             else:
+#                 fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+#
+#             fig.legend(handles, labels, 'center right')
+#
+#     if savefig is not None:
+#         plt.tight_layout()
+#         plt.savefig(savefig)
+#         plt.close()
+#     if show or savefig is None:
+#         plt.show()
 
 
 # TODO: Make function work
@@ -375,14 +375,14 @@ def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen
     plt.close(fig)
 
 
-def plot_scatterplot_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None, savefig=None):
+def plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None, savefig=None):
 
     methods_no_prior = []
     for method in lrs_for_all_methods.keys():
         methods_no_prior.append(method.split('[')[0])
     methods_no_prior = np.unique(methods_no_prior).tolist()
 
-    test_dict = {}
+    test_dict = OrderedDict()
     for method in methods_no_prior:
         for names in lrs_for_all_methods.keys():
             if method in names:
@@ -392,9 +392,10 @@ def plot_scatterplot_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_cla
                     test_dict[method] = {names: (lrs_for_all_methods[names], y_nhot_for_all_methods[names])}
 
     for keys, values in test_dict.items():
-        fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
-        plot_scatterplot_lr(values, target_classes, label_encoder, ax=axs1,
-                            title='augmented test')
+        for t, target_class in enumerate(target_classes):
+            fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
+            plt.suptitle(vec2string(target_class, label_encoder))
+            plot_scatterplot_lr(values, t, target_class, label_encoder, ax=axs1, title='augmented test')
 
     # for method, data in lrs.items():
 
@@ -406,48 +407,143 @@ def plot_scatterplot_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_cla
         # plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
         #                     target_classes, ax=axs3, title='mixtures')
 
+            target_class_str = vec2string(target_class, label_encoder)
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
+            if savefig is not None:
+                plt.tight_layout()
+                plt.savefig(savefig + '_' + keys + '_' + target_class_save)
+                plt.close()
+            if show or savefig is None:
+                plt.tight_layout()
+                plt.show()
+
+
+def plot_scatterplot_lr(values, t, target_class, label_encoder, ax=None, title=None):
+
+    ax = ax
+    min_vals = []
+    max_vals = []
+    loglrs = OrderedDict()
+    y_nhot = OrderedDict()
+    full_name = []
+    priors = []
+    for method, data in values.items():
+        loglrs[method] = np.log10(data[0][:, t])
+        y_nhot[method] = data[1]
+        full_name.append(method)
+        priors.append('[' + method.split('[')[1])
+        min_vals.append(np.min(np.log10(data[0][:, t])))
+        max_vals.append(np.max(np.log10(data[0][:, t])))
+    assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
+    diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
+
+    target_class = np.reshape(target_class, -1, 1)
+    labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+
+    colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+
+    # make sure uniform priors always on bottom
+    if any(str([1] * len(target_class)) in x for x in priors):
+        index1 = priors.index(str([1] * len(target_class)))
+        loglrs1 = loglrs[full_name[index1]]
+        loglrs2 = loglrs[full_name[1-index1]]
+    else:
+        index1 = 0
+        index2 = 1
+        loglrs1 = loglrs[full_name[index1]]
+        loglrs2 = loglrs[full_name[index2]]
+
+    ax.scatter(loglrs1, loglrs2, s=3, color=colors, alpha=0.5)
+    ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+    ax.set_title(title)
+    ax.set_xlim(min(min_vals), max(max_vals))
+    ax.set_ylim(min(min_vals), max(max_vals))
+
+    ax.set_xlabel("10logLR {}".format(prior2string(priors[index1], label_encoder)))
+    ax.set_ylabel("10logLR {}".format(prior2string(priors[1 - index1], label_encoder)))
+
+    return ax
+
+
+def plot_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None,
+                           savefig=None):
+
+    for method in lrs_for_all_methods.keys():
+
+        plot_histogram_log_lr(lrs_for_all_methods[method], y_nhot_for_all_methods[method], target_classes, label_encoder)
+
         if savefig is not None:
             plt.tight_layout()
-            plt.savefig(savefig + '_' + keys)
+            plt.savefig(savefig + '_' + method)
             plt.close()
         if show or savefig is None:
             plt.tight_layout()
             plt.show()
 
 
-def plot_scatterplot_lr(values, target_classes, label_encoder, ax=None, title=None):
+def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='after', density=True):
 
-    ax = ax
-    full_name = []
-    priors = []
-    for prior in list(values.keys()):
-        full_name.append(prior)
-        priors.append('[' + prior.split('[')[1])
+    loglrs = np.log10(lrs)
+    n_target_classes = len(target_classes)
 
-    min_vals = []
-    max_vals = []
-    loglrs = OrderedDict()
-    y_nhot = OrderedDict()
-    for method, data in values.items():
-        loglrs[method] = np.log10(data[0])
-        y_nhot[method] = data[1]
-        min_vals.append(np.min(np.log10(data[0])))
-        max_vals.append(np.max(np.log10(data[0])))
-    assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
-    diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
+    if n_target_classes > 1:
+        n_rows = int(n_target_classes / 2)
+        if title == 'after':
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+        else:
+            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+        plt.suptitle('Histograms {} calibration'.format(title))
 
-    target_class = np.reshape(target_classes, -1, 1)
-    labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+        j = 0
+        k = 0
 
-    colors=['orange' if l == 1.0 else 'blue' for l in labels]
+    for i, target_class in enumerate(target_classes):
 
-    ax.scatter(loglrs[full_name[0]], loglrs[full_name[1]], s=3, color=colors, alpha=0.5)
-    ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-    ax.set_title(title)
-    ax.set_xlim(min(min_vals), max(max_vals))
-    ax.set_ylim(min(min_vals), max(max_vals))
+        celltype = vec2string(target_class, label_encoder)
 
-    ax.set_xlabel("10logLR {}".format(prior2string(priors[0], label_encoder)))
-    ax.set_ylabel("10logLR {}".format(prior2string(priors[1], label_encoder)))
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
 
-    return ax
+        if n_target_classes == 1:
+            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            plt.title(celltype)
+            plt.legend()
+
+        elif n_target_classes == 2:
+            axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[i].set_title(celltype)
+
+            handles, labels = axs[0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
+
+        elif n_target_classes > 2:
+            axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[j, k].set_title(celltype)
+
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            handles, labels = axs[0, 0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.04, "10logLR", ha='center')
+            if density:
+                fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')

@@ -1,6 +1,5 @@
 import time
 
-from rna.nfold_analysis import nfold_analysis
 from rna.test_priors import test_priors
 
 if __name__ == '__main__':
@@ -9,10 +8,9 @@ if __name__ == '__main__':
     retrain = True
 
     # assume that this is what comes from the GUI
-    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
+    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion', 'Skin']
 
     start = time.time()
-    # nfold_analysis(nfolds=1, tc=target_classes_str)
     test_priors(nfolds=2, tc=target_classes_str)
     end = time.time()
 

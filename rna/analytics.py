@@ -1,14 +1,16 @@
 """
 Performs project specific.
 """
+from collections import OrderedDict
 
 import keras
 import numpy as np
 from sklearn.metrics import accuracy_score
 
-from rna.constants import single_cell_types, nhot_matrix_all_combinations
+from rna.constants import nhot_matrix_all_combinations
 
 from lir.lr import calculate_cllr
+from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
 
 
 def combine_samples(data_for_class):
@@ -48,102 +50,8 @@ def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):
     return X_single_nrp, y_nhot_single_nrp, y_single_nrp
 
 
-def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
-    """
-    Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
-    matrix by summing over the probabilities containing the celltype(s) of interest.
-
-    :param prob: n_samples x n_mixtures containing the predicted probabilities
-    :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
-    :param MAX_LR: int
-    :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
-    :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
-    :return: n_samples x n_target_classes of probabilities
-    """
-    assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
-    assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
-    lrs = np.zeros((len(prob), len(target_classes)))
-    for i, target_class in enumerate(target_classes):
-        assert sum(target_class) > 0, 'No cell type given as target class'
-
-        if prob.shape[1] == 2 ** target_classes.shape[1]: # lps
-            # numerator
-            indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
-            numerator = np.sum(prob[:, indices_of_target_class], axis=1)
-
-            # denominator
-            # TODO: Does this work when priors are defined?
-            # TODO: Rewrite with priors.
-            # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
-            all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
-            indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
-            denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
-            lrs[:, i] = numerator/denominator
-
-        else: # sigmoid
-            # TODO: Incorporate priors
-            if len(target_classes) > 1:
-                prob_target_class = prob[:, i].flatten()
-                prob_target_class = np.reshape(prob_target_class, -1, 1)
-                lrs[:, i] = prob_target_class / (1 - prob_target_class)
-            else:  # when one target class it predicts either if it's the label
-                # or if it's not the label.
-                try:
-                    lrs[:, i] = prob[:, 1] / prob[:, 0]
-                except:
-                    lrs[:, i] = np.reshape((prob / (1 - prob)), -1)
-
-    lrs = np.where(lrs > 10 ** MAX_LR, 10 ** MAX_LR, lrs)
-    lrs = np.where(lrs < 10 ** -MAX_LR, 10 ** -MAX_LR, lrs)
-
-    return lrs
-
-
-def get_mixture_columns_for_class(target_class, priors):
-    """
-    for the target_class, a vector of length n_single_cell_types with 1 or more 1's, give
-    back the columns in the mixtures that contain one or more of these single cell types
-
-    :param target_class: vector of length n_single_cell_types with at least one 1
-    :param priors: vector of length n_single_cell_types with 0 or 1 to indicate single cell type has 0 or 1 prior,
-    uniform assumed otherwise
-    :return: list of ints, in [0, 2 ** n_cell_types]
-    """
-
-    def int_to_binary(i):
-        binary = bin(i)[2:]
-        while len(binary) < len(single_cell_types):
-            binary = '0' + binary
-        return np.flip([int(j) for j in binary]).tolist()
-
-    def binary_admissable(binary, target_class, priors):
-        """
-        gives back whether the binary (string of 0 and 1 of length n_single_cell_types) has at least one of
-        target_class in it, and all priors satisfied
-        """
-        if priors:
-            for i in range(len(target_class)):
-                # if prior is zero, the class should not occur
-                if binary[i] == 1 and priors[i] == 0:
-                    return False
-                # if prior is one, the class should occur
-                # as binary is zero it does not occur and return False
-                if binary[i] == 0 and priors[i] == 1:
-                    return False
-        # at least one of the target class should occur
-        if np.inner(binary, target_class)==0:
-            return False
-        return True
-
-    return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
-
-
-def generate_lrs(model, mle, softmax, X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures,
-                 target_classes, y_test):
+def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_mixtures, X_mixtures, model,
+                 target_classes, mle, softmax):
     """
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
@@ -283,3 +191,165 @@ def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
     plt.show()
 
 
+def calculate_lrs_for_different_priors(augmented_data, X_mixtures, softmax, models, mle, target_classes):
+
+    # must be tested on the same test data
+    X_test_augmented = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].X_test_augmented
+    y_test_nhot_augmented = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].y_test_nhot_augmented
+    X_test_as_mixtures_augmented = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].X_test_as_mixtures_augmented
+    y_test_as_mixtures_nhot_augmented = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].y_test_as_mixtures_nhot_augmented
+
+    model = OrderedDict()
+    lrs_before_calib = OrderedDict()
+    lrs_after_calib = OrderedDict()
+    lrs_test_as_mixtures_before_calib = OrderedDict()
+    lrs_test_as_mixtures_after_calib = OrderedDict()
+    lrs_before_calib_mixt = OrderedDict()
+    lrs_after_calib_mixt = OrderedDict()
+
+    for i, (key, data) in enumerate(augmented_data.items()):
+        print(" Prior: {}".format(key))
+
+        X_train_augmented = data.X_train_augmented
+        y_train_nhot_augmented = data.y_train_nhot_augmented
+        X_calib_augmented = data.X_calib_augmented
+        y_calib_nhot_augmented = data.y_calib_nhot_augmented
+
+        model_i, lrs_before_calib_i, lrs_after_calib_i, \
+        lrs_test_as_mixtures_before_calib_i, lrs_test_as_mixtures_after_calib_i, \
+        lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
+            perform_analysis(softmax, models, mle, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+                             y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented,
+                             X_test_as_mixtures_augmented, X_mixtures, target_classes)
+
+        model[key] = model_i
+        lrs_before_calib[key] = lrs_before_calib_i
+        lrs_after_calib[key] = lrs_after_calib_i
+        lrs_test_as_mixtures_before_calib[key] = lrs_test_as_mixtures_before_calib_i
+        lrs_test_as_mixtures_after_calib[key] = lrs_test_as_mixtures_after_calib_i
+        lrs_before_calib_mixt[key] = lrs_before_calib_mixt_i
+        lrs_after_calib_mixt[key] = lrs_after_calib_mixt_i
+
+    return model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
+           lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, y_test_as_mixtures_nhot_augmented, \
+           lrs_before_calib_mixt, lrs_after_calib_mixt
+
+
+def perform_analysis(softmax, models, mle, X_train_augmented, y_train_nhot_augmented, X_calib_augmented,
+                     y_calib_nhot_augmented, X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
+                     X_mixtures, target_classes):
+
+    classifier = models[0]
+    with_calibration = models[1]
+
+    model = model_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
+
+    if with_calibration: # with calibration
+        model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
+                         X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, model,
+                         target_classes, mle, softmax)
+
+        # if save_hist:
+        #     makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+        #                       y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+        #                       label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}_{}'.format(n, bool2str_binarize(binarize), bool2str_softmax(softmax), classifier, name)))
+
+    else: # no calibration
+        model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+            generate_lrs(np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
+                         np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
+                         np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
+                         X_mixtures, model, target_classes, mle, softmax)
+
+    return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
+           lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt
+
+
+def model_with_correct_settings(model_no_settings, softmax, n_classes):
+    """
+    Ensures that the correct model with correct settings is used in the analysis.
+    This is based on a string 'model_no_settings' and a boolean deciding how the
+    probabilties are calculated 'softmax': either with the softmax
+    function or the sigmoid function.
+
+    :param n_classes:
+    :param model_no_settings: str: model
+    :param softmax: boolean: if True the softmax function is used to
+        calculate the probabilities with.
+    :return: model with correct settings
+    """
+
+    if model_no_settings == 'MLP':
+        if softmax:
+            model = MarginalMLPClassifier()
+        else:
+            model = MarginalMLPClassifier(activation='logistic')
+
+    elif model_no_settings == 'MLR':
+        if softmax:
+            model = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
+        else:
+            model = MarginalMLRClassifier()
+
+    elif model_no_settings == 'XGB':
+        if softmax:
+            model = MarginalXGBClassifier()
+        else:
+            model = MarginalXGBClassifier(method='sigmoid')
+
+    elif model_no_settings == 'DL':
+        if softmax:
+            model = MarginalDLClassifier(n_classes=2 ** 8, activation_layer='softmax',
+                                         optimizer="adam", loss="categorical_crossentropy", epochs=150)
+        else:
+            model = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
+                                         optimizer="adam", loss="binary_crossentropy", epochs=30)
+
+    else:
+        raise ValueError("No class exists for this model")
+
+    return model
+
+
+def combine_lrs_for_all_folds(lrs_for_model, type):
+    """
+    Combines the lrs calculated on test data for each fold.
+
+    :param type:
+    :param lrs_for_model:
+    :return:
+    """
+
+    lrs_for_all_methods = OrderedDict()
+    y_nhot_for_all_methods = OrderedDict()
+    for fold, methods in lrs_for_model.items():
+
+        for method, data in methods.items():
+            priors = list(data.lrs_after_calib.keys())
+
+            for prior in priors:
+                prior_method = method + '_' + prior
+
+                if prior_method in lrs_for_all_methods:
+                    if type == 'test augm':
+                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_after_calib[prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_nhot_augmented, axis=0)
+                    elif type == 'test augm as mixt':
+                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_test_as_mixtures_after_calib[prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_as_mixtures_nhot_augmented, axis=0)
+                    elif type == 'mixt':
+                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_after_calib_mixt[prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_mixtures_nhot, axis=0)
+                else:
+                    if type == 'test augm':
+                        lrs_for_all_methods[prior_method] = data.lrs_after_calib[prior]
+                        y_nhot_for_all_methods[prior_method] = data.y_test_nhot_augmented
+                    elif type == 'test augm as mixt':
+                        lrs_for_all_methods[prior_method] = data.lrs_test_as_mixtures_after_calib[prior]
+                        y_nhot_for_all_methods[prior_method] = data.y_test_as_mixtures_nhot_augmented
+                    elif type == 'mixt':
+                        lrs_for_all_methods[prior_method] = data.lrs_after_calib_mixt[prior]
+                        y_nhot_for_all_methods[prior_method] = data.y_mixtures_nhot
+
+    return lrs_for_all_methods, y_nhot_for_all_methods

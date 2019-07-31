@@ -25,4 +25,4 @@ test_size=0.2
 calibration_size=0.5
 models=[['MLP', True], ['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 10, 10, 10, 10, 10, 10, 10]]
+        [10, 1, 1, 1, 1, 1, 1, 1]]

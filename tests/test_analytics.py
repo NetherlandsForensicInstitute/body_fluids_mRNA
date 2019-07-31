@@ -1,4 +1,4 @@
-from rna.analytics import get_mixture_columns_for_class
+from rna.lr_system import get_mixture_columns_for_class
 from rna.constants import single_cell_types
 
 
