@@ -89,7 +89,7 @@
 #                     # ======= Calculate LRs before and after calibration =======
 #                     if settings.augment:
 #                         model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
-#                         lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+#                         lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
 #                             perform_analysis(softmax, models, mle, X_train_augmented, y_train_nhot_augmented,
 #                                              X_calib_augmented, y_calib_nhot_augmented, X_test_augmented,
 #                                              y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
@@ -100,7 +100,7 @@
 #                         y_calib_transformed = mle.inv_transform_single(y_calib)
 #                         y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
 #                         model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, \
-#                         lrs_test_as_mixtures_after_calib, lrs_before_calib_mixt, lrs_after_calib_mixt = \
+#                         lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
 #                             perform_analysis(softmax, models, mle, X_train_transformed, y_train_transformed,
 #                                              X_calib_transformed, y_calib_transformed, X_test_augmented,
 #                                              y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
@@ -121,7 +121,7 @@
 #                         accuracies_single[target_class_str][n, i, j, k] = calculate_accuracy_all_target_classes(model, mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)[t]
 #
 #                         cllr_test[target_class_str][n, i, j, k] = cllr(lrs_after_calib[:, t], y_test_nhot_augmented, target_class)
-#                         cllr_test_as_mixtures[target_class_str][n, i, j, k] = cllr(lrs_test_as_mixtures_after_calib[:, t], y_test_as_mixtures_nhot_augmented, target_class)
+#                         cllr_test_as_mixtures[target_class_str][n, i, j, k] = cllr(lrs_after_calib_test_as_mixtures[:, t], y_test_as_mixtures_nhot_augmented, target_class)
 #                         cllr_mixtures[target_class_str][n, i, j, k] = cllr(lrs_after_calib_mixt[:, t], y_nhot_mixtures, target_class)
 #
 #

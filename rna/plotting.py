@@ -230,80 +230,6 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
     plt.close(fig)
 
 
-# def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='before', density=True,
-#                           savefig=None, show=None):
-#
-#     loglrs = np.log10(lrs)
-#     n_target_classes = len(target_classes)
-#
-#     if n_target_classes > 1:
-#         n_rows = int(n_target_classes / 2)
-#         if title == 'after':
-#             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-#         else:
-#             fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
-#         plt.suptitle('Histogram {} calibration'.format(title))
-#
-#         j = 0
-#         k = 0
-#
-#     for i, target_class in enumerate(target_classes):
-#
-#         celltype = vec2string(target_class, label_encoder)
-#
-#         loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-#         loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-#
-#         if n_target_classes == 1:
-#             plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-#             plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-#             plt.title(celltype)
-#             plt.legend()
-#
-#         elif n_target_classes == 2:
-#             axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-#             axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-#             axs[i].set_title(celltype)
-#
-#             handles, labels = axs[0].get_legend_handles_labels()
-#
-#             fig.text(0.5, 0.04, "10logLR", ha='center')
-#             if density:
-#                 fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-#             else:
-#                 fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
-#
-#             fig.legend(handles, labels, 'center right')
-#
-#         elif n_target_classes > 2:
-#             axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-#             axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-#             axs[j, k].set_title(celltype)
-#
-#             if (i % 2) == 0:
-#                 k = 1
-#             else:
-#                 k = 0
-#                 j = j + 1
-#
-#             handles, labels = axs[0, 0].get_legend_handles_labels()
-#
-#             fig.text(0.5, 0.04, "10logLR", ha='center')
-#             if density:
-#                 fig.text(0.04, 0.5, "Density", va='center', rotation='vertical')
-#             else:
-#                 fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
-#
-#             fig.legend(handles, labels, 'center right')
-#
-#     if savefig is not None:
-#         plt.tight_layout()
-#         plt.savefig(savefig)
-#         plt.close()
-#     if show or savefig is None:
-#         plt.show()
-
-
 # TODO: Make function work
 def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):
     """
@@ -402,7 +328,7 @@ def plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target
         # fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
         # plot_scatterplot_lr(data.lrs_after_calib, label_encoder, data.y_test_nhot_augmented, target_classes, ax=axs1,
         #                     title='augmented test')
-        # plot_scatterplot_lr(data.lrs_test_as_mixtures_after_calib, label_encoder, data.y_test_as_mixtures_nhot_augmented,
+        # plot_scatterplot_lr(data.lrs_after_calib_test_as_mixtures, label_encoder, data.y_test_as_mixtures_nhot_augmented,
         #                     target_classes, ax=axs2, title='test as mixtures')
         # plot_scatterplot_lr(data.lrs_after_calib_mixt, label_encoder, y_nhot_mixtures,
         #                     target_classes, ax=axs3, title='mixtures')
