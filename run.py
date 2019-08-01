@@ -8,7 +8,7 @@ if __name__ == '__main__':
     retrain = True
 
     # assume that this is what comes from the GUI
-    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion', 'Skin']
+    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
 
     start = time.time()
     test_priors(nfolds=2, tc=target_classes_str)

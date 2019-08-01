@@ -31,15 +31,19 @@ class MarginalMLPClassifier():
         """
         Makes calibrated model for each target class
         """
-        lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
+        try:
+            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
-        for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator()
-            loglrs = np.log10(lrs_per_target_class[:, i])
-            # np.max ensures that the nhot matrix is converted into a nhot list with the
-            # relevant target classes coded as a 1.
-            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrator()
+                loglrs = np.log10(lrs_per_target_class[:, i])
+                # np.max ensures that the nhot matrix is converted into a nhot list with the
+                # relevant target classes coded as a 1.
+                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+        except TypeError or ValueError:
+            for target_class in target_classes:
+                self._calibrators_per_target_class[str(target_class)] = None
 
     def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True):
         """
@@ -58,14 +62,21 @@ class MarginalMLPClassifier():
         assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
         assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
 
-        ypred_proba = self._classifier.predict_proba(X)
-        lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR, priors_numerator, priors_denominator)
+        try:
+            ypred_proba = self._classifier.predict_proba(X)
+            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR, priors_numerator, priors_denominator)
+
+        except ValueError:
+            lrs_per_target_class = None
 
         if with_calibration:
-            for i, target_class in enumerate(target_classes):
-                calibrator = self._calibrators_per_target_class[str(target_class)]
-                loglrs_per_target_class = np.log10(lrs_per_target_class)
-                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            try:
+                for i, target_class in enumerate(target_classes):
+                    calibrator = self._calibrators_per_target_class[str(target_class)]
+                    loglrs_per_target_class = np.log10(lrs_per_target_class)
+                    lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            except AttributeError:
+                lrs_per_target_class = lrs_per_target_class
 
         return lrs_per_target_class
 
@@ -154,13 +165,17 @@ class MarginalXGBClassifier():
         """
         Makes calibrated model for each target class
         """
-        lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
+        try:
+            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
-        for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator()
-            loglrs = np.log10(lrs_per_target_class[:, i])
-            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrator()
+                loglrs = np.log10(lrs_per_target_class[:, i])
+                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+        except TypeError or ValueError:
+            for target_class in target_classes:
+                self._calibrators_per_target_class[str(target_class)] = None
 
     def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True):
         """
@@ -179,14 +194,21 @@ class MarginalXGBClassifier():
         assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
         assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
 
-        ypred_proba = self._classifier.predict_proba(X)
-        lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR, priors_numerator, priors_denominator)
+        try:
+            ypred_proba = self._classifier.predict_proba(X)
+            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR, priors_numerator, priors_denominator)
+
+        except ValueError:
+            lrs_per_target_class = None
 
         if with_calibration:
-            for i, target_class in enumerate(target_classes):
-                calibrator = self._calibrators_per_target_class[str(target_class)]
-                loglrs_per_target_class = np.log10(lrs_per_target_class)
-                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            try:
+                for i, target_class in enumerate(target_classes):
+                    calibrator = self._calibrators_per_target_class[str(target_class)]
+                    loglrs_per_target_class = np.log10(lrs_per_target_class)
+                    lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            except AttributeError:
+                lrs_per_target_class = lrs_per_target_class
 
         return lrs_per_target_class
 
@@ -275,28 +297,37 @@ class MarginalDLClassifier():
         """
         Makes calibrated model for each target class
         """
-        lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
+        try:
+            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
-        for i, target_class in enumerate(target_classes):
-            calibrator = self._calibrator()
-            loglrs = np.log10(lrs_per_target_class[:, i])
-            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-            self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
-
+            for i, target_class in enumerate(target_classes):
+                calibrator = self._calibrator()
+                loglrs = np.log10(lrs_per_target_class[:, i])
+                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+        except TypeError or ValueError:
+            for target_class in target_classes:
+                self._calibrators_per_target_class[str(target_class)] = None
 
     def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True):
         assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
         assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
 
-        ypred_proba = self._classifier.predict(X)
-        lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
-                                                                  priors_numerator, priors_denominator)
+        try:
+            ypred_proba = self._classifier.predict(X)
+            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
+                                                                      priors_numerator, priors_denominator)
+        except ValueError:
+            lrs_per_target_class = None
 
         if with_calibration:
-            for i, target_class in enumerate(target_classes):
-                calibrator = self._calibrators_per_target_class[str(target_class)]
-                loglrs_per_target_class = np.log10(lrs_per_target_class)
-                lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            try:
+                for i, target_class in enumerate(target_classes):
+                    calibrator = self._calibrators_per_target_class[str(target_class)]
+                    loglrs_per_target_class = np.log10(lrs_per_target_class)
+                    lrs_per_target_class[:, i] = calibrator.transform(loglrs_per_target_class[:, i])
+            except AttributeError:
+                lrs_per_target_class = lrs_per_target_class
 
         return lrs_per_target_class
 

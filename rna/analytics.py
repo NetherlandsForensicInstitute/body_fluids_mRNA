@@ -265,6 +265,10 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
                          X_mixtures, model, target_classes, mle, softmax)
 
+        assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+        assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+        assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+
     return model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, \
            lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt
 

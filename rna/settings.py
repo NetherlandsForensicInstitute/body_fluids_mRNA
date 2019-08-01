@@ -19,11 +19,11 @@ Options:
 augment=True
 binarize=[True, False]
 markers=False
-softmax=[False]
+softmax=[True, False]
 nsamples=(11, 11, 11)
 test_size=0.2
 calibration_size=0.5
-models=[['MLP', True], ['MLR', False]]
-priors=[[10, 1, 1, 1, 1, 1, 1, 1], # the first one is considered the baseline, so the augmented samples with that
+models=[['MLP', True], ['MLR', True], ['XGB', True], ['DL', True]]
+priors=[[1, 1, 1, 1, 1, 1, 1, 1], # the first one is considered the baseline, so the augmented samples with that
                 # distribution will be the data that is tested on.
-        [1, 1, 1, 1, 1, 1, 1, 1]]
+        [10, 1, 1, 1, 1, 1, 1, 1]]

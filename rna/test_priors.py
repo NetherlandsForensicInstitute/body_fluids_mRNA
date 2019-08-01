@@ -89,6 +89,7 @@ def test_priors(nfolds, tc):
                 for k, models in enumerate(settings.models):
                     print(" Model: {} {}".format(models[0], k))
 
+
                     # ======= Calculate LRs before and after calibration =======
                     if settings.augment:
                         model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
