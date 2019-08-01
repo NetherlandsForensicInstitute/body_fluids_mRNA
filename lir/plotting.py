@@ -243,7 +243,8 @@ def makeplot_density(clf, X0_train, X1_train, X0_calibrate, X1_calibrate, calibr
         plt.show()
 
 
-def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encoder, savefig=None, show=None):
+def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encoder, calibration_on_loglrs, savefig=None,
+                          show=None):
     """
     Makes histogram for calibration data for one hypothesis and plots the KDE curve.
 
@@ -251,15 +252,15 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
     :param y_nhot:
     :param calibrators:
     :param target_classes:
+    :param calibration_on_loglrs:
     :param savefig: boolean if True the figure is saved
     :param show: boolean if True the figure is displayed
     :return:
     """
 
-    loglrs = np.log10(lrs)
-    X = np.arange(np.min(loglrs)-0.25,
-                  np.max(loglrs)+0.25, .01)
-    X = X.reshape(-1, 1)
+    # X = np.arange(np.min(probs)-0.25,
+    #               np.max(probs)+0.25, .01)
+    # X = X.reshape(-1, 1)
 
     n_target_classes = len(target_classes)
 
@@ -274,22 +275,34 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
 
         celltype = vec2string(target_class, label_encoder)
 
-        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-
-        calibrators[str(target_class)].transform(X)
+        if calibration_on_loglrs:
+            loglrs = np.log10(lrs)
+            X = np.ravel(sorted(loglrs))
+            data1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+            data2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+            ratio = calibrators[str(target_class)].transform(X)
+            ratio = np.log10(ratio)
+        else:
+            probs = lrs / (1 + lrs)
+            X = np.ravel(sorted(probs))
+            data1 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+            data2 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+            ratio = calibrators[str(target_class)].transform(X)
+            ratio = ratio / (1 + ratio)
 
         if n_target_classes == 1:
-            plt.hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            plt.hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            plt.hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            plt.hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            plt.hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
             plt.plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
             plt.plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
             plt.title(celltype)
             plt.legend()
 
         elif n_target_classes == 2:
-            axs[i].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            axs[i].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[i].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[i].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[i].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
             axs[i].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
             axs[i].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
             axs[i].set_title(celltype)
@@ -302,8 +315,9 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
             fig.legend(handles, labels, 'center right')
 
         else:
-            axs[j, k].hist(loglrs1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            axs[j, k].hist(loglrs2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[j, k].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+            axs[j, k].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+            axs[j, k].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
             axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
             axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
             axs[j, k].set_title(celltype)
@@ -329,86 +343,152 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
 
     plt.close()
 
+
+def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder):
+
+    loglrs_before = np.log10(lrs_before)
+    loglrs_after = np.log10(lrs_after)
+
+    n_target_classes = len(target_classes)
+
+    if n_target_classes > 1:
+        n_rows = int(n_target_classes / 2)
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+
+        j = 0
+        k = 0
+
+    for i, target_class in enumerate(target_classes):
+
+        celltype = vec2string(target_class, label_encoder)
+
+        min_vals = [min(loglrs_before), min(loglrs_after)]
+        max_vals = [max(loglrs_before), max(loglrs_after)]
+        diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
+
+        target_class = np.reshape(target_class, -1, 1)
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+
+        if n_target_classes == 1:
+
+            plt.scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            plt.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            plt.title(celltype)
+            plt.xlim(min(min_vals), max(max_vals))
+            plt.ylim(min(min_vals), max(max_vals))
+
+            plt.xlabel("lrs before")
+            plt.ylabel("lrs after")
+
+        elif n_target_classes == 2:
+            axs[i].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            axs[i].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            axs[i].set_title(celltype)
+            axs[i].set_xlim(min(min_vals), max(max_vals))
+            axs[i].set_ylim(min(min_vals), max(max_vals))
+
+            fig.text(0.5, 0.04, "lrs before", ha='center')
+            fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
+
+        elif n_target_classes > 2:
+            axs[j, k].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            axs[j, k].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            axs[j, k].set_title(celltype)
+            axs[j, k].set_xlim(min(min_vals), max(max_vals))
+            axs[j, k].set_ylim(min(min_vals), max(max_vals))
+
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            fig.text(0.5, 0.04, "lrs before", ha='center')
+            fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
+
+
 # TODO: Change this function
-def makeplot_hist_density_avg(probs, calibrators, savefig=None, show=None):
-
-    X = np.arange(-0.25, 1.25, .01)
-    X = X.reshape(-1, 1)
-
-    plt.subplots(2, int(len(probs)/2), figsize=(14, 9))
-    for idx, (celltype, list_probs) in enumerate(sorted(probs.items())):
-        probs0 = np.array(list_probs[0])
-        probs1 = np.array(list_probs[1])
-
-        plt.subplot(2, int(len(probs)/2), idx + 1)
-        plt.hist(probs0, density=True, color='orange', label='avg h0', bins=30, alpha=0.5)
-        plt.hist(probs1, density=True, color='blue', label='avg h1', bins=30, alpha=0.5)
-
-        p0s = []
-        p1s = []
-        for calibrator in calibrators[celltype]:
-            calibrator.transform(X)
-            p0s.append(calibrator.p0)
-            p1s.append(calibrator.p1)
-
-        avgp0 = np.mean(np.array([p0 for p0 in p0s]), axis=0)
-        avgp1 = np.mean(np.array([p1 for p1 in p1s]), axis=0)
-
-        plt.plot(X, avgp0, color='black', linestyle='--', label='avg density h0')
-        plt.plot(X, avgp1, color='black', linestyle=':', label='avg density h1')
-        plt.title(celltype)
-        plt.xlabel('Probability')
-        plt.ylabel('Density')
-        plt.legend(loc=2, framealpha=0.5)
-
-        # if idx == 0:
-        #     plt.legend(loc=2, framealpha=0.5)
-
-    if savefig is not None:
-        plt.savefig(savefig)
-    if show or savefig is None:
-        plt.show()
+# def makeplot_hist_density_avg(probs, calibrators, savefig=None, show=None):
+#
+#     X = np.arange(-0.25, 1.25, .01)
+#     X = X.reshape(-1, 1)
+#
+#     plt.subplots(2, int(len(probs)/2), figsize=(14, 9))
+#     for idx, (celltype, list_probs) in enumerate(sorted(probs.items())):
+#         probs0 = np.array(list_probs[0])
+#         probs1 = np.array(list_probs[1])
+#
+#         plt.subplot(2, int(len(probs)/2), idx + 1)
+#         plt.hist(probs0, density=True, color='orange', label='avg h0', bins=30, alpha=0.5)
+#         plt.hist(probs1, density=True, color='blue', label='avg h1', bins=30, alpha=0.5)
+#
+#         p0s = []
+#         p1s = []
+#         for calibrator in calibrators[celltype]:
+#             calibrator.transform(X)
+#             p0s.append(calibrator.p0)
+#             p1s.append(calibrator.p1)
+#
+#         avgp0 = np.mean(np.array([p0 for p0 in p0s]), axis=0)
+#         avgp1 = np.mean(np.array([p1 for p1 in p1s]), axis=0)
+#
+#         plt.plot(X, avgp0, color='black', linestyle='--', label='avg density h0')
+#         plt.plot(X, avgp1, color='black', linestyle=':', label='avg density h1')
+#         plt.title(celltype)
+#         plt.xlabel('Probability')
+#         plt.ylabel('Density')
+#         plt.legend(loc=2, framealpha=0.5)
+#
+#         # if idx == 0:
+#         #     plt.legend(loc=2, framealpha=0.5)
+#
+#     if savefig is not None:
+#         plt.savefig(savefig)
+#     if show or savefig is None:
+#         plt.show()
 
 # TODO: Change this function
-def makeplot_density_avg(calibrators, savefig=None, show=None):
-    linestyles = ['-', '--', '-.', ':', ]
-
-    X = np.arange(-0.25, 1.25, .01)
-    X = X.reshape(-1, 1)
-
-    plt.subplots(2, int(len(calibrators)/2), figsize=(14, 9))
-    for idx, (celltype, list_calibs) in enumerate(sorted(calibrators.items())):
-
-        plt.subplot(2, int(len(calibrators)/2), idx + 1)
-        p0s = []
-        p1s = []
-        for i, calibrator in enumerate(list_calibs):
-
-            calibrator.transform(X)
-
-            plt.plot(X, calibrator.p0, color='blue', linestyle=linestyles[i])
-            plt.plot(X, calibrator.p1, color='orange', linestyle=linestyles[i])
-
-            p0s.append(calibrator.p0)
-            p1s.append(calibrator.p1)
-
-        avgp0 = np.mean(np.array([p0 for p0 in p0s]), axis=0)
-        avgp1 = np.mean(np.array([p1 for p1 in p1s]), axis=0)
-
-        plt.plot(X, avgp0, color='black', linewidth=3)
-        plt.plot(X, avgp1, color='black', linewidth=3)
-        plt.title(celltype)
-        plt.xlabel('Probability')
-        plt.ylabel('Density')
-        # plt.legend(loc=2, framealpha=0.5)
-
-        # if idx == 0:
-        #     plt.legend(loc=2, framealpha=0.5)
-
-    if savefig is not None:
-        plt.savefig(savefig)
-    if show or savefig is None:
-        plt.show()
+# def makeplot_density_avg(calibrators, savefig=None, show=None):
+#     linestyles = ['-', '--', '-.', ':', ]
+#
+#     X = np.arange(-0.25, 1.25, .01)
+#     X = X.reshape(-1, 1)
+#
+#     plt.subplots(2, int(len(calibrators)/2), figsize=(14, 9))
+#     for idx, (celltype, list_calibs) in enumerate(sorted(calibrators.items())):
+#
+#         plt.subplot(2, int(len(calibrators)/2), idx + 1)
+#         p0s = []
+#         p1s = []
+#         for i, calibrator in enumerate(list_calibs):
+#
+#             calibrator.transform(X)
+#
+#             plt.plot(X, calibrator.p0, color='blue', linestyle=linestyles[i])
+#             plt.plot(X, calibrator.p1, color='orange', linestyle=linestyles[i])
+#
+#             p0s.append(calibrator.p0)
+#             p1s.append(calibrator.p1)
+#
+#         avgp0 = np.mean(np.array([p0 for p0 in p0s]), axis=0)
+#         avgp1 = np.mean(np.array([p1 for p1 in p1s]), axis=0)
+#
+#         plt.plot(X, avgp0, color='black', linewidth=3)
+#         plt.plot(X, avgp1, color='black', linewidth=3)
+#         plt.title(celltype)
+#         plt.xlabel('Probability')
+#         plt.ylabel('Density')
+#         # plt.legend(loc=2, framealpha=0.5)
+#
+#         # if idx == 0:
+#         #     plt.legend(loc=2, framealpha=0.5)
+#
+#     if savefig is not None:
+#         plt.savefig(savefig)
+#     if show or savefig is None:
+#         plt.show()
 
 
 def makeplot_cllr(xlabel, generators, experiments, savefig=None, show=None, plots=[PlotCllrAvg, PlotCllrStd, PlotCllrCal]):

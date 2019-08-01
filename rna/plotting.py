@@ -10,7 +10,7 @@ from sklearn.calibration import calibration_curve
 
 from matplotlib import rc, pyplot as plt
 
-from rna.analytics import combine_samples
+# from rna.analytics import combine_samples
 from rna.input_output import read_df
 from rna.utils import vec2string, prior2string
 
@@ -53,7 +53,7 @@ def plot_for_experimental_mixture_data(X_mixtures,
         nearest augmented data point. Indication of whether the point may be an
         outlier (eg measurement error or problem with augmentation scheme)
     """
-    y_prob = model.predict_lrs(X_mixtures)
+    y_prob = model.predict_lrs(X_mixtures, )
     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
         y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
 
@@ -103,14 +103,14 @@ def plot_for_experimental_mixture_data(X_mixtures,
     plt.savefig('mixtures binned data and log lrs')
 
 
-def plot_data(X):
-    """
-    plots the raw data points
-
-    :param X: N_samples x N_observations_per_sample x N_markers measurements
-    """
-    plt.matshow(combine_samples(X))
-    plt.savefig('single_cell_type_measurements_after_QC')
+# def plot_data(X):
+#     """
+#     plots the raw data points
+#
+#     :param X: N_samples x N_observations_per_sample x N_markers measurements
+#     """
+#     plt.matshow(combine_samples(X))
+#     plt.savefig('single_cell_type_measurements_after_QC')
 
 
 def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
@@ -299,6 +299,86 @@ def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen
         plt.savefig(path)
 
     plt.close(fig)
+
+
+def plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None, savefig=None):
+
+    for method in lrs_before_for_all_methods.keys():
+        plot_scatterplot_lr_before_after_calib(lrs_before_for_all_methods[method], lrs_after_for_all_methods[method],
+                                               y_nhot_for_all_methods[method], target_classes, label_encoder)
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + method)
+            plt.close()
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+
+def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder):
+
+    loglrs_before = np.log10(lrs_before)
+    loglrs_after = np.log10(lrs_after)
+
+    n_target_classes = len(target_classes)
+
+    if n_target_classes > 1:
+        n_rows = int(n_target_classes / 2)
+        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+
+        j = 0
+        k = 0
+
+    for i, target_class in enumerate(target_classes):
+
+        celltype = vec2string(target_class, label_encoder)
+
+        min_vals = [min(loglrs_before), min(loglrs_after)]
+        max_vals = [max(loglrs_before), max(loglrs_after)]
+        diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
+
+        target_class = np.reshape(target_class, -1, 1)
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+
+        if n_target_classes == 1:
+
+            plt.scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            plt.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            plt.title(celltype)
+            plt.xlim(min(min_vals), max(max_vals))
+            plt.ylim(min(min_vals), max(max_vals))
+
+            plt.xlabel("lrs before")
+            plt.ylabel("lrs after")
+
+        elif n_target_classes == 2:
+            axs[i].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            axs[i].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            axs[i].set_title(celltype)
+            axs[i].set_xlim(min(min_vals), max(max_vals))
+            axs[i].set_ylim(min(min_vals), max(max_vals))
+
+            fig.text(0.5, 0.04, "lrs before", ha='center')
+            fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
+
+        elif n_target_classes > 2:
+            axs[j, k].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
+            axs[j, k].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
+            axs[j, k].set_title(celltype)
+            axs[j, k].set_xlim(min(min_vals), max(max_vals))
+            axs[j, k].set_ylim(min(min_vals), max(max_vals))
+
+            if (i % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            fig.text(0.5, 0.04, "lrs before", ha='center')
+            fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
 
 
 def plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder, show=None, savefig=None):

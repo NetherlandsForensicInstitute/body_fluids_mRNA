@@ -10,7 +10,9 @@ from sklearn.metrics import accuracy_score
 from rna.constants import nhot_matrix_all_combinations
 
 from lir.lr import calculate_cllr
+from lir.plotting import makeplot_hist_density, plot_scatterplot_lr_before_after_calib
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
+# from rna.plotting import plot_scatterplot_lr_before_after_calib
 
 
 def combine_samples(data_for_class):
@@ -51,11 +53,12 @@ def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):
 
 
 def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_mixtures, X_mixtures, model,
-                 target_classes, mle, softmax):
+                 target_classes, mle, softmax, calibration_on_loglrs):
     """
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
     model and predict the lrs before and after calibration for both X_test and X_mixtures.
+    :param calibration_on_loglrs:
     """
 
     if softmax: # y_train must be list with labels
@@ -88,16 +91,16 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_m
     # test_dl_model(model, X_train, y_train, X_test, y_test, target_classes)
 
     model.fit_classifier(X_train, y_train)
-    model.fit_calibration(X_calib, y_calib, target_classes)
+    model.fit_calibration(X_calib, y_calib, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
-    lrs_after_calib = model.predict_lrs(X_test, target_classes)
+    lrs_after_calib = model.predict_lrs(X_test, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     lrs_test_as_mixtures_before_calib = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
-    lrs_test_as_mixtures_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes)
+    lrs_test_as_mixtures_after_calib = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
-    lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes)
+    lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     return model, lrs_before_calib, lrs_after_calib, lrs_test_as_mixtures_before_calib, lrs_test_as_mixtures_after_calib, \
            lrs_before_calib_mixt, lrs_after_calib_mixt
@@ -192,7 +195,7 @@ def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
 
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, models, mle,
-                                       softmax):
+                                       label_encoder, softmax, calibration_on_loglrs):
 
     # must be tested on the same test data based on baseline prior
     X_test_augmented = augmented_data[baseline_prior].X_test_augmented
@@ -221,7 +224,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
         lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
-                             target_classes, models, mle, softmax)
+                             target_classes, models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i
@@ -238,7 +241,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
 
 def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                      X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
-                     models, mle, softmax):
+                     models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde):
 
     classifier = models[0]
     with_calibration = models[1]
@@ -250,20 +253,22 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                          X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, model,
-                         target_classes, mle, softmax)
+                         target_classes, mle, softmax, calibration_on_loglrs)
 
         # TODO: Check if want to keep
-        # if save_kde:
-        #     makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-        #                       y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-        #                       label_encoder, savefig=os.path.join('scratch', 'kernel_density_estimation{}_{}_{}_{}_{}'.format(n, bool2str_binarize(binarize), bool2str_softmax(softmax), classifier, name)))
+        if save_kde:
+            makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                                  y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                                  label_encoder, calibration_on_loglrs)
+
+            plot_scatterplot_lr_before_after_calib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder)
 
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
                          np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
                          np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                         X_mixtures, model, target_classes, mle, softmax)
+                         X_mixtures, model, target_classes, mle, softmax, calibration_on_loglrs)
 
         assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
@@ -328,7 +333,8 @@ def combine_lrs_for_all_folds(lrs_for_model, type):
     :return:
     """
 
-    lrs_for_all_methods = OrderedDict()
+    lrs_before_for_all_methods = OrderedDict()
+    lrs_after_for_all_methods = OrderedDict()
     y_nhot_for_all_methods = OrderedDict()
     for fold, methods in lrs_for_model.items():
 
@@ -338,25 +344,31 @@ def combine_lrs_for_all_folds(lrs_for_model, type):
             for prior in priors:
                 prior_method = method + '_' + prior
 
-                if prior_method in lrs_for_all_methods:
+                if prior_method in lrs_after_for_all_methods:
                     if type == 'test augm':
-                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_after_calib[prior], axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib[prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib[prior], axis=0)
                         y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_nhot_augmented, axis=0)
                     elif type == 'test augm as mixt':
-                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_after_calib_test_as_mixtures[prior], axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib_test_as_mixtures[prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib_test_as_mixtures[prior], axis=0)
                         y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_as_mixtures_nhot_augmented, axis=0)
                     elif type == 'mixt':
-                        lrs_for_all_methods[prior_method] = np.append(lrs_for_all_methods[prior_method], data.lrs_after_calib_mixt[prior], axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib_mixt[prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib_mixt[prior], axis=0)
                         y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_mixtures_nhot, axis=0)
                 else:
                     if type == 'test augm':
-                        lrs_for_all_methods[prior_method] = data.lrs_after_calib[prior]
+                        lrs_before_for_all_methods[prior_method] = data.lrs_before_calib[prior]
+                        lrs_after_for_all_methods[prior_method] = data.lrs_after_calib[prior]
                         y_nhot_for_all_methods[prior_method] = data.y_test_nhot_augmented
                     elif type == 'test augm as mixt':
-                        lrs_for_all_methods[prior_method] = data.lrs_after_calib_test_as_mixtures[prior]
+                        lrs_before_for_all_methods[prior_method] = data.lrs_before_calib_test_as_mixtures[prior]
+                        lrs_after_for_all_methods[prior_method] = data.lrs_after_calib_test_as_mixtures[prior]
                         y_nhot_for_all_methods[prior_method] = data.y_test_as_mixtures_nhot_augmented
                     elif type == 'mixt':
-                        lrs_for_all_methods[prior_method] = data.lrs_after_calib_mixt[prior]
+                        lrs_before_for_all_methods[prior_method] = data.lrs_before_calib_mixt[prior]
+                        lrs_after_for_all_methods[prior_method] = data.lrs_after_calib_mixt[prior]
                         y_nhot_for_all_methods[prior_method] = data.y_mixtures_nhot
 
-    return lrs_for_all_methods, y_nhot_for_all_methods
+    return lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods

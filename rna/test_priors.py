@@ -17,7 +17,8 @@ from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
-from rna.plotting import plot_scatterplot_all_lrs, plot_boxplot_of_metric, plot_histogram_all_lrs
+from rna.plotting import plot_scatterplot_all_lrs_before_after_calib, plot_scatterplot_all_lrs, \
+    plot_boxplot_of_metric, plot_histogram_all_lrs
 
 
 def test_priors(nfolds, tc):
@@ -99,12 +100,14 @@ def test_priors(nfolds, tc):
                                                                                                          target_classes,
                                                                                                          baseline_prior,
                                                                                                          models, mle,
-                                                                                                         softmax)
+                                                                                                         label_encoder,
+                                                                                                         softmax,
+                                                                                                         settings.calibration_on_loglrs)
 
                     key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
-                    lrs_for_model_in_fold[key_name] = LrsAfterCalib(lrs_after_calib, y_test_nhot_augmented,
-                                                            lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
-                                                            lrs_after_calib_mixt, y_nhot_mixtures)
+                    lrs_for_model_in_fold[key_name] = LrsBeforeAfterCalib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
+                                                                          lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
+                                                                          lrs_before_calib_mixt, lrs_after_calib_mixt, y_nhot_mixtures)
 
                     # TODO: Check whether want to include
                     # else:
@@ -147,25 +150,26 @@ def test_priors(nfolds, tc):
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
         lrs_for_model_per_fold[str(n)] = lrs_for_model_in_fold
 
-    lrs_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
-    plot_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
+    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                            savefig=os.path.join('scratch', 'histograms_after_calib_augm'))
+    # plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
     if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                                  savefig=os.path.join('scratch', 'LRs_for_different_priors_augm'))
 
-    lrs_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
-    plot_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
+    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                            savefig=os.path.join('scratch', 'histograms_after_calib_augmasmixt'))
     if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                                  savefig=os.path.join('scratch', 'LRs_for_different_priors_augmasmixt'))
 
-    lrs_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='mixt')
-    plot_histogram_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='mixt')
+    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                            savefig=os.path.join('scratch', 'histograms_after_calib_mixt'))
     if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                                  savefig=os.path.join('scratch', 'LRs_for_different_priors_mixt'))
 
     for t, target_class in enumerate(target_classes):
@@ -207,13 +211,17 @@ class AugmentedData():
         self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
 
 # TODO: Want to change to dict?
-class LrsAfterCalib():
+class LrsBeforeAfterCalib():
 
-    def __init__(self, lrs_after_calib, y_test_nhot_augmented, lrs_after_calib_test_as_mixtures,
-                 y_test_as_mixtures_nhot_augmented, lrs_after_calib_mixt, y_mixtures_nhot):
+    def __init__(self, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, lrs_before_calib_test_as_mixtures,
+                 lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, lrs_before_calib_mixt,
+                 lrs_after_calib_mixt, y_mixtures_nhot):
+        self.lrs_before_calib = lrs_before_calib
         self.lrs_after_calib = lrs_after_calib
         self.y_test_nhot_augmented = y_test_nhot_augmented
+        self.lrs_before_calib_test_as_mixtures = lrs_before_calib_test_as_mixtures
         self.lrs_after_calib_test_as_mixtures = lrs_after_calib_test_as_mixtures
         self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
+        self.lrs_before_calib_mixt = lrs_before_calib_mixt
         self.lrs_after_calib_mixt = lrs_after_calib_mixt
         self.y_mixtures_nhot = y_mixtures_nhot
