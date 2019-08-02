@@ -343,6 +343,75 @@ def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encode
 
     plt.close()
 
+def plot_calibration_process(lrs, y_nhot, calibrators, target_classes, label_encoder, calibration_on_loglrs, savefig=None,
+                             show=None):
+
+    for i, target_class in enumerate(target_classes):
+        lr = lrs[:, i]
+        calibrator = calibrators[str(target_class)]
+        plot_calibration_process_per_target_class(lr, y_nhot, calibrator, target_class, label_encoder,
+                                              calibration_on_loglrs)
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig)
+        if show or savefig is None:
+            plt.show()
+
+def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, target_class, label_encoder,
+                                              calibration_on_loglrs):
+
+    loglrs = np.log10(lr)
+    celltype = vec2string(target_class, label_encoder)
+
+    loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
+    loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
+
+    loglrs1 = np.reshape(loglrs1, -1)
+    loglrs2 = np.reshape(loglrs2, -1)
+
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(3, 12))
+    plt.suptitle(celltype)
+
+    # 1 histogram log10LRs without calibration
+    axes[0, 0].hist(loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[0, 0].hist(loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+
+    # 2 histogram log10LRs without calibration + KDE curves
+    X = np.ravel(sorted(loglrs))
+    LRs = calibrator.transform(X)
+    axes[0, 1].hist(loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[0, 1].hist(loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    axes[0, 1].plot(X, calibrator.p1, color='orange', label='KDE h1')
+    axes[0, 1].plot(X, calibrator.p0, color='blue', label='KDE h2')
+
+    # 3 KDE curves
+    axes[1, 0].plot(X, calibrator.p1, color='orange', label='KDE h1')
+    axes[1, 0].plot(X, calibrator.p0, color='blue', label='KDE h2')
+
+    # 4 Ratio of two curves
+    ratio = calibrator.p1 / calibrator.p0
+    axes[1, 1].plot(X, ratio, color='red', label='ratio')
+
+    # 5
+    logratio = np.log10(ratio)
+    axes[2, 0].plot(X, logratio, color='red', label='ratio')
+
+    # 7
+    axes[3, 0].hist(logratio, color='pink', density=True, nbins=60, alpha=0.5)
+
+    # 6
+    calibrated_loglrs = np.log10(LRs)
+
+    calibrated_loglrs1 = calibrated_loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
+    calibrated_loglrs2 = calibrated_loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
+
+    calibrated_loglrs1 = np.reshape(calibrated_loglrs1, -1)
+    calibrated_loglrs2 = np.reshape(calibrated_loglrs2, -1)
+
+    axes[3, 1].hist(calibrated_loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[3, 1].hist(calibrated_loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+
 
 def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder):
 

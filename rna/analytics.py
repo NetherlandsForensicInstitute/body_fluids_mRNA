@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score
 from rna.constants import nhot_matrix_all_combinations
 
 from lir.lr import calculate_cllr
-from lir.plotting import makeplot_hist_density, plot_scatterplot_lr_before_after_calib
+from lir.plotting import makeplot_hist_density, plot_scatterplot_lr_before_after_calib, plot_calibration_process
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
 # from rna.plotting import plot_scatterplot_lr_before_after_calib
 
@@ -144,6 +144,10 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          target_classes, model, mle, softmax, calibration_on_loglrs)
 
         if save_kde:
+            plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                                     y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                                     label_encoder, calibration_on_loglrs)
+
             makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                   y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
                                   label_encoder, calibration_on_loglrs)
@@ -195,7 +199,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
         lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
-                             target_classes, models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde=False)
+                             target_classes, models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i

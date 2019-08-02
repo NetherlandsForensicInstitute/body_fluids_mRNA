@@ -174,7 +174,7 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
 
     plt.close()
 
-
+# TODO: Make function generic
 def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
 
     MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif = n_metric[:, 0, 0, :, 0].T
