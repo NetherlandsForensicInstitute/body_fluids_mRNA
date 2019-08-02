@@ -18,14 +18,14 @@ Options:
 """
 
 augment=True
-binarize=[True]
+binarize=[True, False]
 markers=False
-softmax=[False]
-nsamples=(11, 11, 11)
+softmax=[True, False]
+nsamples=(22, 22, 11)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
-models=[['MLP', True], ['MLR', False]]
+models=[['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1], # the first one is considered the baseline, so the augmented samples with that
                 # distribution will be the data that is tested on.
         [10, 1, 1, 1, 1, 1, 1, 1]]
