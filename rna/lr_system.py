@@ -324,7 +324,7 @@ class MarginalDLClassifier():
 
 
     def fit_classifier(self, X, y):
-        self._classifier.fit(X, y, epochs=self.epochs)
+        self._classifier.fit(X, y, epochs=self.epochs, verbose=0)
 
 
     def fit_calibration(self, X, y_nhot, target_classes, calibration_on_loglrs=True):

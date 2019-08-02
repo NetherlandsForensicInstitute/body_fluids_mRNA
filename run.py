@@ -8,10 +8,10 @@ if __name__ == '__main__':
     retrain = True
 
     # assume that this is what comes from the GUI
-    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
+    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion', 'Nasal.mucosa', 'Saliva']
 
     start = time.time()
-    test_priors(nfolds=2, tc=target_classes_str)
+    test_priors(nfolds=1, tc=target_classes_str)
     end = time.time()
 
     print("Execution time in seconds:", end - start)

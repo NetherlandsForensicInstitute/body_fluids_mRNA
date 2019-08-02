@@ -59,9 +59,9 @@ if __name__ == '__main__':
         print(N_SAMPLES)
         for prior in priors:
             print(prior)
-            X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
-                                                                 N_SAMPLES, label_encoder, prior,
-                                                                 binarize=settings.binarize, from_penile=from_penile)
+            X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features, N_SAMPLES,
+                                                         label_encoder, prior, binarize=settings.binarize,
+                                                         from_penile=from_penile)
             test_augment_data(prior, y_nhot_augmented)
 
     print("No assertion errors occurred.")

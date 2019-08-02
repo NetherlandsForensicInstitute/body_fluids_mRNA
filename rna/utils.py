@@ -60,6 +60,13 @@ def remove_markers(X):
 
 
 def bool2str_binarize(binarize):
+    """
+    Converts a boolean to a string.
+
+    :param binarize: boolean if True means that the data has been transformed into binary data,
+                        if False the data has been normalized.
+    :return: str
+    """
     if binarize == True:
         return 'bin'
     elif binarize == False:
@@ -67,6 +74,13 @@ def bool2str_binarize(binarize):
 
 
 def bool2str_softmax(softmax):
+    """
+    Converts a boolean to a string.
+
+    :param softmax: boolean if True means that probabilities have been calculated with the softmax function,
+                        if False probabilities have been calculated with the sigmoid function.
+    :return: str
+    """
     if softmax == True:
         return 'soft'
     elif softmax == False:
@@ -74,6 +88,14 @@ def bool2str_softmax(softmax):
 
 
 def prior2string(prior, label_encoder):
+    """
+    Converts a string vector of integers into a string. For example if the vector is '[1 10 1 1 1 1]' this
+    will be transformed into 'Cell type 1 10x more likely'.
+
+    :param prior: str of vector representing the distribution
+    :param label_encoder:
+    :return: str
+    """
 
     # convert string into list of integers
     prior = prior.strip('][').split(', ')

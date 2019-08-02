@@ -71,18 +71,19 @@ def test_priors(nfolds, tc):
             for p, priors in enumerate(settings.priors):
                 print("Priors for augmenting data: {}".format(priors))
 
-                augmented_data[str(priors)] = augment_splitted_data(X_calib, X_test, X_train, binarize, from_penile,
-                                                                    label_encoder, n_celltypes, n_features, priors,
-                                                                    y_calib, y_nhot_mixtures, y_test, y_train, AugmentedData)
+                augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
+                                                                    y_nhot_mixtures, n_celltypes, n_features,
+                                                                    label_encoder, AugmentedData, priors, binarize,
+                                                                    from_penile)
 
             # ======= Transform data accordingly =======
             if binarize:
-                X_train_transformed = np.where(combine_samples(X_train) > 150, 1, 0)
-                X_calib_transformed = np.where(combine_samples(X_calib) > 150, 1, 0)
+                # X_train_transformed = np.where(combine_samples(X_train) > 150, 1, 0)
+                # X_calib_transformed = np.where(combine_samples(X_calib) > 150, 1, 0)
                 X_test_transformed = np.where(combine_samples(X_test) > 150, 1, 0)
             else:
-                X_train_transformed = combine_samples(X_train) / 1000
-                X_calib_transformed = combine_samples(X_calib) / 1000
+                # X_train_transformed = combine_samples(X_train) / 1000
+                # X_calib_transformed = combine_samples(X_calib) / 1000
                 X_test_transformed = combine_samples(X_test) / 1000
 
             for j, softmax in enumerate(settings.softmax):
@@ -109,7 +110,7 @@ def test_priors(nfolds, tc):
                                                                           lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
                                                                           lrs_before_calib_mixt, lrs_after_calib_mixt, y_nhot_mixtures)
 
-                    # TODO: Check whether want to include
+                    # TODO: Check whether want to include --> original data
                     # else:
                     #     y_train_transformed = mle.inv_transform_single(y_train)
                     #     y_train_transformed = mle.labels_to_nhot(y_train_transformed)
@@ -129,18 +130,22 @@ def test_priors(nfolds, tc):
                             target_class_str = vec2string(target_class, label_encoder)
 
                             accuracies_train[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
-                                model[str_prior], mle, augmented_data[str_prior].y_train_nhot_augmented,
-                                augmented_data[str_prior].X_train_augmented, target_classes)[t]
+                                augmented_data[str_prior].X_train_augmented,
+                                augmented_data[str_prior].y_train_nhot_augmented, target_classes, model[str_prior],
+                                mle)[t]
                             accuracies_test[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
-                                model[str_prior], mle, augmented_data[baseline_prior].y_test_nhot_augmented,
-                                augmented_data[baseline_prior].X_test_augmented, target_classes)[t]
+                                augmented_data[baseline_prior].X_test_augmented,
+                                augmented_data[baseline_prior].y_test_nhot_augmented, target_classes, model[str_prior],
+                                mle)[t]
                             accuracies_test_as_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
-                                model[str_prior], mle, augmented_data[baseline_prior].y_test_as_mixtures_nhot_augmented,
-                                augmented_data[baseline_prior].X_test_as_mixtures_augmented, target_classes)[t]
+                                augmented_data[baseline_prior].X_test_as_mixtures_augmented,
+                                augmented_data[baseline_prior].y_test_as_mixtures_nhot_augmented, target_classes,
+                                model[str_prior], mle)[t]
                             accuracies_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
-                                model[str_prior], mle, y_nhot_mixtures, X_mixtures, target_classes)[t]
+                                X_mixtures, y_nhot_mixtures, target_classes, model[str_prior], mle)[t]
                             accuracies_single[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
-                                model[str_prior], mle, mle.inv_transform_single(y_test), X_test_transformed, target_classes)[t]
+                                X_test_transformed, mle.inv_transform_single(y_test), target_classes, model[str_prior],
+                                mle)[t]
 
                             cllr_test[target_class_str][n, i, j, k, p] = cllr(
                                 lrs_after_calib[str_prior][:, t], augmented_data[baseline_prior].y_test_nhot_augmented, target_class)
