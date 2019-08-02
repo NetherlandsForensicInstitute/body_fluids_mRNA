@@ -2,6 +2,7 @@
 Settings
 
 Options:
+    split_before                If provided, split the original data set before the nfold analysis starts
     augment                     If provided, use augmented data to train/calibrate the model with, otherwise use original data
     binarize                    If provided, make data binary, otherwise use original signal values
     markers                     If provided, include all markers, otherwise exclude 4 markers for control and gender
@@ -21,6 +22,7 @@ Options:
                                 samples with that distribution will be the test data.
 """
 
+split_before=True
 augment=True
 binarize=[True, False]
 markers=False

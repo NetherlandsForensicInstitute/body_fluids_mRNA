@@ -52,13 +52,20 @@ def test_priors(nfolds, tc):
         cllr_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
         cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
 
+    if settings.split_before:
+        # ======= Split data =======
+        X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
+        X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
+
+
     lrs_for_model_per_fold = OrderedDict()
     for n in range(nfolds):
         print("Fold {}".format(n))
 
-        # ======= Split data =======
-        X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
-        X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
+        if not settings.split_before:
+            # ======= Split data =======
+            X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
+            X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
 
         lrs_for_model_in_fold = OrderedDict()
         for i, binarize in enumerate(settings.binarize):
@@ -69,7 +76,7 @@ def test_priors(nfolds, tc):
             # ======= Augment data for all priors =======
             augmented_data = OrderedDict()
             for p, priors in enumerate(settings.priors):
-                print("Priors for augmenting data: {}".format(priors))
+                print(" Priors for augmenting data: {}".format(priors))
 
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
@@ -80,7 +87,10 @@ def test_priors(nfolds, tc):
             if binarize:
                 # X_train_transformed = np.where(combine_samples(X_train) > 150, 1, 0)
                 # X_calib_transformed = np.where(combine_samples(X_calib) > 150, 1, 0)
-                X_test_transformed = np.where(combine_samples(X_test) > 150, 1, 0)
+                X_test_transformed = [
+                    [np.where(X_test[i][j] > 150, 1, 0) for j in range(len(X_test[i]))] for i in
+                    range(len(X_test))]
+                X_test_transformed = combine_samples(np.array(X_test_transformed))
             else:
                 # X_train_transformed = combine_samples(X_train) / 1000
                 # X_calib_transformed = combine_samples(X_calib) / 1000
