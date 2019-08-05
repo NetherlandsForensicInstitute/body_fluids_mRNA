@@ -11,7 +11,7 @@ if __name__ == '__main__':
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
 
     start = time.time()
-    test_priors(nfolds=1, tc=target_classes_str)
+    test_priors(nfolds=15, tc=target_classes_str)
     end = time.time()
 
     print("Execution time in seconds:", end - start)

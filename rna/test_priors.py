@@ -12,7 +12,7 @@ from collections import OrderedDict
 from sklearn.model_selection import train_test_split
 
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
-    calculate_lrs_for_different_priors, combine_lrs_for_all_folds
+    calculate_lrs_for_different_priors, append_lrs_for_all_folds
 from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
@@ -152,7 +152,7 @@ def test_priors(nfolds, tc):
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
         lrs_for_model_per_fold[str(n)] = lrs_for_model_in_fold
 
-    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
     plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                            savefig=os.path.join('scratch', 'histograms_after_calib_augm'))
     if len(settings.priors) == 2:
@@ -173,29 +173,29 @@ def test_priors(nfolds, tc):
     #     plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
     #                              savefig=os.path.join('scratch', 'LRs_for_different_priors_mixt'))
 
-    # for t, target_class in enumerate(target_classes):
-    #     target_class_str = vec2string(target_class, label_encoder)
-    #     target_class_save = target_class_str.replace(" ", "_")
-    #     target_class_save = target_class_save.replace(".", "_")
-    #     target_class_save = target_class_save.replace("/", "_")
-    #
-    #     plot_boxplot_of_metric(accuracies_train[target_class_str], "accuracy",
-    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_train_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(accuracies_test[target_class_str], "accuracy",
-    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_test_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], "accuracy",
-    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(accuracies_mixtures[target_class_str], "accuracy",
-    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(accuracies_single[target_class_str], "accuracy",
-    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_single_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr",
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr",
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr",
-    #                            savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+    for t, target_class in enumerate(target_classes):
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
+        plot_boxplot_of_metric(accuracies_train[target_class_str], "accuracy",
+                               savefig=os.path.join('scratch', 'boxplot_accuracy_train_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test[target_class_str], "accuracy",
+                               savefig=os.path.join('scratch', 'boxplot_accuracy_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], "accuracy",
+                               savefig=os.path.join('scratch', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], "accuracy",
+                               savefig=os.path.join('scratch', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_single[target_class_str], "accuracy",
+                               savefig=os.path.join('scratch', 'boxplot_accuracy_single_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr",
+                               savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr",
+                               savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr",
+                               savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
 
 # TODO: Want to change to dict?
 class AugmentedData():

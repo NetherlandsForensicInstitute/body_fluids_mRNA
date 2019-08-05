@@ -6,7 +6,6 @@ import numpy as np
 
 from rna.constants import single_cell_types
 
-
 def string2vec(list_of_strings, label_encoder):
     """
     Converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s

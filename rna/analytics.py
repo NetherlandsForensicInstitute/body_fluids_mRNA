@@ -1,19 +1,20 @@
 """
 Performs project specific.
 """
-from collections import OrderedDict
 
 import os
-import keras
-import numpy as np
-from sklearn.metrics import accuracy_score
+# import keras
 
-from rna.constants import nhot_matrix_all_combinations
+import numpy as np
+
+from collections import OrderedDict
+from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
 from lir.plotting import plot_scatterplot_lr_before_after_calib, plot_calibration_process
+
+from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
-# from rna.plotting import plot_scatterplot_lr_before_after_calib
 
 
 def combine_samples(data_for_class):
@@ -34,7 +35,6 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_m
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
     model and predict the lrs before and after calibration for both X_test and X_mixtures.
-    :param calibration_on_loglrs:
     """
 
     if softmax: # y_train must be list with labels
@@ -82,60 +82,66 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_m
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
-def model_with_correct_settings(model_no_settings, softmax, n_classes):
+def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
     """
-    Ensures that the correct model with correct settings is used in the analysis.
-    This is based on a string 'model_no_settings' and a boolean deciding how the
-    probabilties are calculated 'softmax': either with the softmax
+    Ensures that the correct classifier with correct settings is used in the analysis. This is based on a string
+    'model_no_settings' and a boolean deciding how the probabilties are calculated 'softmax': either with the softmax
     function or the sigmoid function.
 
-    :param n_classes:
-    :param model_no_settings: str: model
-    :param softmax: boolean: if True the softmax function is used to
-        calculate the probabilities with.
-    :return: model with correct settings
+    :param clf_no_settings: str: classifier
+    :param softmax: bool: whether probabilities are calculated with softmax
+    :param n_classes: int: number of classes
+    :return: classifier with correct settings
     """
 
-    if model_no_settings == 'MLP':
+    if clf_no_settings == 'MLP':
         if softmax:
-            model = MarginalMLPClassifier()
+            classifier = MarginalMLPClassifier()
         else:
-            model = MarginalMLPClassifier(activation='logistic')
+            classifier = MarginalMLPClassifier(activation='logistic')
 
-    elif model_no_settings == 'MLR':
+    elif clf_no_settings == 'MLR':
         if softmax:
-            model = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
+            classifier = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
         else:
-            model = MarginalMLRClassifier()
+            classifier = MarginalMLRClassifier()
 
-    elif model_no_settings == 'XGB':
+    elif clf_no_settings == 'XGB':
         if softmax:
-            model = MarginalXGBClassifier()
+            classifier = MarginalXGBClassifier()
         else:
-            model = MarginalXGBClassifier(method='sigmoid')
+            classifier = MarginalXGBClassifier(method='sigmoid')
 
-    elif model_no_settings == 'DL':
+    elif clf_no_settings == 'DL':
         if softmax:
-            model = MarginalDLClassifier(n_classes=2 ** 8, activation_layer='softmax',
+            classifier = MarginalDLClassifier(n_classes=2 ** 8, activation_layer='softmax',
                                          optimizer="adam", loss="categorical_crossentropy", epochs=150)
         else:
-            model = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
+            classifier = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
                                          optimizer="adam", loss="binary_crossentropy", epochs=30)
 
     else:
-        raise ValueError("No class exists for this model")
+        raise ValueError("No class exists for this classifier")
 
-    return model
+    return classifier
 
 
 def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                      X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
                      models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs, save_calib_plots):
+    """
+    Selects the model with correct settings with 'model' and 'softmax' and calculates the likelihood-ratio's before and
+    after calibration on three test sets (augmented test, original mixtures and augmented test as mixtures).
+
+    :param method_name_prior: str: model and settings to save plots with
+    :param calibration_on_loglrs: bool: whether calibration is fitted on loglrs otherwise on probability
+    :param save_calib_plots: bool: whether to save plots for calibration
+    """
 
     classifier = models[0]
     with_calibration = models[1]
 
-    model = model_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
+    model = clf_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
 
     if with_calibration: # with calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
@@ -154,10 +160,6 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
                                      y_test_nhot_augmented, model._calibrators_per_target_class, target_classes,
                                      label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch', 'calib_process_test_{}'.format(method_name_prior)))
-
-            # makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-            #                       y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-            #                       label_encoder, calibration_on_loglrs)
 
             plot_scatterplot_lr_before_after_calib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
                                                    target_classes, label_encoder,
@@ -180,6 +182,15 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, models, mle,
                                        label_encoder, method_name, softmax, calibration_on_loglrs):
+    """
+    Calculates the likelihood-ratio's before and after calibration for all priors. The baseline prior is used to
+    select the test data (i.e. the data with which the likelihood ratio's are calculated) with. Returns for each test
+    set a dictionary where keys are priors and the values contain the lr's.
+
+    :param baseline_prior: str: string of list that will enable selecting the correct test data
+    :param method_name: str: model and settings to save plots with
+    :param calibration_on_loglrs: bool: whether calibration is fitted on loglrs otherwise on probability
+    """
 
     # must be tested on the same test data based on baseline prior
     X_test_augmented = augmented_data[baseline_prior].X_test_augmented
@@ -227,11 +238,11 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
 
 def calculate_accuracy_all_target_classes(X, y_true, target_classes, model, mle):
     """
-    Predicts labels and ensures that both the true and predicted labels are nhot encoded.
-    Calculates the accuracy.
+    Predicts labels and ensures that both the true and predicted labels are nhot encoded. Calculates the accuracy for
+    all target classes and stores it in a list. The set of labels predicted for a sample must *exactly* match the
+    corresponding set of labels in y_true.
 
-    :return: accuracy: the set of labels predicted for a sample must *exactly* match the
-        corresponding set of labels in y_true.
+    :return: accuracy_scores: list with accuracy for all target classes
     """
 
     y_pred = model._classifier.predict(X)
@@ -272,31 +283,30 @@ def calculate_accuracy_all_target_classes(X, y_true, target_classes, model, mle)
 
 def cllr(lrs, y_nhot, target_class):
     """
-    Computes the cllr for one celltype.
+    Computes the Cllr (log-likelihood ratio cost) for one target class.
 
     :param lrs: numpy array: N_samples with the LRs from the method
     :param y_nhot: N_samples x N_single_cell_type n_hot encoding of the labels
     :param target_class: vector of length n_single_cell_types with at least one 1
-    :return: float: the log-likehood cost ratio
+    :return: float: the log-likehood ratio cost
     """
+
     lrs1 = lrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)].flatten()
     lrs2 = lrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)].flatten()
 
     if len(lrs1) > 0 and len(lrs2) > 0:
         return calculate_cllr(lrs2, lrs1).cllr
     else:
-        # no ground truth labels for the celltype, so cannot calculate
-        # the cllr.
+        # no ground truth labels for the celltype, so cannot calculate the cllr.
         return 9999.0000
 
 
-def combine_lrs_for_all_folds(lrs_for_model, type):
+def append_lrs_for_all_folds(lrs_for_model, type):
     """
-    Combines the lrs calculated on test data for each fold.
+    Concatenates the lrs calculated on test data for each fold.
 
-    :param type:
     :param lrs_for_model:
-    :return:
+    :param type: str: the test data for which lrs should be concatenated.
     """
 
     lrs_before_for_all_methods = OrderedDict()

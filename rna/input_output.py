@@ -8,18 +8,17 @@ import numpy as np
 import pandas as pd
 
 from collections import Counter
+from sklearn.preprocessing import LabelEncoder
 
+from rna import constants
 from rna.analytics import combine_samples
 from rna.utils import remove_markers
-from rna import constants
 
-from sklearn.preprocessing import LabelEncoder
 
 def read_df(filename, nreplicates=None):
     """
-    Reads in an xls file as a dataframe, replacing NA if required.
-    Returns the dataframe containing the data with the signal values and a dataframe
-    with the repeated measurements belonging to a sample.
+    Reads in an xls file as a dataframe, replacing NA if required. Returns the dataframe containing the data with the
+    signal values and a dataframe with the repeated measurements belonging to a sample.
 
     :param filename: path to the file
     :param nreplicates: number of repeated measurements
@@ -56,28 +55,24 @@ def read_df(filename, nreplicates=None):
     return df, rv
 
 
-def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None,
-                           nreplicates=None, ground_truth_known=True, markers=True):
-
+def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
+                           ground_truth_known=True, markers=True):
     """
     Returns data per specified cell types.
 
-    Note that the samples are saved in a separate numpy array
-    based on their replicate indices. As the size differs per
-    sample, the array is filled up with zeros to get the correct
-    dimension.
-
     :param filename: name of file to read in, must include "_rv"
     :param single_cell_types: iterable of strings of all single cell types that exist
+    :param nreplicates: number of repeated measurements
     :param ground_truth_known: does this data file have labels for the real classes?
-    :return: (N_single_cell_experimental_samples x N_measurements per sample x
-        N_markers array of measurements,
-                N_samples x N_single_cell_type n_hot encoding of the labels NB in
-                    in single cell type space!
-                N_cell types,
-                N_markers (=N_features),
-                dict: cell type index -> N_measurements for cell type
-                LabelEncoder: cell type index -> cell type name and cell type name -> cell type index
+    :param markers: bool: if True remove the housekeeping and gender markers
+    :return: X_single: (N_single_cell_experimental_samples x N_measurements per sample x N_markers array of measurements,
+        y_nhot_single: N_samples x N_single_cell_type n_hot encoding of the labels NB in single cell type space!
+        n_celltypes: N_cell types,
+        n_features: N_markers (=N_features),
+        n_per_celltype: dict: cell type index -> N_measurements for cell type,
+        label_encoder: LabelEncoder: cell type index -> cell type name and cell type name -> cell type index,
+        list containing al n_features marker names,
+        list containing strings of all n_samples labels
     """
 
     df, rv = read_df(filename, nreplicates)
@@ -104,7 +99,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single=[]
     if ground_truth_known:
-        # print("===Removed samples===\n")
         for celltype in list(label_encoder.classes_):
             data_for_this_celltype = np.array(df.loc[celltype])
             rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
@@ -146,22 +140,14 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
     """
     Reads in the experimental mixture data that is used as test data.
 
-    Note that the samples are saved in a separate numpy array
-    based on their replicate indices. As the size differs per
-    sample, the array is filled up with zeros to get the correct
-    dimension.
-
-    :param n_celltypes: int: number of single cell types
-        excluding penile skine
+    :param n_celltypes: int: number of single cell types excluding penile skin
+    :param label_encoder: LabelEncoder: cell type index -> cell type name and cell type name -> cell type index
     :param binarize: bool: whether to binarize values
-    :return: N_samples x N_markers array of measurements NB only one replicate per
-                    sample,
-                N_samples iterable of mixture class labels - corresponds to the labels
-                    used in data augmentation,
-                N_samples x N_single_cell_type n_hot encoding of the labels NB in
-                    in single cell type space!
-                dict: mixture name -> list of int single cell type labels
-                dict: mixture class label -> mixture name
+    :param markers: bool: whether to remove the housekeeping and gender markers
+    :return: X_mixtures: N_samples x N_markers array of measurements NB only one replicate per sample,
+        y_nhot_mixtures : N_samples x N_single_cell_type n_hot encoding of the labels NB in in single cell type space!,
+        mixture_label_encoder: LabelEncoder: mixture cell type index -> mixture cell type name and
+                                             mixture cell type name -> mixture cell type index,
     """
 
     df, rv = read_df('Datasets/Dataset_mixtures_rv.xlsx')
@@ -209,8 +195,7 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
 
 def indices_per_replicate(end_replicate, last_index):
     """
-    Put all indices from replicates that belong to one sample
-    in a list and returns one list filled with these lists.
+    Put all indices from replicates that belong to one sample in a list and returns one list filled with these lists.
     """
     end_replicate1 = end_replicate.copy()
     end_replicate2 = end_replicate.copy()
@@ -224,6 +209,18 @@ def indices_per_replicate(end_replicate, last_index):
 
 
 def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicate, rvset_for_this_celltype, discard=True):
+    """
+    Combines the repeated measurements for all samples of the cell type of interest into one sample
+
+    :param celltype: str: cell type
+    :param data_for_this_celltype: array of data belonging to mixture cell type without replicated values combined
+    :param indices_per_replicate: function that returns all indices from replicates that belong to one sample in a
+                                    list and returns one list filled with these lists.
+    :param rvset_for_this_celltype: indices of repeated measurements for cell type of interest
+    :param discard: bool: whether samples that are invalid should be removed
+    :return: n_full_samples: int: the number of samples for this cell type
+        X_for_this_celltype: n_full_samples x n_features of data belonging to this cell type
+    """
 
     end_replicate = [i for i in range(1, len(rvset_for_this_celltype)) if
                      rvset_for_this_celltype[i - 1] > rvset_for_this_celltype[i] or
@@ -246,8 +243,6 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
                 X_for_this_celltype.append(candidate_samples)
         else:
             X_for_this_celltype.append(candidate_samples)
-
-    # print("{} sample(s) from {}".format(n_discarded, celltype))
 
     return n_full_samples, X_for_this_celltype
 
