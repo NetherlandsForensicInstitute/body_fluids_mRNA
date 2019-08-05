@@ -22,15 +22,15 @@ Options:
                                 samples with that distribution will be the test data.
 """
 
-split_before=True
+split_before=False
 augment=True
-binarize=[True, False]
+binarize=[True]
 markers=False
-softmax=[True, False]
-nsamples=(22, 22, 11)
+softmax=[False]
+nsamples=(11, 11, 11)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
-models=[['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]]
+models=[['MLP', True], ['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1],
         [10, 1, 1, 1, 1, 1, 1, 1]]

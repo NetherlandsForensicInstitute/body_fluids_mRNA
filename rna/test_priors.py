@@ -17,8 +17,7 @@ from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
-from rna.plotting import plot_scatterplot_all_lrs_before_after_calib, plot_scatterplot_all_lrs, \
-    plot_boxplot_of_metric, plot_histogram_all_lrs
+from rna.plotting import plot_scatterplot_all_lrs, plot_boxplot_of_metric, plot_histogram_all_lrs
 
 
 def test_priors(nfolds, tc):
@@ -85,15 +84,11 @@ def test_priors(nfolds, tc):
 
             # ======= Transform data accordingly =======
             if binarize:
-                # X_train_transformed = np.where(combine_samples(X_train) > 150, 1, 0)
-                # X_calib_transformed = np.where(combine_samples(X_calib) > 150, 1, 0)
                 X_test_transformed = [
                     [np.where(X_test[i][j] > 150, 1, 0) for j in range(len(X_test[i]))] for i in
                     range(len(X_test))]
                 X_test_transformed = combine_samples(np.array(X_test_transformed))
             else:
-                # X_train_transformed = combine_samples(X_train) / 1000
-                # X_calib_transformed = combine_samples(X_calib) / 1000
                 X_test_transformed = combine_samples(X_test) / 1000
 
             for j, softmax in enumerate(settings.softmax):
@@ -103,6 +98,7 @@ def test_priors(nfolds, tc):
 
 
                     # ======= Calculate LRs before and after calibration =======
+                    key_name_per_fold = str(n) + '_' + bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
                     if settings.augment:
                         model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
                         lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, \
@@ -112,25 +108,16 @@ def test_priors(nfolds, tc):
                                                                                                          baseline_prior,
                                                                                                          models, mle,
                                                                                                          label_encoder,
+                                                                                                         key_name_per_fold,
                                                                                                          softmax,
                                                                                                          settings.calibration_on_loglrs)
+                    else:
+                        raise ValueError("There is no option to set settings.augment = {}".format(settings.augment))
 
                     key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
                     lrs_for_model_in_fold[key_name] = LrsBeforeAfterCalib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
                                                                           lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
                                                                           lrs_before_calib_mixt, lrs_after_calib_mixt, y_nhot_mixtures)
-
-                    # TODO: Check whether want to include --> original data
-                    # else:
-                    #     y_train_transformed = mle.inv_transform_single(y_train)
-                    #     y_train_transformed = mle.labels_to_nhot(y_train_transformed)
-                    #     y_calib_transformed = mle.inv_transform_single(y_calib)
-                    #     y_calib_transformed = mle.labels_to_nhot(y_calib_transformed)
-                    #     model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, \
-                    #     lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                    #         perform_analysis(n, binarize, softmax, models, mle, label_encoder, X_train_transformed,
-                    #                          y_train_transformed, X_calib_transformed, y_calib_transformed, X_test_augmented,
-                    #                          y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, save_hist=True)
 
 
                     # ======= Calculate performance metrics =======
@@ -168,48 +155,47 @@ def test_priors(nfolds, tc):
     lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
     plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                            savefig=os.path.join('scratch', 'histograms_after_calib_augm'))
-    # plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
     if len(settings.priors) == 2:
         plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                                  savefig=os.path.join('scratch', 'LRs_for_different_priors_augm'))
 
-    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
-    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                           savefig=os.path.join('scratch', 'histograms_after_calib_augmasmixt'))
-    if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                 savefig=os.path.join('scratch', 'LRs_for_different_priors_augmasmixt'))
+    # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
+    # plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    #                        savefig=os.path.join('scratch', 'histograms_after_calib_augmasmixt'))
+    # if len(settings.priors) == 2:
+    #     plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    #                              savefig=os.path.join('scratch', 'LRs_for_different_priors_augmasmixt'))
+    #
+    # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='mixt')
+    # plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    #                        savefig=os.path.join('scratch', 'histograms_after_calib_mixt'))
+    # if len(settings.priors) == 2:
+    #     plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    #                              savefig=os.path.join('scratch', 'LRs_for_different_priors_mixt'))
 
-    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='mixt')
-    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                           savefig=os.path.join('scratch', 'histograms_after_calib_mixt'))
-    if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                 savefig=os.path.join('scratch', 'LRs_for_different_priors_mixt'))
-
-    for t, target_class in enumerate(target_classes):
-        target_class_str = vec2string(target_class, label_encoder)
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
-
-        plot_boxplot_of_metric(accuracies_train[target_class_str], "accuracy",
-                               savefig=os.path.join('scratch', 'boxplot_accuracy_train_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(accuracies_test[target_class_str], "accuracy",
-                               savefig=os.path.join('scratch', 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], "accuracy",
-                               savefig=os.path.join('scratch', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], "accuracy",
-                               savefig=os.path.join('scratch', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(accuracies_single[target_class_str], "accuracy",
-                               savefig=os.path.join('scratch', 'boxplot_accuracy_single_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr",
-                               savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr",
-                               savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr",
-                               savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+    # for t, target_class in enumerate(target_classes):
+    #     target_class_str = vec2string(target_class, label_encoder)
+    #     target_class_save = target_class_str.replace(" ", "_")
+    #     target_class_save = target_class_save.replace(".", "_")
+    #     target_class_save = target_class_save.replace("/", "_")
+    #
+    #     plot_boxplot_of_metric(accuracies_train[target_class_str], "accuracy",
+    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_train_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(accuracies_test[target_class_str], "accuracy",
+    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_test_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], "accuracy",
+    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(accuracies_mixtures[target_class_str], "accuracy",
+    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(accuracies_single[target_class_str], "accuracy",
+    #                            savefig=os.path.join('scratch', 'boxplot_accuracy_single_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(cllr_test[target_class_str], "Cllr",
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], "Cllr",
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], "Cllr",
+    #                            savefig=os.path.join('scratch', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
 
 # TODO: Want to change to dict?
 class AugmentedData():

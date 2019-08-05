@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from matplotlib import rc
@@ -242,106 +243,107 @@ def makeplot_density(clf, X0_train, X1_train, X0_calibrate, X1_calibrate, calibr
     if show or savefig is None:
         plt.show()
 
+# TODO: Keep this?
+# def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encoder, calibration_on_loglrs, savefig=None,
+#                           show=None):
+#     """
+#     Makes histogram for calibration data for one hypothesis and plots the KDE curve.
+#
+#     :param lrs:
+#     :param y_nhot:
+#     :param calibrators:
+#     :param target_classes:
+#     :param calibration_on_loglrs:
+#     :param savefig: boolean if True the figure is saved
+#     :param show: boolean if True the figure is displayed
+#     :return:
+#     """
+#
+#     # X = np.arange(np.min(probs)-0.25,
+#     #               np.max(probs)+0.25, .01)
+#     # X = X.reshape(-1, 1)
+#
+#     n_target_classes = len(target_classes)
+#
+#     if len(target_classes) > 1:
+#         n_rows = int(n_target_classes / 2)
+#         fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True)
+#
+#         j = 0
+#         k = 0
+#
+#     for i, target_class in enumerate(target_classes):
+#
+#         celltype = vec2string(target_class, label_encoder)
+#
+#         if calibration_on_loglrs:
+#             loglrs = np.log10(lrs)
+#             X = np.ravel(sorted(loglrs))
+#             data1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+#             data2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+#             ratio = calibrators[str(target_class)].transform(X)
+#             ratio = np.log10(ratio)
+#         else:
+#             probs = lrs / (1 + lrs)
+#             X = np.ravel(sorted(probs))
+#             data1 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
+#             data2 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+#             ratio = calibrators[str(target_class)].transform(X)
+#             ratio = ratio / (1 + ratio)
+#
+#         if n_target_classes == 1:
+#             plt.hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+#             plt.hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+#             plt.hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
+#             plt.plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+#             plt.plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+#             plt.title(celltype)
+#             plt.legend()
+#
+#         elif n_target_classes == 2:
+#             axs[i].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+#             axs[i].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+#             axs[i].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
+#             axs[i].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+#             axs[i].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+#             axs[i].set_title(celltype)
+#
+#             handles, labels = axs[0].get_legend_handles_labels()
+#
+#             fig.text(0.5, 0.04, '10logLR', ha='center')
+#             fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+#
+#             fig.legend(handles, labels, 'center right')
+#
+#         else:
+#             axs[j, k].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
+#             axs[j, k].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
+#             axs[j, k].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
+#             axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
+#             axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
+#             axs[j, k].set_title(celltype)
+#
+#             if (i % 2) == 0:
+#                 k = 1
+#             else:
+#                 k = 0
+#                 j = j + 1
+#
+#             handles, labels = axs[0, 0].get_legend_handles_labels()
+#
+#             fig.text(0.5, 0.04, '10logLR', ha='center')
+#             fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
+#
+#             fig.legend(handles, labels, 'center right')
+#
+#     if savefig is not None:
+#         plt.tight_layout()
+#         plt.savefig(savefig)
+#     if show or savefig is None:
+#         plt.show()
+#
+#     plt.close()
 
-def makeplot_hist_density(lrs, y_nhot, calibrators, target_classes, label_encoder, calibration_on_loglrs, savefig=None,
-                          show=None):
-    """
-    Makes histogram for calibration data for one hypothesis and plots the KDE curve.
-
-    :param lrs:
-    :param y_nhot:
-    :param calibrators:
-    :param target_classes:
-    :param calibration_on_loglrs:
-    :param savefig: boolean if True the figure is saved
-    :param show: boolean if True the figure is displayed
-    :return:
-    """
-
-    # X = np.arange(np.min(probs)-0.25,
-    #               np.max(probs)+0.25, .01)
-    # X = X.reshape(-1, 1)
-
-    n_target_classes = len(target_classes)
-
-    if len(target_classes) > 1:
-        n_rows = int(n_target_classes / 2)
-        fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True)
-
-        j = 0
-        k = 0
-
-    for i, target_class in enumerate(target_classes):
-
-        celltype = vec2string(target_class, label_encoder)
-
-        if calibration_on_loglrs:
-            loglrs = np.log10(lrs)
-            X = np.ravel(sorted(loglrs))
-            data1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-            data2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-            ratio = calibrators[str(target_class)].transform(X)
-            ratio = np.log10(ratio)
-        else:
-            probs = lrs / (1 + lrs)
-            X = np.ravel(sorted(probs))
-            data1 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-            data2 = probs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
-            ratio = calibrators[str(target_class)].transform(X)
-            ratio = ratio / (1 + ratio)
-
-        if n_target_classes == 1:
-            plt.hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            plt.hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
-            plt.hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
-            plt.plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
-            plt.plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
-            plt.title(celltype)
-            plt.legend()
-
-        elif n_target_classes == 2:
-            axs[i].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            axs[i].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
-            axs[i].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
-            axs[i].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
-            axs[i].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
-            axs[i].set_title(celltype)
-
-            handles, labels = axs[0].get_legend_handles_labels()
-
-            fig.text(0.5, 0.04, '10logLR', ha='center')
-            fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
-
-            fig.legend(handles, labels, 'center right')
-
-        else:
-            axs[j, k].hist(data1, density=True, color='orange', label='h1', bins=30, alpha=0.5)
-            axs[j, k].hist(data2, density=True, color='blue', label='h2', bins=30, alpha=0.5)
-            axs[j, k].hist(ratio, density=True, bins=30, color='pink', alpha=0.5)
-            axs[j, k].plot(X, calibrators[str(target_class)].p1, color='orange', label='KDE h1')
-            axs[j, k].plot(X, calibrators[str(target_class)].p0, color='blue', label='KDE h2')
-            axs[j, k].set_title(celltype)
-    
-            if (i % 2) == 0:
-                k = 1
-            else:
-                k = 0
-                j = j + 1
-
-            handles, labels = axs[0, 0].get_legend_handles_labels()
-
-            fig.text(0.5, 0.04, '10logLR', ha='center')
-            fig.text(0.04, 0.5, 'Density', va='center', rotation='vertical')
-
-            fig.legend(handles, labels, 'center right')
-
-    if savefig is not None:
-        plt.tight_layout()
-        plt.savefig(savefig)
-    if show or savefig is None:
-        plt.show()
-
-    plt.close()
 
 def plot_calibration_process(lrs, y_nhot, calibrators, target_classes, label_encoder, calibration_on_loglrs, savefig=None,
                              show=None):
@@ -352,68 +354,146 @@ def plot_calibration_process(lrs, y_nhot, calibrators, target_classes, label_enc
         plot_calibration_process_per_target_class(lr, y_nhot, calibrator, target_class, label_encoder,
                                               calibration_on_loglrs)
 
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
         if savefig is not None:
             plt.tight_layout()
-            plt.savefig(savefig)
+            plt.savefig(savefig + '_' + target_class_save)
         if show or savefig is None:
             plt.show()
 
+        plt.close()
+
+
 def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, target_class, label_encoder,
                                               calibration_on_loglrs):
+    if calibration_on_loglrs:
+        data = np.log10(lr)
+        xlabel = '10logLR'
+        min_val = -11
+        max_val = 11
+    else:
+        data = lr / (1 + lr)
+        xlabel = 'Probability'
+        min_val = -0.1
+        max_val = 1.1
 
-    loglrs = np.log10(lr)
+    data1 = data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
+    data2 = data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
+
+    data1 = np.reshape(data1, -1)
+    data2 = np.reshape(data2, -1)
+
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(6, 12))
     celltype = vec2string(target_class, label_encoder)
-
-    loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
-    loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
-
-    loglrs1 = np.reshape(loglrs1, -1)
-    loglrs2 = np.reshape(loglrs2, -1)
-
-    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(3, 12))
-    plt.suptitle(celltype)
+    plt.suptitle(celltype, y=1.05)
 
     # 1 histogram log10LRs without calibration
-    axes[0, 0].hist(loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
-    axes[0, 0].hist(loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    axes[0, 0].hist(data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[0, 0].hist(data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    axes[0, 0].set_xlabel(xlabel)
+    axes[0, 0].set_ylabel('Density')
+    axes[0, 0].set_xlim(min_val, max_val)
+    axes[0, 0].legend()
 
     # 2 histogram log10LRs without calibration + KDE curves
-    X = np.ravel(sorted(loglrs))
-    LRs = calibrator.transform(X)
-    axes[0, 1].hist(loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
-    axes[0, 1].hist(loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
-    axes[0, 1].plot(X, calibrator.p1, color='orange', label='KDE h1')
-    axes[0, 1].plot(X, calibrator.p0, color='blue', label='KDE h2')
+    LRs = np.ravel(sorted(data))
+    calibrator.transform(LRs)
+    axes[0, 1].hist(data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[0, 1].hist(data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    axes[0, 1].plot(LRs, calibrator.p1, color='orange', label='p1')
+    axes[0, 1].plot(LRs, calibrator.p0, color='blue', label='p0')
+    axes[0, 1].set_xlabel(xlabel)
+    axes[0, 1].set_ylabel('Density')
+    axes[0, 1].set_xlim(min_val, max_val)
 
     # 3 KDE curves
-    axes[1, 0].plot(X, calibrator.p1, color='orange', label='KDE h1')
-    axes[1, 0].plot(X, calibrator.p0, color='blue', label='KDE h2')
+    axes[1, 0].plot(LRs, calibrator.p1, color='orange', label='p1')
+    axes[1, 0].plot(LRs, calibrator.p0, color='blue', label='p0')
+    axes[1, 0].set_xlabel(xlabel)
+    axes[1, 0].set_ylabel('Density')
+    axes[1, 0].set_xlim(min_val, max_val)
+    axes[1, 0].legend()
 
     # 4 Ratio of two curves
     ratio = calibrator.p1 / calibrator.p0
-    axes[1, 1].plot(X, ratio, color='red', label='ratio')
+    if calibration_on_loglrs:
+        X_abovemin10 = np.unique(np.linspace(min_val, min(LRs), 200))
+        calibrator.transform(X_abovemin10)
+        ratio_abovemin10 = calibrator.p1 / calibrator.p0
+
+        X_below10 = np.unique(np.linspace(max(LRs), max_val, 200))
+        calibrator.transform(X_below10)
+        ratio_below10 = calibrator.p1 / calibrator.p0
+
+    axes[1, 1].set_xlim(min_val, max_val)
+    axes[1, 1].plot(LRs, ratio, color='green', label='ratio')
+    if calibration_on_loglrs:
+        axes[1, 1].plot(X_abovemin10, ratio_abovemin10, color='green', linestyle=':', linewidth=1)
+        axes[1, 1].plot(X_below10, ratio_below10, color='green', linestyle=':', linewidth=1)
+    axes[1, 1].set_xlabel(xlabel)
+    axes[1, 1].set_ylabel('Ratio p1/p0')
 
     # 5
     logratio = np.log10(ratio)
-    axes[2, 0].plot(X, logratio, color='red', label='ratio')
-
-    # 7
-    axes[3, 0].hist(logratio, color='pink', density=True, nbins=60, alpha=0.5)
+    axes[2, 0].plot(LRs, logratio, color='green', label='ratio')
+    if calibration_on_loglrs:
+        axes[2, 0].plot(X_abovemin10, np.log10(ratio_abovemin10), color='green', linestyle=':', linewidth=1)
+        axes[2, 0].plot(X_below10, np.log10(ratio_below10), color='green', linestyle=':', linewidth=1)
+    axes[2, 0].set_xlabel(xlabel)
+    axes[2, 0].set_ylabel('10log Ratio p1/p0')
+    axes[2, 0].set_xlim(min_val, max_val)
 
     # 6
-    calibrated_loglrs = np.log10(LRs)
+    # axes[2, 1].hist(logratio, color='green', density=True, bins=30)
+    # axes[2, 1].set_xlabel('10log Ratio p1/p0')
+    # axes[2, 1].set_ylabel('Density')
+    # axes[2, 1].set_xlim(-10.25, 10.25)
 
-    calibrated_loglrs1 = calibrated_loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
-    calibrated_loglrs2 = calibrated_loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
+    # 7
+    LRs = calibrator.transform(data)
 
-    calibrated_loglrs1 = np.reshape(calibrated_loglrs1, -1)
-    calibrated_loglrs2 = np.reshape(calibrated_loglrs2, -1)
+    if calibration_on_loglrs:
+        calibrated_data = np.log10(LRs)
+        xlabel = 'Calibrated 10logLR'
+    else:
+        calibrated_data = LRs / (1 + LRs)
+        xlabel = 'Calibrated probability'
 
-    axes[3, 1].hist(calibrated_loglrs1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
-    axes[3, 1].hist(calibrated_loglrs2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    calibrated_data1 = calibrated_data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
+    calibrated_data2 = calibrated_data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
+
+    calibrated_data1 = np.reshape(calibrated_data1, -1)
+    calibrated_data2 = np.reshape(calibrated_data2, -1)
+
+    axes[3, 0].hist(calibrated_data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+    axes[3, 0].hist(calibrated_data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+    axes[3, 0].set_xlabel(xlabel)
+    axes[3, 0].set_ylabel('Density')
+    axes[3, 0].set_xlim(min_val, max_val)
+
+    # 8
+    if calibration_on_loglrs:
+        axes[3, 1].hist(calibrated_data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+        axes[3, 1].hist(calibrated_data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+        axes[3, 1].set_xlabel(xlabel)
+        axes[3, 1].set_ylabel('Density')
+        axes[3, 1].set_xlim((np.min(calibrated_data) - 0.25), (np.max(calibrated_data) + 0.25))
+    else:
+        calibrated_data1 = np.log10(calibrated_data1 / (1 - calibrated_data1))
+        calibrated_data2 = np.log10(calibrated_data2 / (1 - calibrated_data2))
+
+        axes[3, 1].hist(calibrated_data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
+        axes[3, 1].hist(calibrated_data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
+        axes[3, 1].set_xlabel('Calibrated 10logLR')
+        axes[3, 1].set_ylabel('Density')
 
 
-def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder):
+def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, show=None,
+                                           savefig=None):
 
     loglrs_before = np.log10(lrs_before)
     loglrs_after = np.log10(lrs_after)
@@ -431,14 +511,17 @@ def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target
 
         celltype = vec2string(target_class, label_encoder)
 
-        min_vals = [min(loglrs_before), min(loglrs_after)]
-        max_vals = [max(loglrs_before), max(loglrs_after)]
+        min_vals = [min(loglrs_before[:, i]), min(loglrs_after[:, i])]
+        max_vals = [max(loglrs_before[:, i]), max(loglrs_after[:, i])]
         diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
 
         target_class = np.reshape(target_class, -1, 1)
         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
 
         colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+
+        h1 = mpatches.Patch(color='orange', label='h1')
+        h2 = mpatches.Patch(color='blue', label='h2')
 
         if n_target_classes == 1:
 
@@ -447,9 +530,10 @@ def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target
             plt.title(celltype)
             plt.xlim(min(min_vals), max(max_vals))
             plt.ylim(min(min_vals), max(max_vals))
+            plt.legend(handles=[h1, h2])
 
-            plt.xlabel("lrs before")
-            plt.ylabel("lrs after")
+            plt.xlabel("10logLRs before")
+            plt.ylabel("10logLRs after")
 
         elif n_target_classes == 2:
             axs[i].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
@@ -476,6 +560,16 @@ def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target
 
             fig.text(0.5, 0.04, "lrs before", ha='center')
             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+    if show or savefig is None:
+        plt.show()
+
+    plt.close()
+
+
 
 
 # TODO: Change this function

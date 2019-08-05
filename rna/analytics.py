@@ -3,6 +3,7 @@ Performs project specific.
 """
 from collections import OrderedDict
 
+import os
 import keras
 import numpy as np
 from sklearn.metrics import accuracy_score
@@ -10,7 +11,7 @@ from sklearn.metrics import accuracy_score
 from rna.constants import nhot_matrix_all_combinations
 
 from lir.lr import calculate_cllr
-from lir.plotting import makeplot_hist_density, plot_scatterplot_lr_before_after_calib, plot_calibration_process
+from lir.plotting import plot_scatterplot_lr_before_after_calib, plot_calibration_process
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
 # from rna.plotting import plot_scatterplot_lr_before_after_calib
 
@@ -129,7 +130,7 @@ def model_with_correct_settings(model_no_settings, softmax, n_classes):
 
 def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                      X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
-                     models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde):
+                     models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs, save_calib_plots):
 
     classifier = models[0]
     with_calibration = models[1]
@@ -143,16 +144,24 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
                          target_classes, model, mle, softmax, calibration_on_loglrs)
 
-        if save_kde:
+        if save_calib_plots:
+            # For calibration data
             plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                      y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                     label_encoder, calibration_on_loglrs)
+                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch', 'calib_process_calib_{}'.format(method_name_prior)))
 
-            makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-                                  y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                  label_encoder, calibration_on_loglrs)
+            # For test data
+            plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
+                                     y_test_nhot_augmented, model._calibrators_per_target_class, target_classes,
+                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch', 'calib_process_test_{}'.format(method_name_prior)))
 
-            plot_scatterplot_lr_before_after_calib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder)
+            # makeplot_hist_density(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+            #                       y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
+            #                       label_encoder, calibration_on_loglrs)
+
+            plot_scatterplot_lr_before_after_calib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
+                                                   target_classes, label_encoder,
+                                                   savefig=os.path.join('scratch', 'scatterplot_lrs_before_after_{}'.format(method_name_prior)))
 
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
@@ -170,7 +179,7 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
 
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, models, mle,
-                                       label_encoder, softmax, calibration_on_loglrs):
+                                       label_encoder, method_name, softmax, calibration_on_loglrs):
 
     # must be tested on the same test data based on baseline prior
     X_test_augmented = augmented_data[baseline_prior].X_test_augmented
@@ -188,6 +197,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
 
     for key, data in augmented_data.items():
         print(" Prior: {}".format(key))
+        method_name_prior = method_name + '_' + key
 
         X_train_augmented = data.X_train_augmented
         y_train_nhot_augmented = data.y_train_nhot_augmented
@@ -199,7 +209,8 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
         lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
-                             target_classes, models, mle, label_encoder, softmax, calibration_on_loglrs, save_kde=True)
+                             target_classes, models, mle, label_encoder, method_name_prior, softmax,
+                             calibration_on_loglrs, save_calib_plots=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i
