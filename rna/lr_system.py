@@ -319,7 +319,7 @@ class MarginalDLClassifier():
         model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features, activation_layer=self.activation_layer)
         # compile model
         self.compile_model(model, optimizer=self.optimizer, loss=self.loss)
-        model.summary()
+        # model.summary()
         return model
 
 

@@ -17,10 +17,10 @@ from rna.augment import MultiLabelEncoder, augment_splitted_data
 from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
-from rna.plotting import plot_scatterplot_all_lrs, plot_boxplot_of_metric, plot_histogram_all_lrs
+from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, plot_histograms_all_lrs_all_folds
 
 
-def test_priors(nfolds, tc):
+def nfold_analysis(nfolds, tc):
     from_penile = False
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(settings.priors[0])
@@ -153,11 +153,11 @@ def test_priors(nfolds, tc):
         lrs_for_model_per_fold[str(n)] = lrs_for_model_in_fold
 
     lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
-    plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                           savefig=os.path.join('scratch', 'histograms_after_calib_augm'))
+    plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                                      savefig=os.path.join('scratch', 'histograms_after_calib_augm'))
     if len(settings.priors) == 2:
-        plot_scatterplot_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                 savefig=os.path.join('scratch', 'LRs_for_different_priors_augm'))
+        plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                                                   savefig=os.path.join('scratch', 'LRs_for_different_priors_augm'))
 
     # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
     # plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,

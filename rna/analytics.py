@@ -3,7 +3,7 @@ Performs project specific.
 """
 
 import os
-# import keras
+import keras
 
 import numpy as np
 
@@ -11,7 +11,7 @@ from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
-from lir.plotting import plot_scatterplot_lr_before_after_calib, plot_calibration_process
+from rna.plotting import plot_scatterplot_lr_before_after_calib, plot_calibration_process
 
 from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
