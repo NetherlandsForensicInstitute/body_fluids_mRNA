@@ -2,14 +2,16 @@
 Plotting functions.
 """
 
+import math
 import numpy as np
+import rna.settings as settings
 
 from matplotlib import rc, pyplot as plt, patches as mpatches
 from collections import OrderedDict
 
 # from rna.analytics import combine_samples
 
-from rna.utils import vec2string, prior2string
+from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 
 from lir import PavLogLR
 
@@ -344,9 +346,59 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
 
     for keys, values in test_dict.items():
         for t, target_class in enumerate(target_classes):
-            fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
+            fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(12, 3))
             plt.suptitle(vec2string(target_class, label_encoder))
-            plot_scatterplot_lrs_different_priors(values, t, target_class, label_encoder, ax=axs1, title='augmented test')
+
+            loglrs = OrderedDict()
+            y_nhot = OrderedDict()
+            full_name = []
+            priors = []
+            for method, data in values.items():
+                loglrs[method] = np.log10(data[0][:, t])
+                y_nhot[method] = data[1]
+                full_name.append(method)
+                priors.append('[' + method.split('[')[1])
+            assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
+
+            target_class = np.reshape(target_class, -1, 1)
+            labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+
+            colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+            colors_positive = ['orange'] * int(np.sum(labels))
+            colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
+
+            h1 = mpatches.Patch(color='orange', label='h1')
+            h2 = mpatches.Patch(color='blue', label='h2')
+
+            # make sure uniform priors always on bottom
+            if any(str([1] * len(target_class)) in x for x in priors):
+                index1 = priors.index(str([1] * len(target_class)))
+                loglrs1 = loglrs[full_name[index1]]
+                loglrs2 = loglrs[full_name[1 - index1]]
+            else:
+                index1 = 0
+                index2 = 1
+                loglrs1 = loglrs[full_name[index1]]
+                loglrs2 = loglrs[full_name[index2]]
+
+            loglrs1_pos = loglrs1[np.argwhere(labels == 1)]
+            loglrs2_pos = loglrs2[np.argwhere(labels == 1)]
+            loglrs1_neg = loglrs1[np.argwhere(labels == 0)]
+            loglrs2_neg = loglrs2[np.argwhere(labels == 0)]
+
+            min_val_pos = math.floor(min(np.min(loglrs1_pos), np.min(loglrs2_pos)))
+            max_val_pos = math.trunc(max(np.max(loglrs1_pos), np.max(loglrs2_pos)))
+            min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
+            max_val_neg = math.trunc(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
+
+            plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 8), colors, (h1, h2), ax=axs1)
+            plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
+                                                  (h1), ax=axs2)
+            plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
+                                                  (h2), ax=axs3)
+
+            fig.text(0.5, 0.02, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
+            fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[1 - index1], label_encoder)), va='center', rotation='vertical')
 
             target_class_str = vec2string(target_class, label_encoder)
             target_class_save = target_class_str.replace(" ", "_")
@@ -361,97 +413,80 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 plt.show()
 
 
-def plot_scatterplot_lrs_different_priors(values, t, target_class, label_encoder, ax=None, title=None):
+def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, handles, ax=None):
 
     ax = ax
-    min_vals = []
-    max_vals = []
-    loglrs = OrderedDict()
-    y_nhot = OrderedDict()
-    full_name = []
-    priors = []
-    for method, data in values.items():
-        loglrs[method] = np.log10(data[0][:, t])
-        y_nhot[method] = data[1]
-        full_name.append(method)
-        priors.append('[' + method.split('[')[1])
-        min_vals.append(np.min(np.log10(data[0][:, t])))
-        max_vals.append(np.max(np.log10(data[0][:, t])))
-    assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
-    diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
 
-    target_class = np.reshape(target_class, -1, 1)
-    labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+    rect_neg = mpatches.Rectangle((-5, -5), 5, 5, color='blue', alpha=0.1, linewidth=0)
+    rect_pos1 = mpatches.Rectangle((-5, 0), 13, 8, color='orange', alpha=0.1, linewidth=0)
+    rect_pos2 = mpatches.Rectangle((0, -5), 8, 5, color='orange', alpha=0.1, linewidth=0)
 
-    colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-
-    # make sure uniform priors always on bottom
-    if any(str([1] * len(target_class)) in x for x in priors):
-        index1 = priors.index(str([1] * len(target_class)))
-        loglrs1 = loglrs[full_name[index1]]
-        loglrs2 = loglrs[full_name[1-index1]]
-    else:
-        index1 = 0
-        index2 = 1
-        loglrs1 = loglrs[full_name[index1]]
-        loglrs2 = loglrs[full_name[index2]]
-
-    ax.scatter(loglrs1, loglrs2, s=3, color=colors, alpha=0.5)
     ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-    ax.set_title(title)
-    ax.set_xlim(min(min_vals), max(max_vals))
-    ax.set_ylim(min(min_vals), max(max_vals))
+    ax.scatter(loglrs[0], loglrs[1], s=3, color=colors, alpha=0.2)
+    ax.add_patch(rect_neg)
+    ax.add_patch(rect_pos1)
+    ax.add_patch(rect_pos2)
+    ax.set_xlim(min(diagonal_coordinates), max(diagonal_coordinates))
+    ax.set_ylim(min(diagonal_coordinates), max(diagonal_coordinates))
 
-    ax.set_xlabel("10logLR {}".format(prior2string(priors[index1], label_encoder)))
-    ax.set_ylabel("10logLR {}".format(prior2string(priors[1 - index1], label_encoder)))
+    try:
+        ax.legend(handles=[handles[0], handles[1]], loc=0)
+    except TypeError:
+        ax.legend(handles=[handles], loc=0)
+
+    # ax.set_xlabel("10logLR {}".format(prior2string(priors[index], label_encoder)))
+    # ax.set_ylabel("10logLR {}".format(prior2string(priors[1 - index], label_encoder)))
 
     return ax
 
 
-# TODO: Make function generic
-def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
+def plot_boxplot_of_metric(n_metric, label_encoder, name_metric, savefig=None, show=None):
 
-    MLP_bin_soft_priorunif, MLR_bin_soft_priorunif, XGB_bin_soft_priorunif, DL_bin_soft_priorunif = n_metric[:, 0, 0, :, 0].T
-    MLP_bin_soft_priorother, MLR_bin_soft_priorother, XGB_bin_soft_priorother, DL_bin_soft_priorother = n_metric[:, 0, 0, :, 1].T
-    MLP_norm_soft_priorunif, MLR_norm_soft_priorunif, XGB_norm_soft_priorunif, DL_norm_soft_priorunif = n_metric[:, 1, 0, :, 0].T
-    MLP_norm_soft_priorother, MLR_norm_soft_priorother, XGB_norm_soft_priorother, DL_norm_soft_priorother = n_metric[:, 1, 0, :, 1].T
-    MLP_bin_sig_priorunif, MLR_bin_sig_priorunif, XGB_bin_sig_priorunif, DL_bin_sig_priorunif = n_metric[:, 0, 1, :, 0].T
-    MLP_bin_sig_priorother, MLR_bin_sig_priorother, XGB_bin_sig_priorother, DL_bin_sig_priorother = n_metric[:, 0, 1, :, 1].T
-    MLP_norm_sig_priorunif, MLR_norm_sig_priorunif, XGB_norm_sig_priorunif, DL_norm_sig_priorunif = n_metric[:, 1, 1, :, 0].T
-    MLP_norm_sig_priorother, MLR_norm_sig_priorother, XGB_norm_sig_priorother, DL_norm_sig_priorother = n_metric[:, 1, 1, :, 0].T
+    def int2string_models(int, specify_which=None):
+        if specify_which == None:
+            raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
+        elif specify_which == 1:
+            for i in range(len(settings.binarize)):
+                if int == i:
+                    return bool2str_binarize(settings.binarize[i])
+        elif specify_which == 2:
+            for i in range(len(settings.softmax)):
+                if int == i:
+                    return bool2str_softmax(settings.softmax[i])
+        elif specify_which == 3:
+            for i in range(len(settings.models)):
+                if int == i:
+                    return settings.models[i][0]
+        elif specify_which == 4:
+            for i in range(len(settings.priors)):
+                if int == i:
+                    return prior2string(str(settings.priors[i]), label_encoder)
+        else:
+            raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 
-    data = [MLP_bin_soft_priorunif, MLP_bin_soft_priorother, MLR_bin_soft_priorunif, MLR_bin_soft_priorother,
-            XGB_bin_soft_priorunif, XGB_bin_soft_priorother, DL_bin_soft_priorunif, DL_bin_soft_priorother,
-            MLP_norm_soft_priorunif, MLP_norm_soft_priorother, MLR_norm_soft_priorunif, MLR_norm_soft_priorother,
-            XGB_norm_soft_priorunif, XGB_norm_soft_priorother, DL_norm_soft_priorunif, DL_norm_soft_priorother,
-            MLP_bin_sig_priorunif, MLP_bin_sig_priorother, MLR_bin_sig_priorunif, MLR_bin_sig_priorother,
-            XGB_bin_sig_priorunif, XGB_bin_sig_priorother, DL_bin_sig_priorunif, DL_bin_sig_priorother,
-            MLP_norm_sig_priorunif, MLP_norm_sig_priorother, MLR_norm_sig_priorunif, MLR_norm_sig_priorother,
-            XGB_norm_sig_priorunif, XGB_norm_sig_priorother, DL_norm_sig_priorunif, DL_norm_sig_priorother]
+    i_transformations = n_metric.shape[1]
+    j_probscalulations = n_metric.shape[2]
+    k_models = n_metric.shape[3]
+    p_priors = n_metric.shape[4]
 
-    names = ['MLP bin soft priorunif', 'MLP bin soft priorother', 'MLR bin soft priorunif', 'MLR bin soft priorother',
-             'XGB bin soft priorunif', 'XGB bin soft priorother', 'DL bin soft priorunif', 'DL bin soft priorother',
-             'MLP norm soft priorunif', 'MLP norm soft priorother', 'MLR norm soft priorunif', 'MLR norm soft priorother',
-             'XGB norm soft priorunif', 'XGB norm soft priorother', 'DL norm soft priorunif', 'DL norm soft priorother',
-             'MLP bin sig priorunif', 'MLP bin sig priorother', 'MLR bin sig priorunif', 'MLR bin sig priorother',
-             'XGB bin sig priorunif', 'XGB bin sig priorother', 'DL bin sig priorunif', 'DL bin sig priorother',
-             'MLP norm sig priorunif', 'MLP norm sig priorother', 'MLR norm sig priorunif', 'MLR norm sig priorother',
-             'XGB norm sig priorunif', 'XGB norm sig priorother', 'DL norm sig priorunif', 'DL norm sig priorother']
+    total_boxplots = i_transformations * j_probscalulations * p_priors * k_models
 
-    fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True)
-    fig.suptitle("{} folds".format(n_metric.shape[0]))
-    axes[0].boxplot(data[0:8], vert=False)
-    axes[0].set_yticklabels(names[0:8])
-
-    axes[1].boxplot(data[8:16], vert=False)
-    axes[1].set_yticklabels(names[8:16])
-
-    axes[2].boxplot(data[16:24], vert=False)
-    axes[2].set_yticklabels(names[16:24])
-
-    axes[3].boxplot(data[24:32], vert=False)
-    axes[3].set_yticklabels(names[24:32])
-    axes[3].set_xlabel(name_metric)
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    ax.set_axisbelow(True)
+    a = 0
+    names = []
+    for i in range(i_transformations):
+        for j in range(j_probscalulations):
+            for k in range(k_models):
+                for p in range(p_priors):
+                    names.append(int2string_models(k, 3) + ' ' + int2string_models(i, 1) + ' ' + int2string_models(j, 2) + ' ' + int2string_models(p, 4))
+                    ax.boxplot(n_metric[:, i, j, k, p], vert=False, positions=[a])
+                    a += 1
+    ax.set_yticks(range(total_boxplots))
+    ax.set_yticklabels(names)
+    ax.set_ylim(-0.5, total_boxplots-0.5)
+    ax.set_xlabel(name_metric)
 
     if savefig is not None:
         plt.tight_layout()
@@ -462,6 +497,7 @@ def plot_boxplot_of_metric(n_metric, name_metric, savefig=None, show=None):
         plt.show()
 
     plt.close(fig)
+
 
 
 # TODO: Make this function work (?)

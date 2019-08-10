@@ -22,7 +22,7 @@ Options:
                                 samples with that distribution will be the test data.
 """
 
-split_before=False
+split_before=True
 augment=True
 binarize=[True, False]
 markers=False

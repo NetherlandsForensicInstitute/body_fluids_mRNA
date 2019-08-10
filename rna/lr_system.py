@@ -46,7 +46,7 @@ class MarginalMLPClassifier():
                 else:
                     probs = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
                     self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
-        except TypeError or ValueError:
+        except ValueError or TypeError:
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
 

@@ -154,16 +154,16 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             # For calibration data
             plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                      y_calib_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch', 'calib_process_calib_{}'.format(method_name_prior)))
+                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch/plots_analysis15_060819', 'calib_process_calib_{}'.format(method_name_prior)))
 
             # For test data
             plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
                                      y_test_nhot_augmented, model._calibrators_per_target_class, target_classes,
-                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch', 'calib_process_test_{}'.format(method_name_prior)))
+                                     label_encoder, calibration_on_loglrs, savefig=os.path.join('scratch/plots_analysis15_060819', 'calib_process_test_{}'.format(method_name_prior)))
 
             plot_scatterplot_lr_before_after_calib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
                                                    target_classes, label_encoder,
-                                                   savefig=os.path.join('scratch', 'scatterplot_lrs_before_after_{}'.format(method_name_prior)))
+                                                   savefig=os.path.join('scratch/plots_analysis15_060819', 'scatterplot_lrs_before_after_{}'.format(method_name_prior)))
 
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
