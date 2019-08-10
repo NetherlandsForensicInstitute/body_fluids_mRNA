@@ -11,7 +11,7 @@ from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
-from rna.plotting import plot_calibration_process
+from rna.plotting import plot_calibration_process, plot_pavs
 
 from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
@@ -162,6 +162,8 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                                      (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
                                      calibration_on_loglrs)
 
+            plot_pavs(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder)
+
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
@@ -218,7 +220,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
                              target_classes, models, mle, label_encoder, method_name_prior, softmax,
-                             calibration_on_loglrs, save_calib_plots=False)
+                             calibration_on_loglrs, save_calib_plots=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i

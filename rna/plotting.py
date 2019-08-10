@@ -595,6 +595,7 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
             axis=1))
     plt.savefig('mixtures binned data and log lrs')
 
+
 # TODO: Make this funtion work?
 # def plot_data(X):
 #     """
@@ -606,75 +607,72 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
 #     plt.savefig('single_cell_type_measurements_after_QC')
 
 
-# TODO: Make function work
-def plot_pav(lrs_before, lrs_after, y, classes_map, show_scatter=True, on_screen=False, path=None):
+def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, savefig=None, show=None):
+
+    for t, target_class in enumerate(target_classes):
+
+        loglrs_before = np.log10(lrs_before[:, t])
+        loglrs_after = np.log10(lrs_after[:, t])
+
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+        fig, (axs1, axs2) = plt.subplots(nrows=1, ncols=2, figsize=(9, 3))
+        plt.suptitle(vec2string(target_class, label_encoder))
+
+        plot_pav(loglrs_before, labels, axs1)
+        plot_pav(loglrs_after, labels, axs2)
+
+        fig.text(0.5, 0.001, 'pre-PAVcalibrated 10log(lr)', ha='center')
+        fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical')
+
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save)
+            plt.close()
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+        plt.close(fig)
+
+
+def plot_pav(loglr, labels, ax, show_scatter=True):
     """
     Plots pav plots for all cell types before and after calibration.
-
-    :param lrs_before:
-    :param lrs_after:
-    :param y:
-    :param show_scatter:
-    :param on_screen:
-    :param path:
-    :return:
     """
 
-    celltypes = lrs_before.keys()
-    fig, axs = plt.subplots(len(list(celltypes)), 2, figsize=(9, int(9 / 2 * len(list(celltypes)))))
-    for idx, celltype in enumerate(sorted(celltypes)):
-        i_celltype = classes_map[celltype]
-        lrs_celltype_before = np.append(lrs_before[celltype][0], lrs_before[celltype][1])
-        lrs_celltype_after = np.append(lrs_after[celltype][0], lrs_after[celltype][1])
+    ax=ax
 
-        llrs_celltype_before = np.log10(lrs_celltype_before)
-        llrs_celltype_after = np.log10(lrs_celltype_after)
+    pav = PavLogLR()
+    pav_loglrs = pav.fit_transform(loglr, labels)
 
-        # Plot before
-        pav_before = PavLogLR()
-        pav_llrs = pav_before.fit_transform(llrs_celltype_before, y[:, i_celltype])
+    all_loglrs = np.concatenate([loglr, pav_loglrs])
+    all_loglrs[all_loglrs == -np.inf] = 0
+    all_loglrs[all_loglrs == np.inf] = 0
+    xrange = [all_loglrs.min() - .5, all_loglrs.max() + .5]
 
-        all_llrs = np.concatenate([llrs_celltype_before, pav_llrs])
-        all_llrs[all_llrs == -np.inf] = 0
-        all_llrs[all_llrs == np.inf] = 0
-        xrange = [all_llrs.min() - .5, all_llrs.max() + .5]
+    ax.axis('equal')
+    ax.axis(xrange + xrange)
+    ax.plot(xrange, xrange, color='black')
 
-        axs[i_celltype, 0].axis('equal')
-        axs[i_celltype, 0].axis(xrange + xrange)
-        axs[i_celltype, 0].plot(xrange, xrange)  # rechte lijn door de oorsprong
+    pav_x = np.arange(*xrange, .01)
+    ax.plot(pav_x, pav.transform(pav_x), color='green', alpha=0.9)
+    ax.grid(True, linestyle=':')
+    if show_scatter:
+        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+        h1 = mpatches.Patch(color='orange', label='h1')
+        h2 = mpatches.Patch(color='blue', label='h2')
 
-        pav_x = np.arange(*xrange, .01)
-        axs[i_celltype, 0].set_title(celltype + "\n" + " before calibration", fontsize=12)
-        axs[i_celltype, 0].plot(pav_x, pav_before.transform(pav_x))  # pre-/post-calibrated lr fit
-        axs[i_celltype, 0].grid(True, linestyle=':')
-        if show_scatter:
-            axs[i_celltype, 0].scatter(llrs_celltype_before, pav_llrs)  # scatter plot of measured lrs
+        ax.scatter(loglr, pav_loglrs, color=colors, marker='x')
+        ax.legend(handles=[h1, h2])
 
-        # Plot after
-        pav_after = PavLogLR()
-        pav_llrs_after = pav_after.fit_transform(llrs_celltype_after, y[:, i_celltype])
+    return ax
 
-        axs[i_celltype, 1].axis('equal')
-        axs[i_celltype, 1].axis(xrange + xrange)
-        axs[i_celltype, 1].plot(xrange, xrange)  # rechte lijn door de oorsprong
-
-        pav_x = np.arange(*xrange, .01)
-        axs[i_celltype, 1].set_title(celltype + "\n" + "after calibration", fontsize=12)
-        axs[i_celltype, 1].plot(pav_x, pav_after.transform(pav_x))  # pre-/post-calibrated lr fit
-        axs[i_celltype, 1].grid(True, linestyle=':')
-        if show_scatter:
-            axs[i_celltype, 1].scatter(llrs_celltype_after, pav_llrs_after)  # scatter plot of measured lrs
-
-    fig.text(0.5, 0.001, 'pre-PAVcalibrated 10log(lr)', ha='center', fontsize=14)
-    fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical', fontsize=14)
-
-    if on_screen:
-        plt.show()
-    if path is not None:
-        plt.tight_layout()
-        plt.savefig(path)
-
-    plt.close(fig)
 
 
 # TODO: Want to keep this?
