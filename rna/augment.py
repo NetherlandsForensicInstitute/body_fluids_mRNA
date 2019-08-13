@@ -211,8 +211,14 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
         X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
 
+    print('train:', X_train_augmented.shape)
+    print('calib:', X_calib_augmented.shape)
+    print('test:', X_test_augmented.shape)
+    print('testasm:', X_test_as_mixtures_augmented.shape)
+
     class_to_return = class_to_save(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
            X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented)
+
 
     return class_to_return
 

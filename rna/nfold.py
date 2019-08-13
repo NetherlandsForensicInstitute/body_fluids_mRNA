@@ -154,14 +154,14 @@ def nfold_analysis(nfolds, tc):
         lrs_for_model_per_fold[str(n)] = lrs_for_model_in_fold
 
     # #save cllr's and accurcies
-    # pickle.dump(cllr, open('scratch/cllrs', 'wb'))
-    #
-    # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
-    # plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-    #                                   savefig=os.path.join('scratch/plots_analysis15_060819', 'histograms_after_calib_augm'))
-    # if len(settings.priors) == 2:
-    #     plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-    #                                                savefig=os.path.join('scratch/plots_analysis15_060819', 'LRs_for_different_priors_augm'))
+    pickle.dump(cllr, open('scratch/cllrs', 'wb'))
+
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
+    plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                                      savefig=os.path.join('scratch/plots_analysis5', 'histograms_after_calib_augm'))
+    if len(settings.priors) == 2:
+        plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                                                   savefig=os.path.join('scratch/plots_analysis5', 'LRs_for_different_priors_augm'))
 
     # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = combine_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm as mixt')
     # plot_histogram_all_lrs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
@@ -183,22 +183,23 @@ def nfold_analysis(nfolds, tc):
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
-        plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, target_class, 'accuracy')
-        # plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        # plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-        # plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-        # plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_accuracy_single_{}'.format(target_class_save)))
-        #
-        # plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_cllr_test_{}'.format(target_class_save)))
-        # plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        # plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join('scratch/plots_analysis15_060819/', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, target_class, 'accuracy',
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_accuracy_train_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, target_class, "accuracy",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_accuracy_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, target_class, "accuracy",
+                               savefig=os.path.join('scratch/plots_analysis5/', 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, target_class, "accuracy",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, target_class, "accuracy",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_accuracy_single_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, target_class, "Cllr",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_cllr_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, target_class, "Cllr",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, target_class, "Cllr",
+                               savefig=os.path.join('scratch/plots_analysis5', 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
 
 # TODO: Want to change to dict?
 class AugmentedData():

@@ -11,7 +11,7 @@ from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
-from rna.plotting import plot_calibration_process, plot_pavs
+from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr
 
 from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
@@ -128,11 +128,13 @@ def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
 
 def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                      X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
-                     models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs, save_calib_plots):
+                     models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs, save_calib_plots,
+                     save_cllr_plots):
     """
     Selects the model with correct settings with 'model' and 'softmax' and calculates the likelihood-ratio's before and
     after calibration on three test sets (augmented test, original mixtures and augmented test as mixtures).
 
+    :param save_cllr_plots:
     :param method_name_prior: str: model and settings to save plots with
     :param calibration_on_loglrs: bool: whether calibration is fitted on loglrs otherwise on probability
     :param save_calib_plots: bool: whether to save plots for calibration
@@ -154,15 +156,18 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             # For calibration data
             plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                      y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
-                                     label_encoder, calibration_on_loglrs)
+                                     label_encoder, calibration_on_loglrs,
+                                     savefig=os.path.join('scratch/plots_analysis5', 'calib_process_calib_{}'.format(method_name_prior)))
 
             # For test data
             plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
                                      y_test_nhot_augmented, model._calibrators_per_target_class,
                                      (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
-                                     calibration_on_loglrs)
+                                     calibration_on_loglrs,
+                                     savefig=os.path.join('scratch/plots_analysis5', 'calib_process_test_{}'.format(method_name_prior)))
 
-            plot_pavs(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder)
+            plot_pavs(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
+                      savefig=os.path.join('scratch/plots_analysis5', 'pav_plots_{}'.format(method_name_prior)))
 
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
@@ -174,6 +179,9 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+
+    if save_cllr_plots:
+        plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes)
 
     return model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, \
            lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt
@@ -220,7 +228,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
                              target_classes, models, mle, label_encoder, method_name_prior, softmax,
-                             calibration_on_loglrs, save_calib_plots=True)
+                             calibration_on_loglrs, save_calib_plots=False, save_cllr_plots=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i

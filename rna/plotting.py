@@ -14,6 +14,7 @@ from collections import OrderedDict
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 
 from lir import PavLogLR
+from lir.calibration import IsotonicCalibrator
 
 
 rc('text', usetex=True)
@@ -188,84 +189,6 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
         axes[3, 1].hist(calibrated_data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
         axes[3, 1].set_xlabel('Calibrated 10logLR')
         axes[3, 1].set_ylabel('Density')
-
-
-# def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, show=None,
-#                                            savefig=None):
-#
-#     loglrs_before = np.log10(lrs_before)
-#     loglrs_after = np.log10(lrs_after)
-#
-#     n_target_classes = len(target_classes)
-#
-#     if n_target_classes > 1:
-#         n_rows = int(n_target_classes / 2)
-#         fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-#
-#         j = 0
-#         k = 0
-#
-#     for i, target_class in enumerate(target_classes):
-#
-#         celltype = vec2string(target_class, label_encoder)
-#
-#         min_vals = [min(loglrs_before[:, i]), min(loglrs_after[:, i])]
-#         max_vals = [max(loglrs_before[:, i]), max(loglrs_after[:, i])]
-#         diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
-#
-#         target_class = np.reshape(target_class, -1, 1)
-#         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-#
-#         colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-#
-#         h1 = mpatches.Patch(color='orange', label='h1')
-#         h2 = mpatches.Patch(color='blue', label='h2')
-#
-#         if n_target_classes == 1:
-#
-#             plt.scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             plt.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             plt.title(celltype)
-#             plt.xlim(min(min_vals), max(max_vals))
-#             plt.ylim(min(min_vals), max(max_vals))
-#             plt.legend(handles=[h1, h2])
-#
-#             plt.xlabel("10logLRs before")
-#             plt.ylabel("10logLRs after")
-#
-#         elif n_target_classes == 2:
-#             axs[i].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             axs[i].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             axs[i].set_title(celltype)
-#             axs[i].set_xlim(min(min_vals), max(max_vals))
-#             axs[i].set_ylim(min(min_vals), max(max_vals))
-#
-#             fig.text(0.5, 0.04, "lrs before", ha='center')
-#             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
-#
-#         elif n_target_classes > 2:
-#             axs[j, k].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             axs[j, k].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             axs[j, k].set_title(celltype)
-#             axs[j, k].set_xlim(min(min_vals), max(max_vals))
-#             axs[j, k].set_ylim(min(min_vals), max(max_vals))
-#
-#             if (i % 2) == 0:
-#                 k = 1
-#             else:
-#                 k = 0
-#                 j = j + 1
-#
-#             fig.text(0.5, 0.04, "lrs before", ha='center')
-#             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
-#
-#     if savefig is not None:
-#         plt.tight_layout()
-#         plt.savefig(savefig)
-#     if show or savefig is None:
-#         plt.show()
-#
-#     plt.close()
 
 
 def plot_histograms_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
@@ -521,6 +444,235 @@ def plot_boxplot_of_metric(n_metric, label_encoder, target_class, name_metric, s
     plt.close(fig)
 
 
+def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, savefig=None, show=None):
+
+    for t, target_class in enumerate(target_classes):
+
+        loglrs_before = np.log10(lrs_before[:, t])
+        loglrs_after = np.log10(lrs_after[:, t])
+
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+        fig, (axs1, axs2) = plt.subplots(nrows=1, ncols=2, figsize=(9, 3))
+        plt.suptitle(vec2string(target_class, label_encoder))
+
+        plot_pav(loglrs_before, labels, axs1)
+        plot_pav(loglrs_after, labels, axs2)
+
+        fig.text(0.5, 0.001, 'pre-PAVcalibrated 10log(lr)', ha='center')
+        fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical')
+
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save)
+            plt.close()
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+        plt.close(fig)
+
+
+def plot_pav(loglr, labels, ax, show_scatter=True):
+    """
+    Plots pav plots for all cell types before and after calibration.
+    """
+
+    ax=ax
+
+    pav = PavLogLR()
+    pav_loglrs = pav.fit_transform(loglr, labels)
+
+    all_loglrs = np.concatenate([loglr, pav_loglrs])
+    all_loglrs[all_loglrs == -np.inf] = 0
+    all_loglrs[all_loglrs == np.inf] = 0
+    xrange = [all_loglrs.min() - .5, all_loglrs.max() + .5]
+
+    ax.axis('equal')
+    ax.axis(xrange + xrange)
+    ax.plot(xrange, xrange, color='black')
+
+    pav_x = np.arange(*xrange, .01)
+    ax.plot(pav_x, pav.transform(pav_x), color='green', alpha=0.9)
+    ax.grid(True, linestyle=':')
+    if show_scatter:
+        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+        h1 = mpatches.Patch(color='orange', label='h1')
+        h2 = mpatches.Patch(color='blue', label='h2')
+
+        ax.scatter(loglr, pav_loglrs, color=colors, marker='x')
+        ax.legend(handles=[h1, h2])
+
+    return ax
+
+
+def plot_insights_cllr(lrs_after, y_nhot, target_classes, savefig=None, show=None):
+
+    for t, target_class in enumerate(target_classes):
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+        plot_insight_cllr(lrs_after[:, t], labels, savefig=savefig, show=show)
+
+
+def plot_insight_cllr(lrs, labels, savefig=None, show=None):
+    def plot_ece(lrs, labels, ax):
+
+        def pav_transform_lrs(lrs, labels):
+            ir = IsotonicCalibrator()
+            ir.fit(lrs, labels)
+            lrs_after_calibration = ir.transform(lrs)
+
+            lrs_after_calibration = np.where(lrs_after_calibration > 10 ** 10, 10 ** 10, lrs_after_calibration)
+            lrs_after_calibration = np.where(lrs_after_calibration < 10 ** -10, 10 ** -10, lrs_after_calibration)
+
+            lrs_after_calibration_p = lrs_after_calibration[np.argwhere(labels == 1)]
+            lrs_after_calibration_d = lrs_after_calibration[np.argwhere(labels == 0)]
+
+            return lrs_after_calibration_p, lrs_after_calibration_d
+
+        def emperical_cross_entropy(lr_p, lr_d, prior):
+            """
+
+            :param lr_p: LRs with ground truth label prosecution
+            :param prior_p: int; fixed value for prior prosecution
+            :param lr_d: LRs with groudn trut label defence
+            :param prior_d: int; fixed value for prior defence
+            :return:
+            """
+
+            N_p = len(lr_p)
+            N_d = len(lr_d)
+
+            prior_p = prior
+            prior_d = 1 - prior
+            odds = prior_p / prior_d
+
+            return (prior_p / N_p) * np.sum(np.log2(1 + (1 / (lr_p * odds)))) + \
+                   (prior_d / N_d) * np.sum(np.log2(1 + (lr_d * odds))), odds
+
+        def calculate_cllr(lr_p, lr_d):
+            N_p = len(lr_p)
+            N_d = len(lr_d)
+
+            sum_p = np.sum(np.log2((1 + (1 / lr_p))))
+            sum_d = np.sum(np.log2(1 + lr_d))
+
+            return 0.5 * (((1 / N_p) * sum_p) + ((1 / N_d) * sum_d))
+
+        ax = ax
+
+        priors = np.linspace(0.001, 1 - 0.001, 50).tolist()
+
+        lrs_p = lrs[np.argwhere(labels == 1)]
+        lrs_d = lrs[np.argwhere(labels == 0)]
+
+        # LR = 1
+        results_LR_1 = np.array(
+            [emperical_cross_entropy(np.ones_like(lrs_p), np.ones_like(lrs_d), prior) for prior in priors])
+        ece_LR_1 = results_LR_1[:, 0]
+        odds = results_LR_1[:, 1]
+
+        # True LR
+        results = np.array([emperical_cross_entropy(lrs_p, lrs_d, prior) for prior in priors])
+        ece = results[:, 0]
+
+        # LR after calibration
+        lrs_after_calibration_p, lrs_after_calibration_d = pav_transform_lrs(lrs, labels)
+        results_after_calib = np.array([emperical_cross_entropy(lrs_after_calibration_p, lrs_after_calibration_d, prior)
+                                        for prior in priors])
+        ece_after_calib = results_after_calib[:, 0]
+
+        ax.plot(np.log10(odds), ece_LR_1, color='black', linestyle='--', label='LR=1 always (Cllr = {0:.1f})'.format(
+            calculate_cllr(np.ones_like(lrs_p), np.ones_like(lrs_d))))
+        ax.plot(np.log10(odds), ece, color='red',
+                label='LR values (Cllr = {0:.3f})'.format(calculate_cllr(lrs_p, lrs_d)))
+        ax.plot(np.log10(odds), ece_after_calib, color='blue', linestyle='-',
+                label='LR after PAV (Cllr = {0:.3f})'.format(
+                    calculate_cllr(lrs_after_calibration_p, lrs_after_calibration_d)))
+
+        ax.legend()
+        ax.set_ylabel("Emperical Cross-Entropy")
+        ax.set_xlabel("Prior log10 (odds)")
+
+        return ax
+
+    def plot_punishment(ax, min_val, max_val):
+
+        ax = ax
+
+        sim_lrs = np.linspace(min_val, max_val, 1000000)
+
+        sim_punish_p = np.log2(1 + (1 / sim_lrs))
+        sim_punish_d = np.log2(1 + sim_lrs)
+
+        ax.plot(np.log10(sim_lrs), sim_punish_p, color='orange',
+                label='punish p (max = {0:.1f})'.format(np.max(sim_punish_p)))
+        ax.plot(np.log10(sim_lrs), sim_punish_d, color='blue',
+                label='punish d (max = {0:.1f})'.format(np.max(sim_punish_d)))
+
+        ax.legend()
+        ax.set_ylabel("Punishment")
+        ax.set_xlabel('10log(LR)')
+
+        return ax
+
+    def plot_true_punishment(lrs, labels, ax):
+
+        ax = ax
+
+        lrs_p = lrs[np.argwhere(labels == 1)]
+        lrs_d = lrs[np.argwhere(labels == 0)]
+
+        Np = len(lrs_p)
+        Nd = len(lrs_d)
+
+        punish_p = np.log2(1 + (1 / lrs_p))
+        punish_d = np.log2(1 + lrs_d)
+
+        ax.scatter(np.log10(lrs_p), punish_p, color='orange', marker='+', alpha=0.7,
+                   label='Total_p, relative: {0:.0f},  {1:.3f}'.format(np.sum(punish_p), np.sum(punish_p) / Np))
+        ax.scatter(np.log10(lrs_d), punish_d, color='blue', marker='x', alpha=0.7,
+                   label='Total_d, relative: {0:.0f}, {1:.3f}'.format(np.sum(punish_d), np.sum(punish_d) / Nd))
+
+        ax.set_title('Nd = {} and Np = {}'.format(len(lrs_p), len(lrs_d)))
+        ax.set_ylabel("True Punishment")
+        ax.set_xlabel('10log(LR)')
+
+        ax.legend()
+
+        return ax
+
+    loglrs_p = np.log10(lrs[np.argwhere(labels == 1)])
+    loglrs_d = np.log10(lrs[np.argwhere(labels == 0)])
+
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(9, 9))
+
+    axes[0, 0].hist(loglrs_p, color='orange', label='h1', alpha=0.5, density=True)
+    axes[0, 0].hist(loglrs_d, color='blue', label='h2', alpha=0.5, density=True)
+    axes[0, 0].set_xlim(-5, 11)
+    axes[0, 0].legend()
+    axes[0, 0].set_title('mu_p = {0:.1f}, sd_p = {1:.1f} \n mu_d = {2:.1f}, sd_d = {3:.1f}'.format(
+        np.mean(loglrs_p), np.std(loglrs_p), np.mean(loglrs_d), np.std(loglrs_d)))
+    axes[0, 0].set_ylabel('Density')
+    axes[0, 0].set_xlabel('10log(LR)')
+
+    plot_ece(lrs, labels, ax=axes[0, 1])
+    plot_punishment(ax=axes[1, 0], min_val=np.min(lrs), max_val=np.max(lrs))
+    plot_true_punishment(lrs, labels, ax=axes[1, 1])
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.tight_layout()
+        plt.show()
+
+
 # TODO: Make this function work (?)
 def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix, inv_test_map, classes_to_evaluate,
                                        mixtures_in_classes_of_interest, n_single_cell_types_no_penile, dists):
@@ -594,86 +746,6 @@ def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix
             np.expand_dims(np.array([d*5 for d in dists]), axis=1),
             axis=1))
     plt.savefig('mixtures binned data and log lrs')
-
-
-# TODO: Make this funtion work?
-# def plot_data(X):
-#     """
-#     plots the raw data points
-#
-#     :param X: N_samples x N_observations_per_sample x N_markers measurements
-#     """
-#     plt.matshow(combine_samples(X))
-#     plt.savefig('single_cell_type_measurements_after_QC')
-
-
-def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, savefig=None, show=None):
-
-    for t, target_class in enumerate(target_classes):
-
-        loglrs_before = np.log10(lrs_before[:, t])
-        loglrs_after = np.log10(lrs_after[:, t])
-
-        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-
-        fig, (axs1, axs2) = plt.subplots(nrows=1, ncols=2, figsize=(9, 3))
-        plt.suptitle(vec2string(target_class, label_encoder))
-
-        plot_pav(loglrs_before, labels, axs1)
-        plot_pav(loglrs_after, labels, axs2)
-
-        fig.text(0.5, 0.001, 'pre-PAVcalibrated 10log(lr)', ha='center')
-        fig.text(0.001, 0.5, 'post-PAVcalibrated 10log(lr)', va='center', rotation='vertical')
-
-        target_class_str = vec2string(target_class, label_encoder)
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
-
-        if savefig is not None:
-            plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
-            plt.close()
-        if show or savefig is None:
-            plt.tight_layout()
-            plt.show()
-
-        plt.close(fig)
-
-
-def plot_pav(loglr, labels, ax, show_scatter=True):
-    """
-    Plots pav plots for all cell types before and after calibration.
-    """
-
-    ax=ax
-
-    pav = PavLogLR()
-    pav_loglrs = pav.fit_transform(loglr, labels)
-
-    all_loglrs = np.concatenate([loglr, pav_loglrs])
-    all_loglrs[all_loglrs == -np.inf] = 0
-    all_loglrs[all_loglrs == np.inf] = 0
-    xrange = [all_loglrs.min() - .5, all_loglrs.max() + .5]
-
-    ax.axis('equal')
-    ax.axis(xrange + xrange)
-    ax.plot(xrange, xrange, color='black')
-
-    pav_x = np.arange(*xrange, .01)
-    ax.plot(pav_x, pav.transform(pav_x), color='green', alpha=0.9)
-    ax.grid(True, linestyle=':')
-    if show_scatter:
-        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-        h1 = mpatches.Patch(color='orange', label='h1')
-        h2 = mpatches.Patch(color='blue', label='h2')
-
-        ax.scatter(loglr, pav_loglrs, color=colors, marker='x')
-        ax.legend(handles=[h1, h2])
-
-    return ax
-
-
 
 # TODO: Want to keep this?
 # def plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods,
@@ -768,3 +840,14 @@ def plot_pav(loglr, labels, ax, show_scatter=True):
 #
 #             fig.text(0.5, 0.04, "lrs before", ha='center')
 #             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
+
+
+# TODO: Make this funtion work?
+# def plot_data(X):
+#     """
+#     plots the raw data points
+#
+#     :param X: N_samples x N_observations_per_sample x N_markers measurements
+#     """
+#     plt.matshow(combine_samples(X))
+#     plt.savefig('single_cell_type_measurements_after_QC')
