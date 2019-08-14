@@ -228,7 +228,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
                              target_classes, models, mle, label_encoder, method_name_prior, softmax,
-                             calibration_on_loglrs, save_calib_plots=False, save_cllr_plots=True)
+                             calibration_on_loglrs, save_calib_plots=False, save_cllr_plots=False)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i

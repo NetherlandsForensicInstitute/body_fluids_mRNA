@@ -338,7 +338,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
             min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
             max_val_neg = math.trunc(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
 
-            plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 8), colors, (h1, h2), ax=axs1)
+            plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 11), colors, (h1, h2), ax=axs1)
             plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
                                                   (h1), ax=axs2)
             plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
@@ -365,8 +365,8 @@ def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, 
     ax = ax
 
     rect_neg = mpatches.Rectangle((-5, -5), 5, 5, color='blue', alpha=0.1, linewidth=0)
-    rect_pos1 = mpatches.Rectangle((-5, 0), 13, 8, color='orange', alpha=0.1, linewidth=0)
-    rect_pos2 = mpatches.Rectangle((0, -5), 8, 5, color='orange', alpha=0.1, linewidth=0)
+    rect_pos1 = mpatches.Rectangle((-5, 0), 16, 11, color='orange', alpha=0.1, linewidth=0)
+    rect_pos2 = mpatches.Rectangle((0, -5), 11, 5, color='orange', alpha=0.1, linewidth=0)
 
     ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
     ax.scatter(loglrs[0], loglrs[1], s=3, color=colors, alpha=0.2)
@@ -432,6 +432,73 @@ def plot_boxplot_of_metric(n_metric, label_encoder, target_class, name_metric, s
     ax.set_yticklabels(names)
     ax.set_ylim(-0.5, total_boxplots-0.5)
     ax.set_xlabel(name_metric)
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+        plt.close()
+    if show or savefig is None:
+        plt.tight_layout()
+        plt.show()
+
+    plt.close(fig)
+
+
+def plot_progress_of_metric(n_metric, label_encoder, target_class, name_metric, savefig=None, show=None):
+
+    def int2string_models(int, specify_which=None):
+        if specify_which == None:
+            raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
+        elif specify_which == 1:
+            for i in range(len(settings.binarize)):
+                if int == i:
+                    return bool2str_binarize(settings.binarize[i])
+        elif specify_which == 2:
+            for i in range(len(settings.softmax)):
+                if int == i:
+                    return bool2str_softmax(settings.softmax[i])
+        elif specify_which == 3:
+            for i in range(len(settings.models)):
+                if int == i:
+                    return settings.models[i][0]
+        elif specify_which == 4:
+            for i in range(len(settings.priors)):
+                if int == i:
+                    return prior2string(str(settings.priors[i]), label_encoder)
+        else:
+            raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
+
+    n_folds = n_metric.shape[0]
+
+    i_transformations = n_metric.shape[1]
+    j_probscalulations = n_metric.shape[2]
+    k_models = n_metric.shape[3]
+    p_priors = n_metric.shape[4]
+
+    fig = plt.figure()
+    plt.suptitle(vec2string(target_class, label_encoder))
+    ax = plt.subplot(111)
+    x_lim = np.linspace(1, n_folds, n_folds)
+    min_vals = []
+    max_vals = []
+    a = 0
+    markers = ['+', 'o', 'x', '.', 'v', 'p', 's', 'P', '*', 'h', 'X', 'd', 'D',
+               '+', 'o', 'x', '.', 'v', 'p', 's', 'P', '*', 'h', 'X', 'd', 'D',
+               '+', 'o', 'x', '.', 'v', 'p', 's', 'P', '*', 'h']
+
+    for i in range(i_transformations):
+        for j in range(j_probscalulations):
+            for k in range(k_models):
+                for p in range(p_priors):
+                    name = int2string_models(k, 3) + ' ' + int2string_models(i, 1) + ' ' + int2string_models(j, 2) + ' ' + int2string_models(p, 4)
+                    ax.plot(x_lim, n_metric[:, i, j, k, p], label=name, marker=markers[a], linewidth=0.5, linestyle='--')
+                    min_vals.append(np.min(n_metric[:, i, j, k, p]))
+                    max_vals.append(np.max(n_metric[:, i, j, k, p]))
+                    a += 1
+    ax.set_xticks(x_lim)
+    ax.set_xlabel('n fold')
+    ax.set_ylabel(name_metric)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
     if savefig is not None:
         plt.tight_layout()
@@ -674,78 +741,78 @@ def plot_insight_cllr(lrs, labels, savefig=None, show=None):
 
 
 # TODO: Make this function work (?)
-def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix, inv_test_map, classes_to_evaluate,
-                                       mixtures_in_classes_of_interest, n_single_cell_types_no_penile, dists):
-    """
-    for each mixture category that we have measurements on, plot the
-    distribution of marginal LRs for each cell type, as well as for the special
-    combinations (eg vaginal+menstrual) also plot LRs as a function of distance
-    to nearest data point also plot experimental measurements together with LRs
-    found and distance in a large matrix plot
-
-    :param X_mixtures: N_experimental_mixture_samples x N_markers array of
-        observations
-    :param y_mixtures: N_experimental_mixture_samples array of int mixture labels
-    :param y_mixtures_matrix:  N_experimental_mixture_samples x
-        (N_single_cell_types + N_combos) n_hot encoding
-    :param inv_test_map: dict: mixture label -> mixture name
-    :param classes_to_evaluate: list of str, classes to evaluate
-    :param mixtures_in_classes_of_interest:  list of lists, specifying for each
-        class in classes_to_evaluate which mixture labels contain these
-    :param n_single_cell_types_no_penile: int: number of single cell types
-        excluding penile skin
-    :param dists: N_experimental_mixture_samples iterable of distances to
-        nearest augmented data point. Indication of whether the point may be an
-        outlier (eg measurement error or problem with augmentation scheme)
-    """
-    y_prob = model.predict_lrs(X_mixtures, )
-    y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-        y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
-
-    log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-    plt.subplots(3, 3, figsize=(18, 9))
-    for i, i_clas in enumerate(set(y_mixtures)):
-        indices_experiments = [j for j in range(len(y_mixtures)) if y_mixtures[j] == i_clas]
-        plt.subplot(3, 3, i + 1)
-        plt.xlim([-MAX_LR - .5, MAX_LR + .5])
-        bplot = plt.boxplot(log_lrs_per_class[indices_experiments, :], vert=False,
-                            labels=classes_to_evaluate, patch_artist=True)
-
-        for j, (patch, cla) in enumerate(zip(bplot['boxes'], classes_to_evaluate)):
-            if j < n_single_cell_types_no_penile:
-                # single cell type
-                if cla in inv_test_map[i_clas]:
-                    patch.set_facecolor('black')
-            else:
-                # sample 'Vaginal.mucosa and/or Menstrual.secretion'
-                for comb_class in cla.split(' and/or '):
-                    if comb_class in inv_test_map[i_clas]:
-                        patch.set_facecolor('black')
-        plt.title(inv_test_map[i_clas])
-    plt.savefig('mixtures_boxplot')
-
-    plt.subplots(3, 3, figsize=(18, 9))
-    for i in range(y_mixtures_matrix.shape[1]):
-        plt.subplot(3, 3, i + 1)
-        plt.ylim([-MAX_LR - .5, MAX_LR + .5])
-        plt.scatter(
-            dists + np.random.random(len(dists)) / 20,
-            log_lrs_per_class[:, i],
-            color=['red' if iv else 'blue' for iv in y_mixtures_matrix[:, i]],
-            alpha=0.1
-        )
-        plt.ylabel('LR')
-        plt.xlabel('distance to nearest data point')
-        plt.title(classes_to_evaluate[i])
-    plt.savefig('LRs_as_a_function_of_distance')
-
-    plt.figure()
-    plt.matshow(
-        np.append(
-            np.append(X_mixtures, log_lrs_per_class, axis=1),
-            np.expand_dims(np.array([d*5 for d in dists]), axis=1),
-            axis=1))
-    plt.savefig('mixtures binned data and log lrs')
+# def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix, inv_test_map, classes_to_evaluate,
+#                                        mixtures_in_classes_of_interest, n_single_cell_types_no_penile, dists):
+#     """
+#     for each mixture category that we have measurements on, plot the
+#     distribution of marginal LRs for each cell type, as well as for the special
+#     combinations (eg vaginal+menstrual) also plot LRs as a function of distance
+#     to nearest data point also plot experimental measurements together with LRs
+#     found and distance in a large matrix plot
+#
+#     :param X_mixtures: N_experimental_mixture_samples x N_markers array of
+#         observations
+#     :param y_mixtures: N_experimental_mixture_samples array of int mixture labels
+#     :param y_mixtures_matrix:  N_experimental_mixture_samples x
+#         (N_single_cell_types + N_combos) n_hot encoding
+#     :param inv_test_map: dict: mixture label -> mixture name
+#     :param classes_to_evaluate: list of str, classes to evaluate
+#     :param mixtures_in_classes_of_interest:  list of lists, specifying for each
+#         class in classes_to_evaluate which mixture labels contain these
+#     :param n_single_cell_types_no_penile: int: number of single cell types
+#         excluding penile skin
+#     :param dists: N_experimental_mixture_samples iterable of distances to
+#         nearest augmented data point. Indication of whether the point may be an
+#         outlier (eg measurement error or problem with augmentation scheme)
+#     """
+#     y_prob = model.predict_lrs(X_mixtures, )
+#     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
+#         y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
+#
+#     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
+#     plt.subplots(3, 3, figsize=(18, 9))
+#     for i, i_clas in enumerate(set(y_mixtures)):
+#         indices_experiments = [j for j in range(len(y_mixtures)) if y_mixtures[j] == i_clas]
+#         plt.subplot(3, 3, i + 1)
+#         plt.xlim([-MAX_LR - .5, MAX_LR + .5])
+#         bplot = plt.boxplot(log_lrs_per_class[indices_experiments, :], vert=False,
+#                             labels=classes_to_evaluate, patch_artist=True)
+#
+#         for j, (patch, cla) in enumerate(zip(bplot['boxes'], classes_to_evaluate)):
+#             if j < n_single_cell_types_no_penile:
+#                 # single cell type
+#                 if cla in inv_test_map[i_clas]:
+#                     patch.set_facecolor('black')
+#             else:
+#                 # sample 'Vaginal.mucosa and/or Menstrual.secretion'
+#                 for comb_class in cla.split(' and/or '):
+#                     if comb_class in inv_test_map[i_clas]:
+#                         patch.set_facecolor('black')
+#         plt.title(inv_test_map[i_clas])
+#     plt.savefig('mixtures_boxplot')
+#
+#     plt.subplots(3, 3, figsize=(18, 9))
+#     for i in range(y_mixtures_matrix.shape[1]):
+#         plt.subplot(3, 3, i + 1)
+#         plt.ylim([-MAX_LR - .5, MAX_LR + .5])
+#         plt.scatter(
+#             dists + np.random.random(len(dists)) / 20,
+#             log_lrs_per_class[:, i],
+#             color=['red' if iv else 'blue' for iv in y_mixtures_matrix[:, i]],
+#             alpha=0.1
+#         )
+#         plt.ylabel('LR')
+#         plt.xlabel('distance to nearest data point')
+#         plt.title(classes_to_evaluate[i])
+#     plt.savefig('LRs_as_a_function_of_distance')
+#
+#     plt.figure()
+#     plt.matshow(
+#         np.append(
+#             np.append(X_mixtures, log_lrs_per_class, axis=1),
+#             np.expand_dims(np.array([d*5 for d in dists]), axis=1),
+#             axis=1))
+#     plt.savefig('mixtures binned data and log lrs')
 
 # TODO: Want to keep this?
 # def plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods,

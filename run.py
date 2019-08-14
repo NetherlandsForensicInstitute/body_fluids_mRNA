@@ -11,7 +11,7 @@ if __name__ == '__main__':
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
 
     start = time.time()
-    nfold_analysis(nfolds=5, tc=target_classes_str)
+    nfold_analysis(nfolds=2, tc=target_classes_str)
     end = time.time()
 
     print("Execution time in seconds:", end - start)
