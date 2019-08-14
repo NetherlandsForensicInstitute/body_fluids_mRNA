@@ -11,6 +11,7 @@ from collections import OrderedDict
 
 # from rna.analytics import combine_samples
 
+from rna.constants import celltype_specific_markers
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 
 from lir import PavLogLR
@@ -223,12 +224,12 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
         j = 0
         k = 0
 
-    for i, target_class in enumerate(target_classes):
+    for t, target_class in enumerate(target_classes):
 
         celltype = vec2string(target_class, label_encoder)
 
-        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), i]
-        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), i]
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
 
         if n_target_classes == 1:
             plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
@@ -237,9 +238,9 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
             plt.legend()
 
         elif n_target_classes == 2:
-            axs[i].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            axs[i].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            axs[i].set_title(celltype)
+            axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[t].set_title(celltype)
 
             handles, labels = axs[0].get_legend_handles_labels()
 
@@ -256,7 +257,7 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
             axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
             axs[j, k].set_title(celltype)
 
-            if (i % 2) == 0:
+            if (t % 2) == 0:
                 k = 1
             else:
                 k = 0
@@ -271,7 +272,6 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
                 fig.text(0.04, 0.5, "Frequency", va='center', rotation='vertical')
 
             fig.legend(handles, labels, 'center right')
-
 
 
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
@@ -738,6 +738,131 @@ def plot_insight_cllr(lrs, labels, savefig=None, show=None):
     if show or savefig is None:
         plt.tight_layout()
         plt.show()
+
+from sklearn.metrics import roc_curve, auc
+from scipy import interp
+from itertools import cycle
+
+
+def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder, savefig=None, show=None):
+
+    for t, target_class in enumerate(target_classes):
+        target_class_str = vec2string(target_class, label_encoder)
+        plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class, target_class_str)
+
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save)
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+
+def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class, title):
+
+    n_methods = len(lrs_all_methods.keys())
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    method_name = dict()
+    for i, method in enumerate(lrs_all_methods.keys()):
+        # TODO: On probs or lrs?
+        lrs = np.log10(lrs_all_methods[method][:, t])
+        # probs = lrs_all_methods[method][:, t] / (1 + lrs_all_methods[method][:, t])
+        y_nhot = y_nhot_all_methods[method]
+        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+
+        fpr[i], tpr[i], _ = roc_curve(labels, lrs)
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+        method = method.replace("_", " ")
+        method_name[i] = method
+
+    # all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_methods)]))
+    #
+    # # Then interpolate all ROC curves at this points
+    # mean_tpr = np.zeros_like(all_fpr)
+    # for i in range(n_methods):
+    #     mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+    #
+    # # Finally average it and compute AUC
+    # mean_tpr /= n_methods
+    #
+    # fpr["macro"] = all_fpr
+    # tpr["macro"] = mean_tpr
+    # roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    #
+    # plt.figure()
+    # lw = 2
+    # plt.plot(fpr["macro"], tpr["macro"], label='macro-average ROC curve (area = {0:0.2f})'''.format(roc_auc["macro"]),
+    #          color='navy', linestyle=':', linewidth=4)
+
+    lw=1
+    colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'navy'])
+    linestyle = ['-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':',
+                 '-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':', '-', '-.', '--', ':']
+
+    for i, color in zip(range(n_methods), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=lw, linestyle=linestyle[i], label='ROC curve of method {0} (area = {1:0.2f})'''.format(method_name[i], roc_auc[i]))
+    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    plt.xlim([-0.05, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+
+
+def plot_coefficient_importance(model, present_markers, celltypes, savefig=None, show=None):
+    """
+
+    :param savefig:
+    :param show:
+    :param model:
+    :param present_markers:
+    :param celltypes: list of strings: list of celltypes
+    :return:
+    """
+
+    # MLR - BIN - SIG
+    coefficients = model._classifier.coef_
+    coefficients = np.reshape(coefficients, -1)
+
+    # sort
+    sorted_indices = np.argsort(coefficients)
+    coefficients = coefficients[sorted_indices]
+    present_markers = np.array(present_markers)[sorted_indices].tolist()
+    x = np.linspace(1, len(coefficients), len(coefficients))
+
+    # get the indices of the celltype specific markers
+    marker_indices = []
+    for celltype in celltypes:
+        for marker in celltype_specific_markers[celltype]:
+            marker_indices.append(present_markers.index(marker))
+    marker_indices = np.unique(marker_indices)
+
+    barlist = plt.barh(x, coefficients, color='grey', alpha=0.6)
+    for marker_index in marker_indices:
+        # highlight the markers that are celltype specific
+        barlist[marker_index].set_color('navy')
+        barlist[marker_index].set_alpha(1)
+    plt.yticks(x, present_markers)
+
+    plt.xlabel('Coefficient')
+    plt.ylabel('Marker names')
+
+    if savefig is not None:
+        plt.tight_layout()
+        plt.savefig(savefig)
+    if show or savefig is None:
+        plt.tight_layout()
+        plt.show()
+
+    plt.close()
 
 
 # TODO: Make this function work (?)

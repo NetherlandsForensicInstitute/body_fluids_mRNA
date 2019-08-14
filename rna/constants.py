@@ -26,3 +26,14 @@ def make_nhot_matrix_of_combinations(N):
     return np.array([int_to_binary(i) for i in range(2**N)])
 
 nhot_matrix_all_combinations = make_nhot_matrix_of_combinations(len(single_cell_types))
+
+
+celltype_specific_markers = dict()
+celltype_specific_markers['Blood'] = ['HBB', 'ALAS2', 'CD93']
+celltype_specific_markers['Saliva'] = ['HTN3', 'STATH']
+celltype_specific_markers['Vaginal.mucosa'] = ['MUC4', 'MYOZ1', 'CYP2B7P1']
+celltype_specific_markers['Menstrual.secretion'] = ['MMP10', 'MMP7', 'MMP11']
+celltype_specific_markers['Semen.fertile'] = ['HTN3', 'STATH']
+celltype_specific_markers['Semen.sterile'] = ['SEMG1', 'KLK3', 'PRIM1']
+celltype_specific_markers['Nasal.mucosa'] = ['STATH', 'BPIFA1']
+celltype_specific_markers['Skin'] = [None]

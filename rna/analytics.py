@@ -11,11 +11,11 @@ from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
-from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr
+from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr, plot_coefficient_importance
 
 from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
-
+from rna.utils import vec2string
 
 def combine_samples(data_for_class):
     """
@@ -128,12 +128,13 @@ def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
 
 def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                      X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes,
-                     models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs, save_calib_plots,
-                     save_cllr_plots):
+                     present_markers, models, mle, label_encoder, method_name_prior, softmax, calibration_on_loglrs,
+                     save_calib_plots, save_cllr_plots):
     """
     Selects the model with correct settings with 'model' and 'softmax' and calculates the likelihood-ratio's before and
     after calibration on three test sets (augmented test, original mixtures and augmented test as mixtures).
 
+    :param present_markers:
     :param save_cllr_plots:
     :param method_name_prior: str: model and settings to save plots with
     :param calibration_on_loglrs: bool: whether calibration is fitted on loglrs otherwise on probability
@@ -176,9 +177,17 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
                          X_mixtures, target_classes, model, mle, softmax, calibration_on_loglrs)
 
+
         assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+
+    if classifier == 'MLR':
+        for t, target_class in enumerate(target_classes):
+            target_class_str = vec2string(target_class, label_encoder)
+            celltype = target_class_str.split(' and/or ')
+            plot_coefficient_importance(model, present_markers, celltype)
+
 
     if save_cllr_plots:
         plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes)
@@ -187,13 +196,14 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
            lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
-def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, models, mle,
-                                       label_encoder, method_name, softmax, calibration_on_loglrs):
+def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, present_markers,
+                                       models, mle, label_encoder, method_name, softmax, calibration_on_loglrs):
     """
     Calculates the likelihood-ratio's before and after calibration for all priors. The baseline prior is used to
     select the test data (i.e. the data with which the likelihood ratio's are calculated) with. Returns for each test
     set a dictionary where keys are priors and the values contain the lr's.
 
+    :param present_markers:
     :param baseline_prior: str: string of list that will enable selecting the correct test data
     :param method_name: str: model and settings to save plots with
     :param calibration_on_loglrs: bool: whether calibration is fitted on loglrs otherwise on probability
@@ -227,7 +237,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
         lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
-                             target_classes, models, mle, label_encoder, method_name_prior, softmax,
+                             target_classes, present_markers, models, mle, label_encoder, method_name_prior, softmax,
                              calibration_on_loglrs, save_calib_plots=False, save_cllr_plots=False)
 
         model[key] = model_i

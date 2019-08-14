@@ -18,7 +18,7 @@ from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
-    plot_histograms_all_lrs_all_folds, plot_progress_of_metric
+    plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs
 
 
 def nfold_analysis(nfolds, tc):
@@ -107,6 +107,7 @@ def nfold_analysis(nfolds, tc):
                                                                                                          X_mixtures,
                                                                                                          target_classes,
                                                                                                          baseline_prior,
+                                                                                                         present_markers,
                                                                                                          models, mle,
                                                                                                          label_encoder,
                                                                                                          key_name_per_fold,
@@ -153,10 +154,12 @@ def nfold_analysis(nfolds, tc):
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
         lrs_for_model_per_fold[str(n)] = lrs_for_model_in_fold
 
-    # lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
-    # plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-    #                                   savefig=os.path.join('scratch/plots_analysis5', 'histograms_after_calib_augm'))
-    # if len(settings.priors) == 2:
+    lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
+    plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
+
+    plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
+                                      # savefig=os.path.join('scratch/plots_analysis5', 'histograms_after_calib_augm'))
+    # if len(settings.priors) == 2:s
     #     plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
     #                                                savefig=os.path.join('scratch/plots_analysis5', 'LRs_for_different_priors_augm'))
 
