@@ -176,12 +176,32 @@ class MarginalXGBClassifier():
             self._classifier = XGBClassifier()
         elif method == 'sigmoid':
             self._classifier = OneVsRestClassifier(XGBClassifier())
+        self.method = method
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR
 
     def fit_classifier(self, X, y):
         self._classifier.fit(X, y)
+
+        if self.method == 'softmax':
+            self.n_trees = len(self._classifier.get_booster().get_dump())
+            # import matplotlib.pyplot as plt
+            # from xgboost import plot_tree
+            # import graphviz
+            #
+            # plot_tree(self._classifier, num_trees=10)
+            # plt.show()
+
+        elif self.method == 'sigmoid':
+            self.n_trees = len(self._classifier._first_estimator.get_booster().get_dump())
+            # import matplotlib.pyplot as plt
+            # from xgboost import plot_tree
+            # import graphviz
+            #
+            # plot_tree(self._classifier._first_estimator, num_trees=10)
+            # plt.show()
+
 
     def fit_calibration(self, X, y_nhot, target_classes, calibration_on_loglrs=True):
         """
@@ -200,7 +220,7 @@ class MarginalXGBClassifier():
                 else:
                     probs = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
                     self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
-        except TypeError or ValueError:
+        except ValueError or TypeError:
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
 
@@ -344,7 +364,7 @@ class MarginalDLClassifier():
                 else:
                     probs = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
                     self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
-        except TypeError or ValueError:
+        except ValueError or TypeError:
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
 
