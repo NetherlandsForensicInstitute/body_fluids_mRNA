@@ -162,7 +162,7 @@ def nfold_analysis(nfolds, tc, savepath):
 
     lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type='test augm')
     plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-              savefig=os.path.join(savepath, 'roc_curves'))
+              savefig=os.path.join(savepath, 'roc'))
 
     plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                                       savefig=os.path.join(savepath, 'histograms_after_calib_augm'))
@@ -191,44 +191,44 @@ def nfold_analysis(nfolds, tc, savepath):
         target_class_save = target_class_save.replace("/", "_")
 
         plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, target_class, 'accuracy',
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_train[target_class_str], label_encoder, target_class, 'accuracy',
-                                savefig = os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}_1'.format(target_class_save)))
+        # plot_progress_of_metric(accuracies_train[target_class_str], label_encoder, target_class, 'accuracy',
+        #                         savefig = os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
 
         plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, target_class, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, target_class, 'accuracy',
-                                savefig = os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}_1'.format(target_class_save)))
+        # plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, target_class, 'accuracy',
+        #                         savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, target_class, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, target_class, 'accuracy',
-                                savefig = os.path.join(savepath, 'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, target_class, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, target_class, 'accuracy',
-                                savefig = os.path.join(savepath, 'progress_accuracy_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, target_class, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, target_class, 'accuracy',
-                                savefig = os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
-
+        # plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, target_class, "accuracy",
+        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        # plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, target_class, 'accuracy',
+        #                         savefig = os.path.join(savepath, 'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        #
+        # plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, target_class, "accuracy",
+        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+        # plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, target_class, 'accuracy',
+        #                         savefig = os.path.join(savepath, 'progress_accuracy_mixtures_{}'.format(target_class_save)))
+        #
+        # plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, target_class, "accuracy",
+        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
+        # plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, target_class, 'accuracy',
+        #                         savefig = os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
+        #
         plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, target_class, "Cllr",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_test[target_class_str], label_encoder, target_class, 'Cllr',
-                                savefig = os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, target_class, "Cllr",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, target_class, 'Cllr',
-                                savefig = os.path.join(savepath, 'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, target_class, "Cllr",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, target_class, 'Cllr',
-                                savefig = os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
+                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}_1'.format(target_class_save)))
+        # plot_progress_of_metric(cllr_test[target_class_str], label_encoder, target_class, 'Cllr',
+        #                         savefig = os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+        #
+        # plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, target_class, "Cllr",
+        #                        savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+        # plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, target_class, 'Cllr',
+        #                         savefig = os.path.join(savepath, 'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
+        #
+        # plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, target_class, "Cllr",
+        #                        savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+        # plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, target_class, 'Cllr',
+        #                         savefig = os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
 
 # TODO: Want to change to dict?
 class AugmentedData():

@@ -156,18 +156,18 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             # For calibration data
             plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                      y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
-                                     label_encoder, calibration_on_loglrs,
-                                     savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'calib_process_calib_{}'.format(method_name_prior)))
+                                     label_encoder, calibration_on_loglrs)
+                                     # savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'calib_process_calib_{}'.format(method_name_prior)))
 
             # For test data
             plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
                                      y_test_nhot_augmented, model._calibrators_per_target_class,
                                      (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
-                                     calibration_on_loglrs,
-                                     savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'calib_process_test_{}'.format(method_name_prior)))
+                                     calibration_on_loglrs)
+                                     # savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'calib_process_test_{}'.format(method_name_prior)))
 
-            plot_pavs(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
-                      savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'pav_plots_{}'.format(method_name_prior)))
+            plot_pavs(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder)
+                      # savefig=os.path.join('scratch/plots_analysis5/narrowed1', 'pav_plots_{}'.format(method_name_prior)))
 
     else: # no calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
@@ -175,7 +175,6 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
                          np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
                          X_mixtures, target_classes, model, mle, softmax, calibration_on_loglrs)
-
 
         assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
         assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
@@ -239,11 +238,11 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
 
         model_i, lrs_before_calib_i, lrs_after_calib_i, \
         lrs_before_calib_test_as_mixtures_i, lrs_after_calib_test_as_mixtures_i, \
-        lrs_before_calib_mixt_i, lrs_after_calib_mixt_i = \
+        lrs_before_calib_mixt_i, lrs_after_calib_mixt_i, confidence_interval_per_target_class_i = \
             perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                              X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, X_mixtures,
                              target_classes, present_markers, models, mle, label_encoder, method_name_prior, softmax,
-                             calibration_on_loglrs, save_plots=False)
+                             calibration_on_loglrs, save_plots=True)
 
         model[key] = model_i
         lrs_before_calib[key] = lrs_before_calib_i
@@ -352,12 +351,6 @@ def bootstrap_cllr(lrs, y_nhot, target_classes, label_encoder, B):
     return confidence_interval_per_target_class
 
 
-
-
-
-
-
-
 def append_lrs_for_all_folds(lrs_for_model, type):
     """
     Concatenates the lrs calculated on test data for each fold.
@@ -408,26 +401,26 @@ def append_lrs_for_all_folds(lrs_for_model, type):
 
 
 ## TO TEST DL --> CAN BE REMOVED LATER ON
-import matplotlib.pyplot as plt
-def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
-
-    history = model._classifier.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30)
-
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
-    plt.title('model accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
-    plt.show()
-
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
-    plt.show()
+# import matplotlib.pyplot as plt
+# def test_dl_model(model, X_train, y_train, X_test, y_test, target_classes):
+#
+#     history = model._classifier.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=30)
+#
+#     plt.plot(history.history['acc'])
+#     plt.plot(history.history['val_acc'])
+#     plt.title('model accuracy')
+#     plt.ylabel('accuracy')
+#     plt.xlabel('epoch')
+#     plt.legend(['train', 'test'], loc='upper left')
+#     plt.show()
+#
+#     plt.plot(history.history['loss'])
+#     plt.plot(history.history['val_loss'])
+#     plt.title('model loss')
+#     plt.ylabel('loss')
+#     plt.xlabel('epoch')
+#     plt.legend(['train', 'test'], loc='upper left')
+#     plt.show()
 
 
 # TODO: Check if want to keep

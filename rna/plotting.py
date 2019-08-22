@@ -846,7 +846,17 @@ def plot_coefficient_importance(coefficients, present_markers, celltypes):
     :return:
     """
 
+    def calculate_maximum_lr(coefficients):
+        positive_coefficients = coefficients[np.argwhere(coefficients > 0).ravel()]
+        max_probability = 1 / (1 + np.exp(-(np.sum(positive_coefficients))))
+        max_lr = max_probability / (1 - max_probability)
+        if max_lr > 10 ** 10:
+            return 10 ** 10
+        else:
+            return max_lr
+
     coefficients = np.reshape(coefficients, -1)
+    max_lr = calculate_maximum_lr(coefficients)
 
     # sort
     sorted_indices = np.argsort(coefficients)
@@ -873,6 +883,7 @@ def plot_coefficient_importance(coefficients, present_markers, celltypes):
         pass
     plt.yticks(x, present_markers)
 
+    plt.title('Max lr = {}'.format(math.ceil(max_lr)))
     plt.xlabel('Coefficient value')
     plt.ylabel('Marker names')
 
