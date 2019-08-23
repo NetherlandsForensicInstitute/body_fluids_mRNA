@@ -1,13 +1,16 @@
+import os
 import numpy as np
+import tensorflow as tf
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 
+from xgboost import XGBClassifier
+
 from keras import Input, Model
 from keras.layers import Dense, Dropout
-
-from xgboost import XGBClassifier
+from keras.callbacks import TensorBoard, Callback, ModelCheckpoint
 
 from lir import KDECalibrator
 from rna.constants import single_cell_types
@@ -269,7 +272,7 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=80, n_features=15,
+    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=200, n_features=15,
                  calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
@@ -302,9 +305,13 @@ class MarginalDLClassifier():
         # first dense (hidden) layer
         cnn = Dense(units//4, activation="sigmoid")(x)
         # dropout
-        cnn = Dropout(rate=drop)(cnn)
+        # cnn = Dropout(rate=drop)(cnn)
         # second dense (hidden) layer
         cnn = Dense(units, activation="sigmoid")(cnn)
+        # third dense (hidden) layer
+        cnn = Dense(units, activation="sigmoid")(cnn)
+        # fourth dense (hidden) layer
+        # cnn = Dense(units//2, activation="sigmoid")(cnn)
 
         # output layer (corresponding to the number of classes)
         y = Dense(n_classes, activation=activation_layer)(cnn)
@@ -323,7 +330,7 @@ class MarginalDLClassifier():
         :param optimizer: a string or optimizer class that is supported by keras
         :param loss: a string or loss class that is supported by keras
         """
-        model.compile(optimizer=optimizer, loss=loss)
+        model.compile(optimizer=optimizer, loss=loss, metrics=[self._accuracy_em])
 
 
     def create_model(self):
@@ -342,9 +349,57 @@ class MarginalDLClassifier():
         model.summary()
         return model
 
+    # def create_callbacks(self, batch_size: int, generator: EvalGenerator, log_dir: str, ) -> list:
+    #     """
+    #     create callbacks to use in model.fit
+    #     :param batch_size: batch size used for training the model
+    #     :param generator: data generator
+    #     :param log_dir: directory which is used for the logging
+    #     :return: a list of callbacks
+    #     """
+    #     # create callbacks
+    #     callbacks = [TensorBoard(log_dir=log_dir, batch_size=batch_size),
+    #                  MetricsPerType(generator),
+    #                  ModelCheckpoint(filepath=os.path.join(log_dir, 'model_weights_{epoch:02d}.hdf5'),
+    #                                  save_best_only=False, save_weights_only=True)]
+    #
+    #     return callbacks
+
+    def _accuracy_exact_match(self, y_true, y_pred, threshold: float = .5):
+        """
+        Custom keras metric that mirrors the sklearn.metrics.accuracy_score, that is only samples that have the correct
+        labels for each class are scored as 1. If not the sample is scored as 0.
+        From: https://stackoverflow.com/questions/46799261/how-to-create-an-exact-match-eval-metric-op-for-tensorflow
+        :param y_true: Tensor with the the true labels
+        :param y_pred: Tensor with the predicted labels
+        :param threshold: Threshold  used to classify a prediction as 1/0
+        :return: float that represents the accuracy
+        """
+        # check if prediction are above threshold
+        predictions = tf.to_float(tf.greater_equal(y_pred, threshold))
+        # check if predictions match ground truth
+        pred_match = tf.equal(predictions, tf.round(y_true))
+        # reduce to mean
+        exact_match = tf.reduce_min(tf.to_float(pred_match), axis=1)
+
+        return exact_match
+
+
+    def _accuracy_em(self, *args):
+        """
+        wrapper for _accuracy_exact_match
+        :param args: input from metric evaluation provided by keras
+        :return: float that represents the accuracy
+        """
+        return tf.reduce_mean(self._accuracy_exact_match(*args))
+
 
     def fit_classifier(self, X, y):
-        self._classifier.fit(X, y, epochs=self.epochs, verbose=0)
+        callbacks = [TensorBoard(log_dir='./logs', batch_size=10),
+                     ModelCheckpoint(filepath=os.path.join('./logs', 'model_weights_{epoch:02d}.hdf5'),
+                                     save_best_only=False, save_weights_only=True)]
+
+        self._classifier.fit(X, y, epochs=self.epochs, verbose=0, callbacks=callbacks)
 
 
     def fit_calibration(self, X, y_nhot, target_classes, calibration_on_loglrs=True):
@@ -367,6 +422,7 @@ class MarginalDLClassifier():
         except ValueError or TypeError:
             for target_class in target_classes:
                 self._calibrators_per_target_class[str(target_class)] = None
+
 
     def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True,
                     calibration_on_loglrs=True):

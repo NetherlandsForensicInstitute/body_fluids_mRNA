@@ -33,9 +33,10 @@ augment=True
 binarize=[True]
 markers=False
 softmax=[False]
-nsamples=(11, 11, 11)
+nsamples=(33, 33, 22)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
 models=[['MLR', False]]
-priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
+priors=[[1, 1, 1, 1, 1, 1, 1, 1],
+        [10, 1, 1, 1, 1, 1, 1, 1]]
