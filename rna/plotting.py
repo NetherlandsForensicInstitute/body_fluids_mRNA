@@ -890,6 +890,56 @@ def plot_coefficient_importance(coefficients, present_markers, celltypes):
     plt.legend(loc='lower right')
 
 
+def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_nhot_augmented, target_classes,
+                               label_encoder, show=None, savefig=None):
+
+    def confidence_interval(all_lrs_after_calib_bs_tc, lrs_after_calib_tc):
+        B = all_lrs_after_calib_bs_tc.shape[1]
+
+        avg_bootstrap_lrs = np.mean(all_lrs_after_calib_bs_tc, axis=1)
+        est_var_true_cllr = (1 / (B - 1)) * np.sum(np.array([all_lrs_after_calib_bs_tc[:, b] - avg_bootstrap_lrs for b in range(B)]).T ** 2, axis=1)
+
+        # calculate the confidence interval for all samples
+        lower_bounds = lrs_after_calib_tc - 0.025 * np.sqrt(est_var_true_cllr)
+        upper_bounds = lrs_after_calib_tc + 0.025 * np.sqrt(est_var_true_cllr)
+
+        return lower_bounds, upper_bounds
+
+    for t, target_class in enumerate(target_classes):
+        target_class_str = vec2string(target_class, label_encoder)
+        lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], lrs_after_calib[:, t])
+
+        plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
+
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save)
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
+
+        plt.close()
+
+
+def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds):
+
+    X = np.arange(lrs.shape[0])
+    llrs = np.log10(lrs)
+    sorted_indices = np.argsort(llrs)
+
+    llrs = llrs[sorted_indices]
+    llower_bounds = np.log10(lower_bounds)[sorted_indices]
+    lupper_bounds = np.log10(upper_bounds)[sorted_indices]
+    yerr = np.vstack((llower_bounds, lupper_bounds))
+
+    plt.errorbar(X, llrs, xerr=yerr)
+    plt.plot(X, llrs, color='orange')
+
+
 def plot_per_feature(model, augmented_data, target_classes, present_markers, train=True, savefig=None, show=None):
 
     # present_markers = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',

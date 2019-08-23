@@ -11,7 +11,8 @@ from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 
 from lir.lr import calculate_cllr
-from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr, plot_coefficient_importances
+from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr, plot_coefficient_importances, \
+    plot_lrs_with_bootstrap_ci
 
 from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
@@ -170,15 +171,42 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                       savefig=os.path.join('scratch/analysisMLR/both', 'pav_plots_{}'.format(method_name_prior)))
 
     else: # no calibration
-        model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt = \
-            generate_lrs(np.concatenate((X_train_augmented, X_calib_augmented), axis=0),
-                         np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0), np.array([]),
-                         np.array([]), X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented,
-                         X_mixtures, target_classes, model, mle, softmax, calibration_on_loglrs)
+        X_train = np.concatenate((X_train_augmented, X_calib_augmented), axis=0)
+        y_train = np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0)
+        X_calib = np.array([])
+        y_calib = np.array([])
 
-        assert np.array_equal(lrs_before_calib, lrs_after_calib), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
-        assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
-        assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+        model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
+        lrs_before_calib_mixt, lrs_after_calib_mixt = generate_lrs(X_train, y_train, X_calib, y_calib, X_test_augmented,
+                                                                   y_test_nhot_augmented, X_test_as_mixtures_augmented,
+                                                                   X_mixtures, target_classes, model, mle, softmax,
+                                                                   calibration_on_loglrs)
+
+        assert np.array_equal(lrs_before_calib, lrs_after_calib), \
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+        assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), \
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+        assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), \
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+
+        # bootstrap LRs
+        B = 3
+        all_lrs_after_calib_bs = np.zeros([lrs_after_calib.shape[0], lrs_after_calib.shape[1], B])
+        for b in range(B):
+            # throw away random 20% from train data
+            sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=int(0.8 * X_train.shape[0]), replace=False)
+
+            X_train_bs = X_train[sample_indices, :]
+            y_train_bs = y_train[sample_indices, :]
+
+            _, _, lrs_after_calib_bs, _, _, _, _ = generate_lrs(X_train_bs, y_train_bs, X_calib, y_calib,
+                                                                X_test_augmented, y_test_nhot_augmented,
+                                                                X_test_as_mixtures_augmented, X_mixtures, target_classes,
+                                                                model, mle, softmax, calibration_on_loglrs)
+            all_lrs_after_calib_bs[:, :, b] = lrs_after_calib_bs
+
+        plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_nhot_augmented, target_classes,
+                                   label_encoder)
 
     # Plot the weights of the coefficients to see if MLR differentiates using the correct features.
     if save_plots:
@@ -190,7 +218,7 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                            savefig=os.path.join('scratch/analysisMLR/both',
                                                 'insights_cllr_calculation_{}'.format(method_name_prior)))
 
-    # bootstrap
+    # bootstrap cllr
     # confidence_interval_per_target_class = bootstrap_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes,
     #                                                       label_encoder, B=100)
 
