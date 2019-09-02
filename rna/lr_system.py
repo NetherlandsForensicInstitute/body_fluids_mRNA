@@ -1,4 +1,5 @@
 import os
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -10,6 +11,7 @@ from xgboost import XGBClassifier
 
 from keras import Input, Model
 from keras.layers import Dense, Dropout
+from keras.initializers import Zeros
 from keras.callbacks import TensorBoard, Callback, ModelCheckpoint
 
 from lir import KDECalibrator
@@ -189,12 +191,12 @@ class MarginalXGBClassifier():
 
         if self.method == 'softmax':
             self.n_trees = len(self._classifier.get_booster().get_dump())
-            import matplotlib.pyplot as plt
-            from xgboost import plot_tree
-            import graphviz
+            # import matplotlib.pyplot as plt
+            # from xgboost import plot_tree
+            # import graphviz
 
-            plot_tree(self._classifier, num_trees=0)
-            plt.show()
+            # plot_tree(self._classifier, num_trees=0)
+            # plt.show()
 
         elif self.method == 'sigmoid':
             self.n_trees = len(self._classifier._first_estimator.get_booster().get_dump())
@@ -272,7 +274,7 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=200, n_features=15,
+    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=500, n_features=15,
                  calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
@@ -297,7 +299,7 @@ class MarginalDLClassifier():
         :return: a keras model
         """
         # set drop out
-        drop = 0.05
+        drop = 0.5
 
         # inout shape
         x = Input(shape=(n_features, ))
@@ -305,11 +307,13 @@ class MarginalDLClassifier():
         # first dense (hidden) layer
         cnn = Dense(units//4, activation="sigmoid")(x)
         # dropout
-        # cnn = Dropout(rate=drop)(cnn)
+        cnn = Dropout(rate=drop)(cnn)
         # second dense (hidden) layer
         cnn = Dense(units, activation="sigmoid")(cnn)
+        # dropout
+        # cnn = Dropout(rate=drop)(cnn)
         # third dense (hidden) layer
-        cnn = Dense(units, activation="sigmoid")(cnn)
+        cnn = Dense(units//2, activation="sigmoid")(cnn)
         # fourth dense (hidden) layer
         # cnn = Dense(units//2, activation="sigmoid")(cnn)
 
@@ -346,7 +350,7 @@ class MarginalDLClassifier():
         model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features, activation_layer=self.activation_layer)
         # compile model
         self.compile_model(model, optimizer=self.optimizer, loss=self.loss)
-        model.summary()
+        # model.summary()
         return model
 
     # def create_callbacks(self, batch_size: int, generator: EvalGenerator, log_dir: str, ) -> list:
@@ -395,11 +399,11 @@ class MarginalDLClassifier():
 
 
     def fit_classifier(self, X, y):
-        callbacks = [TensorBoard(log_dir='./logs', batch_size=10),
-                     ModelCheckpoint(filepath=os.path.join('./logs', 'model_weights_{epoch:02d}.hdf5'),
-                                     save_best_only=False, save_weights_only=True)]
+        # callbacks = [TensorBoard(log_dir='./logs', batch_size=10),
+        #              ModelCheckpoint(filepath=os.path.join('./logs', 'model_weights_{epoch:02d}.hdf5'),
+        #                              save_best_only=False, save_weights_only=True)]
 
-        self._classifier.fit(X, y, epochs=self.epochs, verbose=0, callbacks=callbacks)
+        self._classifier.fit(X, y, epochs=self.epochs, verbose=0)
 
 
     def fit_calibration(self, X, y_nhot, target_classes, calibration_on_loglrs=True):

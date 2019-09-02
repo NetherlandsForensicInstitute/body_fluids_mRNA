@@ -3,15 +3,18 @@ Plotting functions.
 """
 
 import math
+import scipy
 import numpy as np
 import rna.settings as settings
 
 from matplotlib import rc, pyplot as plt, patches as mpatches
-from matplotlib import colors as mcolors
+# from matplotlib import colors as mcolors
 # from matplotlib.cm import get_cmap
 from collections import OrderedDict
 from sklearn.metrics import roc_curve, auc
 from itertools import cycle
+from scipy.interpolate import interp1d
+# from scipy.misc import derivative
 
 # from rna.analytics import combine_samples
 
@@ -235,47 +238,27 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
 
         celltype = vec2string(target_class, label_encoder)
 
-        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
-        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
+        try:
+            loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
+            loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
 
-        if n_target_classes == 1:
-            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            plt.title(celltype)
-            plt.xlabel("10logLR")
-            if density:
-                plt.ylabel("Density")
-            else:
-                plt.ylabel("Frequency")
-            plt.legend(loc='upper right')
-
-        elif n_rows == 1:
-            axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-            axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-            axs[t].set_title(celltype)
-
-            handles, labels = axs[0].get_legend_handles_labels()
-
-            fig.text(0.5, 0.002, "10logLR", ha='center')
-            if density:
-                fig.text(0.002, 0.5, "Density", va='center', rotation='vertical')
-            else:
-                fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
-
-            fig.legend(handles, labels, 'center right')
-
-        elif n_rows > 1:
-                axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                axs[j, k].set_title(celltype)
-
-                if (t % 2) == 0:
-                    k = 1
+            if n_target_classes == 1:
+                plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+                plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+                plt.title(celltype)
+                plt.xlabel("10logLR")
+                if density:
+                    plt.ylabel("Density")
                 else:
-                    k = 0
-                    j = j + 1
+                    plt.ylabel("Frequency")
+                plt.legend(loc='upper right')
 
-                handles, labels = axs[0, 0].get_legend_handles_labels()
+            elif n_rows == 1:
+                axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+                axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+                axs[t].set_title(celltype)
+
+                handles, labels = axs[0].get_legend_handles_labels()
 
                 fig.text(0.5, 0.002, "10logLR", ha='center')
                 if density:
@@ -284,6 +267,30 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
                     fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
 
                 fig.legend(handles, labels, 'center right')
+
+            elif n_rows > 1:
+                    axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+                    axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+                    axs[j, k].set_title(celltype)
+
+                    if (t % 2) == 0:
+                        k = 1
+                    else:
+                        k = 0
+                        j = j + 1
+
+                    handles, labels = axs[0, 0].get_legend_handles_labels()
+
+                    fig.text(0.5, 0.002, "10logLR", ha='center')
+                    if density:
+                        fig.text(0.002, 0.5, "Density", va='center', rotation='vertical')
+                    else:
+                        fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
+
+                    fig.legend(handles, labels, 'center right')
+
+        except ValueError:
+            pass
 
 
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
@@ -305,79 +312,83 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
 
     for keys, values in test_dict.items():
         for t, target_class in enumerate(target_classes):
-            fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(16, 5))
+            try:
+                fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(16, 5))
 
-            loglrs = OrderedDict()
-            y_nhot = OrderedDict()
-            full_name = []
-            priors = []
-            for method, data in values.items():
-                loglrs[method] = np.log10(data[0][:, t])
-                y_nhot[method] = data[1]
-                full_name.append(method)
-                priors.append('[' + method.split('[')[1])
-            assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
+                loglrs = OrderedDict()
+                y_nhot = OrderedDict()
+                full_name = []
+                priors = []
+                for method, data in values.items():
+                    loglrs[method] = np.log10(data[0][:, t])
+                    y_nhot[method] = data[1]
+                    full_name.append(method)
+                    priors.append('[' + method.split('[')[1])
+                assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
-            target_class = np.reshape(target_class, -1, 1)
-            labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+                target_class = np.reshape(target_class, -1, 1)
+                labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
-            colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-            colors_positive = ['orange'] * int(np.sum(labels))
-            colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
+                colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+                colors_positive = ['orange'] * int(np.sum(labels))
+                colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
 
-            h1 = mpatches.Patch(color='orange', label='h1')
-            h2 = mpatches.Patch(color='blue', label='h2')
+                h1 = mpatches.Patch(color='orange', label='h1')
+                h2 = mpatches.Patch(color='blue', label='h2')
 
-            # make sure uniform priors always on bottom
-            if any(str([1] * len(target_class)) in x for x in priors):
-                index1 = priors.index(str([1] * len(target_class)))
-                loglrs1 = loglrs[full_name[index1]]
-                loglrs2 = loglrs[full_name[1 - index1]]
-            else:
-                index1 = 0
-                index2 = 1
-                loglrs1 = loglrs[full_name[index1]]
-                loglrs2 = loglrs[full_name[index2]]
+                # make sure uniform priors always on bottom
+                if any(str([1] * len(target_class)) in x for x in priors):
+                    index1 = priors.index(str([1] * len(target_class)))
+                    loglrs1 = loglrs[full_name[index1]]
+                    loglrs2 = loglrs[full_name[1 - index1]]
+                else:
+                    index1 = 0
+                    index2 = 1
+                    loglrs1 = loglrs[full_name[index1]]
+                    loglrs2 = loglrs[full_name[index2]]
 
-            loglrs1_pos = loglrs1[np.argwhere(labels == 1)]
-            loglrs2_pos = loglrs2[np.argwhere(labels == 1)]
-            loglrs1_neg = loglrs1[np.argwhere(labels == 0)]
-            loglrs2_neg = loglrs2[np.argwhere(labels == 0)]
+                loglrs1_pos = loglrs1[np.argwhere(labels == 1)]
+                loglrs2_pos = loglrs2[np.argwhere(labels == 1)]
+                loglrs1_neg = loglrs1[np.argwhere(labels == 0)]
+                loglrs2_neg = loglrs2[np.argwhere(labels == 0)]
 
-            min_val_pos = math.floor(min(np.min(loglrs1_pos), np.min(loglrs2_pos)))
-            max_val_pos = math.ceil(max(np.max(loglrs1_pos), np.max(loglrs2_pos)))
-            min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
-            max_val_neg = math.ceil(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
+                min_val_pos = math.floor(min(np.min(loglrs1_pos), np.min(loglrs2_pos)))
+                max_val_pos = math.ceil(max(np.max(loglrs1_pos), np.max(loglrs2_pos)))
+                min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
+                max_val_neg = math.ceil(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
 
-            plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 11), colors, (h1, h2), ax=axs1)
-            plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
-                                                  (h1), ax=axs2)
-            plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
-                                                  (h2), ax=axs3)
+                plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 11), colors, (h1, h2), ax=axs1)
+                plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
+                                                      (h1), ax=axs2)
+                plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
+                                                      (h2), ax=axs3)
 
-            fig.text(0.5, 0.002, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
-            fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[1 - index1], label_encoder)), va='center', rotation='vertical')
+                fig.text(0.5, 0.002, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
+                fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[1 - index1], label_encoder)), va='center', rotation='vertical')
 
-            target_class_str = vec2string(target_class, label_encoder)
-            target_class_save = target_class_str.replace(" ", "_")
-            target_class_save = target_class_save.replace(".", "_")
-            target_class_save = target_class_save.replace("/", "_")
-            if savefig is not None:
-                plt.tight_layout()
-                plt.savefig(savefig + '_' + keys + '_' + target_class_save)
-                plt.close()
-            if show or savefig is None:
-                plt.tight_layout()
-                plt.show()
+                target_class_str = vec2string(target_class, label_encoder)
+                target_class_save = target_class_str.replace(" ", "_")
+                target_class_save = target_class_save.replace(".", "_")
+                target_class_save = target_class_save.replace("/", "_")
+                if savefig is not None:
+                    plt.tight_layout()
+                    plt.savefig(savefig + '_' + keys + '_' + target_class_save)
+                    plt.close()
+                if show or savefig is None:
+                    plt.tight_layout()
+                    plt.show()
+
+            except ValueError:
+                pass
 
 
 def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, handles, ax=None):
 
     ax = ax
 
-    rect_neg = mpatches.Rectangle((-5, -5), 5, 5, color='blue', alpha=0.1, linewidth=0)
-    rect_pos1 = mpatches.Rectangle((-5, 0), 16, 11, color='orange', alpha=0.1, linewidth=0)
-    rect_pos2 = mpatches.Rectangle((0, -5), 11, 5, color='orange', alpha=0.1, linewidth=0)
+    rect_neg = mpatches.Rectangle((-8, -8), 8, 8, color='blue', alpha=0.1, linewidth=0)
+    rect_pos1 = mpatches.Rectangle((-8, 0), 19, 11, color='orange', alpha=0.1, linewidth=0)
+    rect_pos2 = mpatches.Rectangle((0, -8), 11, 8, color='orange', alpha=0.1, linewidth=0)
 
     ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
     ax.scatter(loglrs[0], loglrs[1], s=3, color=colors, alpha=0.2)
@@ -395,7 +406,7 @@ def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, 
     return ax
 
 
-def plot_boxplot_of_metric(n_metric, label_encoder, target_class, name_metric, savefig=None, show=None):
+def plot_boxplot_of_metric(n_metric, label_encoder, name_metric, savefig=None, show=None):
 
     def int2string_models(int, specify_which=None):
         if specify_which == None:
@@ -455,7 +466,7 @@ def plot_boxplot_of_metric(n_metric, label_encoder, target_class, name_metric, s
     plt.close(fig)
 
 
-def plot_progress_of_metric(n_metric, label_encoder, target_class, name_metric, savefig=None, show=None):
+def plot_progress_of_metric(n_metric, label_encoder, name_metric, savefig=None, show=None):
 
     def int2string_models(int, specify_which=None):
         if specify_which == None:
@@ -521,7 +532,16 @@ def plot_progress_of_metric(n_metric, label_encoder, target_class, name_metric, 
         plt.show()
     plt.close(fig)
 
-def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, savefig=None, show=None):
+
+def plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+                          label_encoder, show=None, savefig=None):
+
+    for method in lrs_before_for_all_methods.keys():
+        plot_pavs(lrs_before_for_all_methods[method], lrs_after_for_all_methods[method], y_nhot_for_all_methods[method],
+                  target_classes, label_encoder, method_name=method, show=show, savefig=savefig)
+
+
+def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, method_name, savefig=None, show=None):
 
     for t, target_class in enumerate(target_classes):
 
@@ -529,11 +549,14 @@ def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, save
         loglrs_after = np.log10(lrs_after[:, t])
         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
 
-        fig, (axs1, axs2) = plt.subplots(nrows=1, ncols=2, figsize=(11, 5))
-        # plt.suptitle(vec2string(target_class, label_encoder))
-
-        plot_pav(loglrs_before, labels, 'Before calibration', axs1)
-        plot_pav(loglrs_after, labels, 'After calibration', axs2)
+        if np.array_equal(loglrs_before, loglrs_after):
+            fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(8, 7))
+            plot_pav(loglrs_before, labels, 'Before calibration', axs1)
+        else:
+            fig, (axs1, axs2) = plt.subplots(nrows=1, ncols=2, figsize=(11, 5))
+            # plt.suptitle(vec2string(target_class, label_encoder))
+            plot_pav(loglrs_before, labels, 'Before calibration', axs1)
+            plot_pav(loglrs_after, labels, 'After calibration', axs2)
 
         fig.text(0.5, 0.001, 'pre-PAVcalibrated 10logLR', ha='center')
         fig.text(0.001, 0.5, 'post-PAVcalibrated 10logLR', va='center', rotation='vertical')
@@ -542,6 +565,9 @@ def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, save
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
+
+        if method_name is not None:
+            target_class_save =  method_name + '_' + target_class_save
 
         if savefig is not None:
             plt.tight_layout()
@@ -562,28 +588,38 @@ def plot_pav(loglr, labels, title, ax, show_scatter=True):
 
     ax=ax
 
-    pav = PavLogLR()
-    pav_loglrs = pav.fit_transform(loglr, labels)
-    xrange = [-10, 10]
+    try:
+        pav = PavLogLR()
+        pav_loglrs = pav.fit_transform(loglr, labels)
+        xrange = [-10, 10]
 
-    ax.axis('equal')
-    ax.axis(xrange + xrange)
-    ax.plot(xrange, xrange, color='black')
+        ax.axis('equal')
+        ax.axis(xrange + xrange)
+        ax.plot(xrange, xrange, color='black')
 
-    pav_x = np.arange(*xrange, .01)
-    ax.plot(pav_x, pav.transform(pav_x), color='green', alpha=0.9)
-    ax.grid(True, linestyle=':')
-    ax.set_title(title)
-    if show_scatter:
-        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-        h1 = mpatches.Patch(color='orange', label='h1')
-        h2 = mpatches.Patch(color='blue', label='h2')
-        ax.scatter(loglr, pav_loglrs, color=colors)
-        ax.legend(handles=[h1, h2], loc='upper right')
-    ax.set_xticks(np.linspace(-10, 10, 8+1))
-    ax.set_yticks(np.linspace(-10, 10, 8+1))
+        pav_x = np.arange(*xrange, .01)
+        pav_transformed_x = pav.transform(pav_x)
+        pav_transformed_x = np.where(pav_transformed_x == -np.Inf, -11, pav_transformed_x)
+        pav_transformed_x = np.where(pav_transformed_x == np.Inf, 11, pav_transformed_x)
+        ax.plot(pav_x, pav_transformed_x, color='green')
+        ax.grid(True, linestyle=':')
+        ax.set_title(title)
+        if show_scatter:
+            indices_h1 = np.argwhere(labels == 1).ravel()
+            indices_h0 = np.argwhere(labels == 0).ravel()
+            h1 = mpatches.Patch(color='orange', label='h1')
+            h2 = mpatches.Patch(color='blue', label='h2')
+            ax.scatter(loglr[indices_h1], [-9]*len(pav_loglrs[indices_h1]), color='orange', s=1.5, marker='+')
+            ax.scatter(loglr[indices_h0], [-9.5]*len(pav_loglrs[indices_h0]), color='blue', s=1.5, marker='x')
+            ax.legend(handles=[h1, h2], loc='upper right')
+        ax.set_xticks(np.linspace(-10, 10, 9))
+        ax.set_yticks(np.linspace(-10, 10, 9))
 
-    return ax
+        return ax
+
+    except ValueError:
+        # when the target class does not exist in the test data
+        pass
 
 
 def plot_insights_cllr(lrs_after, y_nhot, target_classes, label_encoder, savefig=None, show=None):
@@ -690,9 +726,7 @@ def plot_insight_cllr(lrs, labels, savefig=None, show=None):
         sim_punish_d = np.log2(1 + sim_lrs)
 
         ax.plot(np.log10(sim_lrs), sim_punish_p, color='orange')
-                # label='punish p (max = {0:.1f})'.format(np.max(sim_punish_p)))
         ax.plot(np.log10(sim_lrs), sim_punish_d, color='blue')
-                # label='punish d (max = {0:.1f})'.format(np.max(sim_punish_d)))
 
         ax.set_ylabel("Cost")
         ax.set_xlabel("10logLR")
@@ -753,7 +787,9 @@ def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder
 
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
-        plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class)
+        fpr, tpr = plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class)
+
+        # derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class)
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -767,6 +803,61 @@ def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder
             plt.show()
 
         plt.close()
+
+
+def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class):
+    from statsmodels.nonparametric.kernel_regression import KernelReg
+
+    loglrs = np.log10(lrs_all_methods['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'][:, t])
+    y_nhot = y_nhot_all_methods['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]']
+    labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+    loglrs_h1 = loglrs[np.argwhere(labels == 1)]
+    loglrs_h2 = loglrs[np.argwhere(labels == 0)]
+
+    # Make a function from coordinates (fpr, tpr) to enable calculating the differtiated function
+    '''
+    Interpolation is the process of finding a value between two points on a line or a curve. To help us remember 
+    what it means, we should think of the first part of the word, 'inter,' as meaning 'enter,' which reminds us to 
+    look 'inside' the data we originally had. This tool, interpolation, is not only useful in statistics, but is also 
+    useful in science, business, or when there is a need to predict values that fall within two existing data points.
+    '''
+    f = interp1d(fpr[0], tpr[0], kind='linear')
+    # When score is 1
+    x = np.linspace(fpr[0].min(), fpr[0].max(), len(fpr[0]))
+    y = f(x)
+    dy = np.zeros(x.shape[0])
+    dy[0:-1] = np.diff(y) / np.diff(x)
+    dy[-1] = (y[-1] - y[-2]) / (x[-1] - x[-2])
+    # # dy = np.where(dy == np.Inf, 10, dy)
+    # # dy = np.where(dy == -np.Inf, -10, dy)
+    plt.scatter(x, dy)
+    plt.show()
+
+    kr = KernelReg(y, x, 'c')
+    y_pred, y_std = kr.fit(x)
+
+    # create cumulative density function
+    F_d = scipy.stats.norm.cdf(loglrs_h2)
+    F_d_ = 1 - F_d
+    f_F_d_ = interp1d(loglrs_h2.ravel(), F_d_.ravel())
+    fig, ax = plt.subplots()
+    fitx = np.linspace(loglrs_h2.min(), loglrs_h2.max(), 100)
+    ax.scatter(loglrs_h2, F_d_)
+    ax.plot(fitx, f_F_d_(fitx), color='black')
+    fig.show()
+
+
+    logscore = 0
+    T = f_F_d_(logscore).max()
+    # true_LR = derivative(f, T, dx=1e-2)
+    fig, ax = plt.subplots()
+    ax.scatter(fpr[0], tpr[0], color='orange', alpha=0.2, label='true coordinates')
+    ax.plot(x, f(x), color='black', lw=1, label='approximated function')
+    ax.plot(x, y_pred, color='green', lw=1, linstyle='--', label='smoothed function')
+    ax.axvline(x=T, color='red', label='x (10logScore) = 0')
+    ax.legend()
+    ax.set_title('True LR at Fd({})={} is {}'.format(logscore, T, true_LR))
+    fig.show()
 
 
 def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
@@ -808,6 +899,8 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     plt.title("ROC")
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
+    return fpr, tpr
+
 
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
 
@@ -817,11 +910,13 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
         # TODO: Is this correct for MLP with softmax?
         if len(model._classifier.coef_) == 2 ** 8:
             indices_target_class = get_mixture_columns_for_class(target_class, None)
+            intercept = np.mean(model._classifier.intercept_[indices_target_class])
             coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
         else:
+            intercept = model._classifier.intercept_[t, :]
             coefficients = model._classifier.coef_[t, :]
 
-        plot_coefficient_importance(coefficients, present_markers, celltype)
+        plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -837,18 +932,20 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
         plt.close()
 
 
-def plot_coefficient_importance(coefficients, present_markers, celltypes):
+def plot_coefficient_importance(intercept, coefficients, present_markers, celltypes):
     """
 
+    :param intercept:
     :param coefficients:
     :param present_markers:
     :param celltypes: list of strings: list of celltypes
     :return:
     """
 
-    def calculate_maximum_lr(coefficients):
+    def calculate_maximum_lr(intercept, coefficients):
         positive_coefficients = coefficients[np.argwhere(coefficients > 0).ravel()]
-        max_probability = 1 / (1 + np.exp(-(np.sum(positive_coefficients))))
+        all_coefficients = np.append(intercept, positive_coefficients)
+        max_probability = 1 / (1 + np.exp(-(np.sum(all_coefficients))))
         max_lr = max_probability / (1 - max_probability)
         if max_lr > 10 ** 10:
             return 10 ** 10
@@ -856,7 +953,7 @@ def plot_coefficient_importance(coefficients, present_markers, celltypes):
             return max_lr
 
     coefficients = np.reshape(coefficients, -1)
-    max_lr = calculate_maximum_lr(coefficients)
+    max_lr = calculate_maximum_lr(intercept, coefficients)
 
     # sort
     sorted_indices = np.argsort(coefficients)
@@ -893,7 +990,7 @@ def plot_coefficient_importance(coefficients, present_markers, celltypes):
 def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_nhot_augmented, target_classes,
                                label_encoder, show=None, savefig=None):
 
-    def confidence_interval(all_lrs_after_calib_bs_tc, lrs_after_calib_tc):
+    def confidence_interval(all_lrs_after_calib_bs_tc, lrs_after_calib_tc, alpha):
         B = all_lrs_after_calib_bs_tc.shape[1]
 
         avg_bootstrap_lrs = np.mean(all_lrs_after_calib_bs_tc, axis=1)
@@ -907,9 +1004,9 @@ def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_n
 
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
-        lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], lrs_after_calib[:, t])
+        lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], lrs_after_calib[:, t], alpha=0.05)
 
-        plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
+        # plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -928,73 +1025,74 @@ def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_n
 def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds):
 
     X = np.arange(lrs.shape[0])
-    llrs = np.log10(lrs)
-    sorted_indices = np.argsort(llrs)
+    sorted_indices = np.argsort(lrs)
 
-    llrs = llrs[sorted_indices]
+    llrs = np.log10(lrs)[sorted_indices]
     llower_bounds = np.log10(lower_bounds)[sorted_indices]
     lupper_bounds = np.log10(upper_bounds)[sorted_indices]
-    yerr = np.vstack((llower_bounds, lupper_bounds))
 
-    plt.errorbar(X, llrs, xerr=yerr)
-    plt.plot(X, llrs, color='orange')
+    plt.plot(X, llrs, color='black')
+    plt.fill_between(X, llower_bounds, lupper_bounds, color='gray', alpha=0.2)
+    plt.xlabel('n')
+    plt.ylabel('10logLR')
 
 
-def plot_per_feature(model, augmented_data, target_classes, present_markers, train=True, savefig=None, show=None):
 
-    # present_markers = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',
-    #                    'MMP11', 'SEMG1', 'KLK3', 'PRM1', 'RPS4Y1', 'XIST', 'ACTB', '18S-rRNA']
-    present_markers = present_markers[:-4]
-    augmented_data = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]']
-    if train:
-        X = augmented_data.X_train_augmented
-        y_nhot = augmented_data.y_train_nhot_augmented
-        title='Train'
-    else:
-        X = augmented_data.X_test_augmented
-        y_nhot = augmented_data.y_test_nhot_augmented
-        title='Test'
 
-    for t, target_class in enumerate(target_classes):
-        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-
-        h1 = mpatches.Patch(color='orange', label='h1')
-        h2 = mpatches.Patch(color='blue', label='h2')
-
-        colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-        # colors_test = ['orange' if l == 1.0 else 'blue' for l in labels_test]
-
-        # coefficients = model['[1, 1, 1, 1, 1, 1, 1, 1]']._classifier.coef_[t, :]
-
-        fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(12, 9))
-        plt.suptitle(title)
-        j = 0
-        k = 0
-        for i, marker in enumerate(present_markers):
-            # # xrange = np.linspace(min(X[:, i]), max(X[:, i]))
-            # # xrange_test = np.linspace(min(X_test_augm_markers), max(X_test_augm_markers))
-            #
-            axes[j, k].scatter(X[:, i], labels, color=colors, s=1.5)
-            # axes[j, k].set_xlim(np.linspace(min(X), max(X), 10))
-            # # axes[i].plot(xrange_train, 1 / (1 + np.exp(-(coefficient * xrange_train))), color='darkgray', lw=2)
-            axes[j, k].set_title(marker)
-            axes[j, k].set_yticks([0, 1])
-
-            k += 1
-            if i == 3:
-                k = 0
-                j = 1
-            elif i == 7:
-                k = 0
-                j = 2
-            elif i == 11:
-                k = 0
-                j = 3
-
-        plt.tight_layout()
-        plt.show()
-
-        # plt.legend(handles=[h1, h2], loc='center left', bbox_to_anchor=(1, 0.5))
+# def plot_per_feature(model, augmented_data, target_classes, present_markers, train=True, savefig=None, show=None):
+#
+#
+#     present_markers = present_markers[:-4]
+#     augmented_data = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]']
+#     if train:
+#         X = augmented_data.X_train_augmented
+#         y_nhot = augmented_data.y_train_nhot_augmented
+#         title='Train'
+#     else:
+#         X = augmented_data.X_test_augmented
+#         y_nhot = augmented_data.y_test_nhot_augmented
+#         title='Test'
+#
+#     for t, target_class in enumerate(target_classes):
+#         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+#
+#         h1 = mpatches.Patch(color='orange', label='h1')
+#         h2 = mpatches.Patch(color='blue', label='h2')
+#
+#         colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+#         # colors_test = ['orange' if l == 1.0 else 'blue' for l in labels_test]
+#
+#         # coefficients = model['[1, 1, 1, 1, 1, 1, 1, 1]']._classifier.coef_[t, :]
+#
+#         fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(12, 9))
+#         plt.suptitle(title)
+#         j = 0
+#         k = 0
+#         for i, marker in enumerate(present_markers):
+#             # # xrange = np.linspace(min(X[:, i]), max(X[:, i]))
+#             # # xrange_test = np.linspace(min(X_test_augm_markers), max(X_test_augm_markers))
+#             #
+#             axes[j, k].scatter(X[:, i], labels, color=colors, s=1.5)
+#             # axes[j, k].set_xlim(np.linspace(min(X), max(X), 10))
+#             # # axes[i].plot(xrange_train, 1 / (1 + np.exp(-(coefficient * xrange_train))), color='darkgray', lw=2)
+#             axes[j, k].set_title(marker)
+#             axes[j, k].set_yticks([0, 1])
+#
+#             k += 1
+#             if i == 3:
+#                 k = 0
+#                 j = 1
+#             elif i == 7:
+#                 k = 0
+#                 j = 2
+#             elif i == 11:
+#                 k = 0
+#                 j = 3
+#
+#         plt.tight_layout()
+#         plt.show()
+#
+#         # plt.legend(handles=[h1, h2], loc='center left', bbox_to_anchor=(1, 0.5))
 
 
 # TODO: Not sure if correct
