@@ -138,7 +138,7 @@ class MarginalMLRClassifier():
         gives back an N x n_target_class array of LRs
         :param calibration_on_loglrs:
         :param X: the N x n_features data
-        :param target_classes: vector of length n_single_cell_types with at least one 1
+        :param target_classes: list of vectors of length n_single_cell_types with at least one 1
         :param with_calibration:
         :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
         does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
