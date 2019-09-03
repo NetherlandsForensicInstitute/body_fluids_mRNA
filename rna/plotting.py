@@ -990,23 +990,22 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
 def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_nhot_augmented, target_classes,
                                label_encoder, show=None, savefig=None):
 
-    def confidence_interval(all_lrs_after_calib_bs_tc, lrs_after_calib_tc, alpha):
-        B = all_lrs_after_calib_bs_tc.shape[1]
+    def confidence_interval(all_lrs_after_calib_bs_tc, alpha):
 
-        avg_bootstrap_lrs = np.mean(all_lrs_after_calib_bs_tc, axis=1)
-        est_var_true_cllr = (1 / (B - 1)) * np.sum(np.array([all_lrs_after_calib_bs_tc[:, b] - avg_bootstrap_lrs for b in range(B)]).T ** 2, axis=1)
-
-        # calculate the confidence interval for all samples
-        lower_bounds = lrs_after_calib_tc - 0.025 * np.sqrt(est_var_true_cllr)
-        upper_bounds = lrs_after_calib_tc + 0.025 * np.sqrt(est_var_true_cllr)
+        lower_bounds=np.percentile(all_lrs_after_calib_bs_tc, (alpha/2)*100, axis=1)
+        upper_bounds=np.percentile(all_lrs_after_calib_bs_tc, (1 - (alpha/2))*100, axis=1)
 
         return lower_bounds, upper_bounds
 
+    lower_bounds_tc = dict()
+    upper_bounds_tc = dict()
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
-        lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], lrs_after_calib[:, t], alpha=0.05)
+        lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], alpha=0.05)
+        lower_bounds_tc[target_class] = lower_bounds
+        upper_bounds_tc[target_class] = upper_bounds
 
-        # plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
+        plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -1020,6 +1019,8 @@ def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_n
             plt.show()
 
         plt.close()
+
+    return lower_bounds_tc, upper_bounds_tc
 
 
 def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds):

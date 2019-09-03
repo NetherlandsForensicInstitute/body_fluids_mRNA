@@ -43,7 +43,7 @@ class MarginalMLPClassifier():
             for i, target_class in enumerate(target_classes):
                 calibrator = self._calibrator()
                 # np.max ensures that the nhot matrix is converted into a nhot list with the
-                # relevant target classes coded as a 1.
+                # lrs from the relevant target classes coded as a 1.
                 labels = np.max(np.multiply(y_nhot, target_class), axis=1)
                 if calibration_on_loglrs:
                     loglrs = np.log10(lrs_per_target_class[:, i])

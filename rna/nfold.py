@@ -22,7 +22,7 @@ from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplo
     plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs, plot_pavs_all_methods
 
 
-def nfold_analysis(nfolds, tc, savepath):
+def nfold_analysis(nfolds, run, tc, savepath):
     from_penile = False
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(settings.priors[0])
@@ -35,24 +35,6 @@ def nfold_analysis(nfolds, tc, savepath):
     target_classes = string2vec(tc, label_encoder)
 
 
-    # ======= Initialize =======
-    emtpy_numpy_array = np.zeros((nfolds, len(settings.binarize), len(settings.softmax), len(settings.models), len(settings.priors)))
-    accuracies_train, accuracies_test, accuracies_test_as_mixtures, accuracies_mixtures, accuracies_single,\
-    cllr_test, cllr_test_as_mixtures, cllr_mixtures = [dict() for i in range(8)]
-
-    for target_class in target_classes:
-        target_class_str = vec2string(target_class, label_encoder)
-
-        accuracies_train[target_class_str] = emtpy_numpy_array.copy()
-        accuracies_test[target_class_str] = emtpy_numpy_array.copy()
-        accuracies_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
-        accuracies_mixtures[target_class_str] = emtpy_numpy_array.copy()
-        accuracies_single[target_class_str] = emtpy_numpy_array.copy()
-
-        cllr_test[target_class_str] = emtpy_numpy_array.copy()
-        cllr_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
-        cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
-
     if settings.split_before:
         # ======= Split data =======
         X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
@@ -60,13 +42,33 @@ def nfold_analysis(nfolds, tc, savepath):
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
+        n = n + (nfolds * run)
+        print(n)
+
+        # ======= Initialize =======
+        lrs_for_model_in_fold = OrderedDict()
+        emtpy_numpy_array = np.zeros((len(settings.binarize), len(settings.softmax), len(settings.models), len(settings.priors)))
+        accuracies_train_n, accuracies_test_n, accuracies_test_as_mixtures_n, accuracies_mixtures_n, accuracies_single_n,\
+        cllr_test_n, cllr_test_as_mixtures_n, cllr_mixtures_n = [dict() for i in range(8)]
+
+        for target_class in target_classes:
+            target_class_str = vec2string(target_class, label_encoder)
+
+            accuracies_train_n[target_class_str] = emtpy_numpy_array.copy()
+            accuracies_test_n[target_class_str] = emtpy_numpy_array.copy()
+            accuracies_test_as_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
+            accuracies_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
+            accuracies_single_n[target_class_str] = emtpy_numpy_array.copy()
+
+            cllr_test_n[target_class_str] = emtpy_numpy_array.copy()
+            cllr_test_as_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
+            cllr_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
 
         if not settings.split_before:
             # ======= Split data =======
             X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
             X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
 
-        lrs_for_model_in_fold = OrderedDict()
         for i, binarize in enumerate(settings.binarize):
             X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, markers=settings.markers)
 
@@ -117,105 +119,178 @@ def nfold_analysis(nfolds, tc, savepath):
                             str_prior = str(priors)
                             target_class_str = vec2string(target_class, label_encoder)
 
-                            accuracies_train[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_train_n[target_class_str][i, j, k, p] = calculate_accuracy_all_target_classes(
                                 augmented_data[str_prior].X_train_augmented,
                                 augmented_data[str_prior].y_train_nhot_augmented, target_classes, model[str_prior],
                                 mle)[t]
-                            accuracies_test[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_test_n[target_class_str][i, j, k, p] = calculate_accuracy_all_target_classes(
                                 augmented_data[baseline_prior].X_test_augmented,
                                 augmented_data[baseline_prior].y_test_nhot_augmented, target_classes, model[str_prior],
                                 mle)[t]
-                            accuracies_test_as_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_test_as_mixtures_n[target_class_str][i, j, k, p] = calculate_accuracy_all_target_classes(
                                 augmented_data[baseline_prior].X_test_as_mixtures_augmented,
                                 augmented_data[baseline_prior].y_test_as_mixtures_nhot_augmented, target_classes,
                                 model[str_prior], mle)[t]
-                            accuracies_mixtures[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_mixtures_n[target_class_str][i, j, k, p] = calculate_accuracy_all_target_classes(
                                 X_mixtures, y_nhot_mixtures, target_classes, model[str_prior], mle)[t]
-                            accuracies_single[target_class_str][n, i, j, k, p] = calculate_accuracy_all_target_classes(
+                            accuracies_single_n[target_class_str][i, j, k, p] = calculate_accuracy_all_target_classes(
                                 X_test_transformed, mle.inv_transform_single(y_test), target_classes, model[str_prior],
                                 mle)[t]
 
-                            cllr_test[target_class_str][n, i, j, k, p] = cllr(
+                            cllr_test_n[target_class_str][i, j, k, p] = cllr(
                                 lrs_after_calib[str_prior][:, t], augmented_data[baseline_prior].y_test_nhot_augmented, target_class)
-                            cllr_test_as_mixtures[target_class_str][n, i, j, k, p] = cllr(
+                            cllr_test_as_mixtures_n[target_class_str][i, j, k, p] = cllr(
                                 lrs_after_calib_test_as_mixtures[str_prior][:, t], augmented_data[baseline_prior].y_test_as_mixtures_nhot_augmented, target_class)
-                            cllr_mixtures[target_class_str][n, i, j, k, p] = cllr(
+                            cllr_mixtures_n[target_class_str][i, j, k, p] = cllr(
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
         outer.update(1)
-        # pickle.dump(lrs_for_model_in_fold, open('lrs_for_model_in_fold_{}'.format(n), 'wb'))
+
+        pickle.dump(lrs_for_model_in_fold, open(os.path.join(savepath, 'picklesaves/lrs_for_model_in_fold_{}'.format(n)), 'wb'))
+
+        for t, target_class in enumerate(target_classes):
+            target_class_str = vec2string(target_class, label_encoder)
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
+
+            pickle.dump(accuracies_train_n[target_class_str], open(os.path.join(savepath, 'picklesaves/accuracies_train_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(accuracies_test_n[target_class_str], open(os.path.join(savepath, 'picklesaves/accuracies_test_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(accuracies_test_as_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/accuracies_test_as_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(accuracies_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/accuracies_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(accuracies_single_n[target_class_str], open(os.path.join(savepath, 'picklesaves/accuracies_single_{}_{}'.format(target_class_save, n)), 'wb'))
+
+            pickle.dump(cllr_test_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_test_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(cllr_test_as_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_test_as_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
+            pickle.dump(cllr_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
+
+
+def makeplots(nfolds, run, tc, path, savepath):
+
+    _, _, _, _, _, label_encoder, _, _ = \
+        get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
+    target_classes = string2vec(tc, label_encoder)
 
     lrs_for_model_per_fold = OrderedDict()
-    for n in range(10):
-        lrs_for_model_per_fold[str(n)] = pickle.load(open('lrs_for_model_in_fold_{}'.format(n), 'rb'))
+    emtpy_numpy_array = np.zeros(
+        (nfolds, len(settings.binarize), len(settings.softmax), len(settings.models), len(settings.priors)))
+    accuracies_train, accuracies_test, accuracies_test_as_mixtures, accuracies_mixtures, accuracies_single, \
+    cllr_test, cllr_test_as_mixtures, cllr_mixtures = [dict() for i in range(8)]
+
+    for target_class in target_classes:
+        target_class_str = vec2string(target_class, label_encoder)
+
+        accuracies_train[target_class_str] = emtpy_numpy_array.copy()
+        accuracies_test[target_class_str] = emtpy_numpy_array.copy()
+        accuracies_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
+        accuracies_mixtures[target_class_str] = emtpy_numpy_array.copy()
+        accuracies_single[target_class_str] = emtpy_numpy_array.copy()
+
+        cllr_test[target_class_str] = emtpy_numpy_array.copy()
+        cllr_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
+        cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
+
+    for n in range(nfolds):
+        n = n + (nfolds * run)
+        lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
         # os.remove('lrs_for_model_in_fold_{}'.format(n))
 
+        for target_class in target_classes:
+            target_class_str = vec2string(target_class, label_encoder)
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
 
-    types_data = ['test augm', 'mixt'] # 'mixt' and/or 'test augm as mixt'
+            accuracies_train[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path, 'accuracies_train_{}_{}'.format(target_class_save, n)), 'rb'))
+            accuracies_test[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path,'accuracies_test_{}_{}'.format(target_class_save, n)), 'rb'))
+            accuracies_test_as_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path,'accuracies_test_as_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
+            accuracies_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path,'accuracies_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
+            accuracies_single[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path, 'accuracies_single_{}_{}'.format(target_class_save, n)), 'rb'))
+
+            cllr_test[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path, 'cllr_test_{}_{}'.format(target_class_save, n)), 'rb'))
+            cllr_test_as_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path, 'cllr_test_as_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
+            cllr_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path,'cllr_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
+
+    types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
+
     for type_data in types_data:
-        lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(lrs_for_model_per_fold, type=type_data)
-    #     # plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
-    #     #                       target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
-    #
+        lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
+            lrs_for_model_per_fold, type=type_data)
+
+        plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
+                                  target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
+
         plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
                   savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
 
-        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                        savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+                                          label_encoder,
+                                          savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
 
         if len(settings.priors) == 2:
-            plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                                       savefig=os.path.join(savepath, 'LRs_for_different_priors_{}'.format(type_data)))
+            plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
+                                                       target_classes, label_encoder,
+                                                       savefig=os.path.join(savepath,
+                                                                            'LRs_for_different_priors_{}'.format(
+                                                                                type_data)))
+    for t, target_class in enumerate(target_classes):
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
 
-    # for t, target_class in enumerate(target_classes):
-    #     target_class_str = vec2string(target_class, label_encoder)
-    #     target_class_save = target_class_str.replace(" ", "_")
-    #     target_class_save = target_class_save.replace(".", "_")
-    #     target_class_save = target_class_save.replace("/", "_")
+        plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
+        plot_progress_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
+                                savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
 
-        # plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
-        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
-        # plot_progress_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
-        #                         savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
-        #
-        # plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        # plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, 'accuracy',
-        #                         savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
-        #
-        # plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join(savepath,
-        #                                             'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-        # plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, 'accuracy',
-        #                         savefig=os.path.join(savepath,
-        #                                              'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, "accuracy",
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
+        plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, 'accuracy',
+                                savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
 
-        # plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-        # plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, 'accuracy',
-        #                         savefig=os.path.join(savepath,
-        #                                              'progress_accuracy_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
+                               savefig=os.path.join(savepath,
+                                                    'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+        plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, 'accuracy',
+                                savefig=os.path.join(savepath,
+                                                     'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
 
-        # plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
-        #                        savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
-        # plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
-        #                         savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
-        #
-        # plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        # plot_progress_of_metric(cllr_test[target_class_str], label_encoder, 'Cllr',
-        #                         savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+        plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, 'accuracy',
+                                savefig=os.path.join(savepath,
+                                                     'progress_accuracy_mixtures_{}'.format(target_class_save)))
 
-        # plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join(savepath,
-        #                                             'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        # plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, 'Cllr',
-        #                         savefig=os.path.join(savepath,
-        #                                              'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        #
-        # plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        # plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, 'Cllr',
-        #                         savefig=os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
+                               savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
+        plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
+                                savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
+        plot_progress_of_metric(cllr_test[target_class_str], label_encoder, 'Cllr',
+                                savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath,
+                                                    'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+        plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, 'Cllr',
+                                savefig=os.path.join(savepath,
+                                                     'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+        plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, 'Cllr',
+                                savefig=os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
+
 
 # TODO: Want to change to dict?
 class AugmentedData():

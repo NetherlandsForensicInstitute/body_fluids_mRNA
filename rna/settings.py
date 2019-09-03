@@ -10,8 +10,8 @@ Options:
     softmax                     If provided, calculate the probabilities with softmax, otherwise use sigmoids
     nsamples                    The number of augmented samples per combination: (N_SAMPLES_TRAIN, N_SAMPLES_CALIB, N_SAMPLES_TEST)
                                 Note that 22 = 4 and 11 = 2 # TODO: explain clearer
-    test_size                   The size of the test data depending on total size of the data. The size of the train data = 1 - test_size.
-    calibration_size            The size of the calibration depending on the size of the residual train data.
+    test_size                   The size of the test data from the original NFI data set depending on total size of the data. The size of the train data = 1 - test_size.
+    calibration_size            The size of the calibration data from the original NFI data set depending on the size of the residual train data.
                                 If no separate data for calibration set to 0.0
                                 An example: if test_size=0.2 and calibration_size=0.0, than the train_size=0.8. If calibration=0.5, than the actual
                                 calibration_size=0.4 (and not 0.5!) and the actual train_size=0.4.
@@ -30,12 +30,12 @@ Options:
 
 split_before=False
 augment=True # False does not work
-binarize=[True]
+binarize=[True, False]
 markers=False
-softmax=[False]
-nsamples=(11, 11, 11)
+softmax=[True, False]
+nsamples=(33, 33, 22)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
-models=[['MLR', False]]
+models=[['MLR', False], ['MLP', True], ['XGB', True], ['DL', True]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
