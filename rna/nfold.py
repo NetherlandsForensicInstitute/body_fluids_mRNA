@@ -33,7 +33,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
         get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
-
+    pickle.dump(label_encoder, open(os.path.join('models', 'label_encoder'), 'wb'))
 
     if settings.split_before:
         # ======= Split data =======
@@ -80,6 +80,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
                                                                     y_nhot_mixtures, n_celltypes, n_features,
                                                                     label_encoder, AugmentedData, priors, binarize,
                                                                     from_penile)
+                pickle.dump(augmented_data[str(priors)], open(os.path.join('models', f'data_{priors}'), 'wb'))
 
             # ======= Transform data accordingly =======
             if binarize:
@@ -108,6 +109,8 @@ def nfold_analysis(nfolds, run, tc, savepath):
                         raise ValueError("There is no option to set settings.augment = {}".format(settings.augment))
 
                     key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
+                    for prior, model_per_prior in model.items():
+                        pickle.dump(model_per_prior, open(os.path.join('models', f'{key_name}_{prior}'), 'wb'))
                     lrs_for_model_in_fold[key_name] = LrsBeforeAfterCalib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
                                                                           lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
                                                                           lrs_before_calib_mixt, lrs_after_calib_mixt, y_nhot_mixtures)

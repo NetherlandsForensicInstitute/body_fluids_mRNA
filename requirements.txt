@@ -7,3 +7,11 @@ xlrd
 xgboost
 keras
 tensorflow
+jinja2
+ipython
+pyzmq
+tornado
+lime
+jupyter
+shap
+ceml
