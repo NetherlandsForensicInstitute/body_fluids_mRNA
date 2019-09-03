@@ -15,4 +15,4 @@ if __name__ == '__main__':
                           'Menstrual.secretion', 'Saliva', 'Nasal.mucosa', 'Skin']
     nfold_analysis(nfolds=nfolds, run=run, tc=target_classes_str, savepath='scratch/final_runs/baseline')
 
-    # makeplots(nfolds=nfolds, run=run, tc=target_classes_str, path='scratch/final_runs/baseline/picklesaves', savepath='scratch')
+    makeplots(nfolds=nfolds, run=run, tc=target_classes_str, path='scratch/final_runs/baseline/picklesaves', savepath='scratch')
