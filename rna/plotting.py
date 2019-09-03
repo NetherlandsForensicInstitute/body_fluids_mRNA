@@ -987,13 +987,13 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
     plt.legend(loc='lower right')
 
 
-def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_nhot_augmented, target_classes,
-                               label_encoder, show=None, savefig=None):
+def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, target_classes, label_encoder, show=None,
+                               savefig=None):
 
     def confidence_interval(all_lrs_after_calib_bs_tc, alpha):
 
-        lower_bounds=np.percentile(all_lrs_after_calib_bs_tc, (alpha/2)*100, axis=1)
-        upper_bounds=np.percentile(all_lrs_after_calib_bs_tc, (1 - (alpha/2))*100, axis=1)
+        lower_bounds = np.percentile(all_lrs_after_calib_bs_tc, (alpha/2)*100, axis=1)
+        upper_bounds = np.percentile(all_lrs_after_calib_bs_tc, (1 - (alpha/2))*100, axis=1)
 
         return lower_bounds, upper_bounds
 
@@ -1002,8 +1002,8 @@ def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, y_test_n
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         lower_bounds, upper_bounds = confidence_interval(all_lrs_after_calib_bs[:, t, :], alpha=0.05)
-        lower_bounds_tc[target_class] = lower_bounds
-        upper_bounds_tc[target_class] = upper_bounds
+        lower_bounds_tc[target_class_str] = lower_bounds
+        upper_bounds_tc[target_class_str] = upper_bounds
 
         plot_lrs_with_bootstrap_ci_per_target_class(lrs_after_calib[:, t], lower_bounds, upper_bounds)
 
@@ -1033,8 +1033,8 @@ def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds)
     lupper_bounds = np.log10(upper_bounds)[sorted_indices]
 
     plt.plot(X, llrs, color='black')
-    plt.fill_between(X, llower_bounds, lupper_bounds, color='gray', alpha=0.2)
-    plt.xlabel('n')
+    plt.fill_between(X, llower_bounds, lupper_bounds, color='gray')
+    plt.xlabel('number of samples in test data')
     plt.ylabel('10logLR')
 
 

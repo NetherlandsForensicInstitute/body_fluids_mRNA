@@ -145,6 +145,8 @@ def nfold_analysis(nfolds, run, tc, savepath):
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
         outer.update(1)
 
+
+        # ======= Save lrs and performance metrics =======
         pickle.dump(lrs_for_model_in_fold, open(os.path.join(savepath, 'picklesaves/lrs_for_model_in_fold_{}'.format(n)), 'wb'))
 
         for t, target_class in enumerate(target_classes):

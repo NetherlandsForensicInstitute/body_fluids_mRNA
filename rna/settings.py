@@ -30,12 +30,12 @@ Options:
 
 split_before=False
 augment=True # False does not work
-binarize=[True, False]
+binarize=[True]
 markers=False
-softmax=[True, False]
-nsamples=(33, 33, 22)
+softmax=[False]
+nsamples=(11, 11, 11)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
-models=[['MLR', False], ['MLP', True], ['XGB', True], ['DL', True]]
+models=[['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
