@@ -23,10 +23,8 @@ from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplo
 
 
 def nfold_analysis(nfolds, run, tc, savepath):
-    from_penile = False
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(settings.priors[0])
-
 
     # ======= Load data =======
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
@@ -79,7 +77,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
                                                                     label_encoder, AugmentedData, priors, binarize,
-                                                                    from_penile)
+                                                                    settings.from_penile)
 
             # ======= Transform data accordingly =======
             if binarize:
@@ -167,6 +165,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
 
 
 def makeplots(nfolds, run, tc, path, savepath):
+    nfolds = nfolds + (run * nfolds)
 
     _, _, _, _, _, label_encoder, _, _ = \
         get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
@@ -192,7 +191,6 @@ def makeplots(nfolds, run, tc, path, savepath):
         cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
 
     for n in range(nfolds):
-        n = n + (nfolds * run)
         lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
         # os.remove('lrs_for_model_in_fold_{}'.format(n))
 

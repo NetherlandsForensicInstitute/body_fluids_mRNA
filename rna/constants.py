@@ -2,7 +2,7 @@ import numpy as np
 
 single_cell_types = \
     ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
-     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
+     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin', 'Skin.penile')
 
 # TODO: Remove last 4 marker names?
 marker_names = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',

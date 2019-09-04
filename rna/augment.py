@@ -72,6 +72,11 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     X_as_mixt = X_augmented[indices_flattened, :]
     y_nhot_as_mixt = y_nhot[indices_flattened, :]
 
+    if X_as_mixt.shape[0] == 0:
+        # when there is not a single match between the y_nhot and y_nhot_mixtures
+        X_as_mixt = np.zeros([1, X_as_mixt.shape[1]])
+        y_nhot_as_mixt = np.zeros([1, y_nhot_as_mixt.shape[1]])
+
     return X_as_mixt, y_nhot_as_mixt
 
 
@@ -96,6 +101,10 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
              n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample which single cell type it
                 was made up of. Does not contain column for penile skin
     """
+    if not from_penile:
+        n_celltypes_without_penile = n_celltypes
+    else:
+        n_celltypes_without_penile = n_celltypes - 1
 
     if prior is None: # uniform priors
         prior = [1] * n_celltypes
@@ -105,8 +114,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     if len(np.unique(prior)) == 1:
         ratio_relevant_prior = 0.5
         ratio_other_priors = 0.5
-    # !only works with two unique priors values!
-    else:
+    elif len(np.unique(prior)) == 2:
         counts = {prior.count(value): value for value in list(set(prior))}
         value_relevant_prior = counts[1]
         index_of_relevant_prior = prior.index(value_relevant_prior)
@@ -119,6 +127,9 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
         elif value_relevant_prior < value_other_priors:
             ratio_other_priors = value_other_priors / (1 + value_other_priors)
             ratio_relevant_prior = 1-ratio_other_priors
+    else:
+        raise ValueError("Cannot augment samples if there are more than two unique prior values. "
+                         "Change 'priors' in settings.")
 
     if X.size == 0:
         # This is the case when calibration_size = 0.0, this is an implicit way to
@@ -128,27 +139,34 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
     else:
         X_augmented = np.zeros((0, n_features))
-        N_SAMPLES = int(2 * N_SAMPLES_PER_COMBINATION * ratio_relevant_prior * (2 ** (n_celltypes-1)) + \
-                    2 * N_SAMPLES_PER_COMBINATION * ratio_other_priors * 2 ** ((n_celltypes-1)))
-        assert N_SAMPLES == N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes
+        N_SAMPLES = int(2 * N_SAMPLES_PER_COMBINATION * ratio_relevant_prior * (2 ** (n_celltypes_without_penile-1)) + \
+                    2 * N_SAMPLES_PER_COMBINATION * ratio_other_priors * 2 ** ((n_celltypes_without_penile-1)))
+        assert N_SAMPLES == N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes_without_penile
         y_nhot_augmented = np.zeros((N_SAMPLES, n_celltypes), dtype=int)
 
         begin = 0
-        for i in range(2 ** n_celltypes):
+        for i in range(2 ** n_celltypes_without_penile):
             binary = bin(i)[2:]
             while len(binary) < n_celltypes:
                 binary = '0' + binary
 
             # figure out which classes will be in the combination each iteration
             classes_in_current_mixture = []
-            for i_celltype in range(len(label_encoder.classes_)):
-                if binary[-i_celltype - 1] == '1':
-                    classes_in_current_mixture.append(i_celltype)
-            if from_penile:
-                # also (always) add penile skin samples. the index for penile is n_celltypes
-                classes_in_current_mixture.append(n_celltypes)
+            if not from_penile:
+                for i_celltype in range(len(label_encoder.classes_)):
+                    if binary[-i_celltype - 1] == '1':
+                        classes_in_current_mixture.append(i_celltype)
+            else:
+                classes_str = label_encoder.classes_.tolist()
+                classes_str.remove('Skin.penile')
+                classes = np.array([label_encoder.transform([class_str]) for class_str in classes_str]).ravel()
+                classes_map = {i:classes[i] for i in range(len(classes))}
+                for i_celltype in range(len(classes)):
+                    if binary[-i_celltype - 1] == '1':
+                        classes_in_current_mixture.append(classes_map[i_celltype])
+                # also (always) add penile skin samples.
+                classes_in_current_mixture.append(int(label_encoder.transform(['Skin.penile'])))
 
-            # if the cell type is in the classes_in_current_mixture
             try:
                 if index_of_relevant_prior in classes_in_current_mixture:
                     Np = 2 * ratio_relevant_prior
@@ -158,11 +176,15 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
                 Np = 1
 
             end = int(begin + N_SAMPLES_PER_COMBINATION * Np)
-            for i_celltype in range(len(label_encoder.classes_)):
-                if binary[-i_celltype - 1] == '1':
-                    y_nhot_augmented[begin:end, i_celltype] = 1
-            if from_penile:
-                y_nhot_augmented[begin:end, n_celltypes] = 1
+            if not from_penile:
+                for i_celltype in range(len(label_encoder.classes_)):
+                    if binary[-i_celltype - 1] == '1':
+                        y_nhot_augmented[begin:end, i_celltype] = 1
+            else:
+                for i_celltype in range(len(label_encoder.classes_)):
+                    if binary[-i_celltype - 1] == '1':
+                        y_nhot_augmented[begin:end, classes_map[i_celltype]] = 1
+                y_nhot_augmented[begin:end, int(label_encoder.transform(['Skin.penile']))] = 1
 
             X_augmented = np.append(X_augmented,
                                     construct_random_samples(X, y, end - begin, classes_in_current_mixture, n_features,
@@ -171,6 +193,9 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
         if not binarize:
             X_augmented = X_augmented / 1000
+
+    if from_penile:
+        assert np.sum(y_nhot_augmented[:, int(label_encoder.transform(['Skin.penile']))]) == y_nhot_augmented.shape[0]
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 

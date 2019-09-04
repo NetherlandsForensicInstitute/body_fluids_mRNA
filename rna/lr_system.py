@@ -598,13 +598,14 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
             lrs[:, i] = numerator/denominator
 
         else: # sigmoid
-            # TODO: Incorporate priors
             if len(target_classes) > 1:
                 prob_target_class = prob[:, i].flatten()
                 prob_target_class = np.reshape(prob_target_class, -1, 1)
                 lrs[:, i] = prob_target_class / (1 - prob_target_class)
-            else:  # when one target class it predicts either if it's the label
-                # or if it's not the label.
+            else:
+                # When only one target class some classifiers predict the positive and negative label (i.e. output two probs)
+                # and others predict only the probability of the positive label. With the following try and except statement
+                # catch this.
                 try:
                     lrs[:, i] = prob[:, 1] / prob[:, 0]
                 except:

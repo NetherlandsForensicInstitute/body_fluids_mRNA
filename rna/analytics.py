@@ -74,8 +74,13 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, y_test, X_test_as_m
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
     lrs_after_calib = model.predict_lrs(X_test, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
-    lrs_before_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
-    lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    try:
+        lrs_before_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
+        lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    except TypeError:
+        # When there are no samples from the synthetic data with the same labels as in the original mixtures data.
+        lrs_before_calib_test_as_mixtures = np.zeros([1, lrs_before_calib.shape[1]])
+        lrs_after_calib_test_as_mixtures = np.zeros([1, lrs_before_calib.shape[1]])
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
     lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
@@ -189,29 +194,29 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
 
         # bootstrap LRs
-        B = 1
-        all_lrs_after_calib_bs = np.zeros([lrs_after_calib.shape[0], lrs_after_calib.shape[1], B])
-        for b in range(B):
-            # throw away random 20% from train data
-            # sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=int(0.8 * X_train.shape[0]), replace=False)
-
-            # sample with replacement
-            # TODO: Take into account equal size for h1 and h2
-            sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=True)
-
-            X_train_bs = X_train[sample_indices, :]
-            y_train_bs = y_train[sample_indices, :]
-
-            _, _, lrs_after_calib_bs, _, _, _, _ = generate_lrs(X_train_bs, y_train_bs, X_calib, y_calib,
-                                                                X_test_augmented, y_test_nhot_augmented,
-                                                                X_test_as_mixtures_augmented, X_mixtures,
-                                                                target_classes, model, model_tc, mle, softmax,
-                                                                calibration_on_loglrs)
-            all_lrs_after_calib_bs[:, :, b] = lrs_after_calib_bs
-
-        # TODO: Think what to do with upper and lower bounds
-        lower_bounds_tc, upper_bounds_tc = plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs,
-                                                                      target_classes, label_encoder)
+        # B = 1
+        # all_lrs_after_calib_bs = np.zeros([lrs_after_calib.shape[0], lrs_after_calib.shape[1], B])
+        # for b in range(B):
+        #     # throw away random 20% from train data
+        #     # sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=int(0.8 * X_train.shape[0]), replace=False)
+        #
+        #     # sample with replacement
+        #     # TODO: Take into account equal size for h1 and h2
+        #     sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=True)
+        #
+        #     X_train_bs = X_train[sample_indices, :]
+        #     y_train_bs = y_train[sample_indices, :]
+        #
+        #     _, _, lrs_after_calib_bs, _, _, _, _ = generate_lrs(X_train_bs, y_train_bs, X_calib, y_calib,
+        #                                                         X_test_augmented, y_test_nhot_augmented,
+        #                                                         X_test_as_mixtures_augmented, X_mixtures,
+        #                                                         target_classes, model, model_tc, mle, softmax,
+        #                                                         calibration_on_loglrs)
+        #     all_lrs_after_calib_bs[:, :, b] = lrs_after_calib_bs
+        #
+        # # TODO: Think what to do with upper and lower bounds
+        # lower_bounds_tc, upper_bounds_tc = plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs,
+        #                                                               target_classes, label_encoder)
 
     # Plot the values of the coefficients to see if MLR uses the correct features (markers).
     if save_plots:

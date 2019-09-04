@@ -16,6 +16,7 @@ Options:
                                 An example: if test_size=0.2 and calibration_size=0.0, than the train_size=0.8. If calibration=0.5, than the actual
                                 calibration_size=0.4 (and not 0.5!) and the actual train_size=0.4.
     calibration_on_loglrs       If provided, fit calibration model on 10loglrs, otherwise on the probabilities.
+    from_penile                 If provided, always add penile skin in the mixtures created when augmenting data.
     models [model, bool]        Models is a list of lists [str, bool]. The model used for the analysis: 'MLR', 'MLP', 'XGB', 'DL'.
                                 If boolean is True then perform with calibration otherwise no calibration.
                                 An example: [['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]] --> four models that are trained
@@ -37,5 +38,6 @@ nsamples=(11, 11, 11)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
+from_penile=True # !only checked for 'MLR' and softmax=False whether this works!
 models=[['MLR', False]]
-priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
+priors=[[1, 1, 1, 1, 1, 1, 1, 1, 1]]
