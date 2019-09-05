@@ -20,35 +20,49 @@ if __name__ == "__main__":
 
     X, y = data.X_train_augmented, data.y_train_nhot_augmented
 
-    # Whitelist of features - list of features we can change/use when computing a counterfactual
-    features_whitelist = None  # We can use all features
+    # the target classes used to train the models with
+    target_classes = np.array([[0., 1., 0., 0., 0., 0., 0., 1.], [0., 0., 0., 1., 0., 0., 0., 0.]])
+    # the target class we will be looking at
+    i_target_class = 1
+
+
+    ############# find the datapoints with very wrong predictions
+
+    mlr_predictions = np.log10(mlr_model.predict_lrs(X, target_classes, with_calibration=False))
+    mlp_predictions = np.log10(mlp_model.predict_lrs(X, target_classes, with_calibration=True))
+    xgb_predictions = np.log10(xgb_model.predict_lrs(X, target_classes, with_calibration=True))
+    threshold = 2
+    false_positives = [(i, truth, mlrp, mlpp, xgbp) for i, (truth, mlrp, mlpp, xgbp) in
+                       enumerate(zip(y, mlr_predictions[:,i_target_class], mlp_predictions[:,i_target_class], xgb_predictions[:,i_target_class]))
+                       if (mlrp > threshold or mlpp > threshold or xgbp > threshold) and np.inner(truth, target_classes[i_target_class]) == 0]
+    false_negatives = [(i, truth, mlrp, mlpp, xgbp) for i, (truth, mlrp, mlpp, xgbp) in
+                       enumerate(zip(y, mlr_predictions[:,i_target_class], mlp_predictions[:,i_target_class], xgb_predictions[:,i_target_class]))
+                       if (mlrp < -threshold or mlpp < -threshold or xgbp < -threshold) and np.inner(truth, target_classes[i_target_class]) == 1]
+
+    print(false_positives)
 
     # Select data point for explaining its prediction
-    i=130 # XGB en MLP goede voorspelling, MLR matig
-    x = X[i,:].reshape(1,-1)
-    target_classes = np.array([[0., 1., 0., 0., 0., 0., 0., 1.], [0., 0., 0., 1., 0., 0., 0., 0.]])
-    print(f"MLR ln LR prediction: {np.log(mlr_model.predict_lrs(x, target_classes, with_calibration=False))}"
-          f"    \n  on x({x})")
-    print(f'real class {y[i,:]}')
-    i_target_class = 0
+
+    # for train data:
+    # i=130 # XGB en MLP goede voorspelling, MLR matig
+    # i=4965 # XGB schiet harder uit de bocht dan MLP en MLR, omdat eerste alleen op 1 feature focused
+    # i = 3448 # MLR voorspelt verkeerd vag/menstr omdat feat 7 erin zit. andere dicht bij LR=1
+    # XGB en MLP lijken wel lineair - alle gezien datapunten geven 8 10 9 ongeveer even groot
+    # zelfs voor MLR geeft lime niet altijd dezelfde componenten (kan)
+    for false in false_positives + false_negatives:
+        i_data = false[0]
+        print(i_data)
+        x = X[i_data, :].reshape(1, -1)
 
 
-    explainer = lime.lime_tabular.LimeTabularExplainer(X, discretize_continuous=False, mode='regression')
+        ############ plot lime predictions on the selected data point. Also print the model performance
+        explainer = lime.lime_tabular.LimeTabularExplainer(X, discretize_continuous=False, mode='regression')
 
-    fn = lambda x: np.log(mlr_model.predict_lrs(x, target_classes=target_classes)[:,i_target_class])
-    exp = explainer.explain_instance(X[i], fn, num_features=3, top_labels=1)
-    exp.save_to_file(os.path.join('scratch','lime_mlr'), show_table=True, show_all=True)
-    for feature, feature_val in exp.local_exp[1]:
-        print(f'for feature {feature}, lime found {feature_val}, MLR has {mlr_model._classifier.coef_[i_target_class,feature]}')
-
-    print(f"MLP ln LR prediction: {np.log(mlp_model.predict_lrs(x, target_classes, with_calibration=False))}"
-          f"    on on x({x})")
-    fn = lambda x: np.log(mlp_model.predict_lrs(x, target_classes=target_classes)[:,i_target_class])
-    exp = explainer.explain_instance(X[i], fn, num_features=3, top_labels=1)
-    exp.save_to_file(os.path.join('scratch','lime_mlp'), show_table=True, show_all=True)
-
-    print(f"XGB ln LR prediction: {np.log(xgb_model.predict_lrs(x, target_classes, with_calibration=False))}"
-          f"    on on x({x})")
-    fn = lambda x: np.log(xgb_model.predict_lrs(x, target_classes=target_classes)[:,i_target_class])
-    exp = explainer.explain_instance(X[i], fn, num_features=3, top_labels=1)
-    exp.save_to_file(os.path.join('scratch','lime_xgb'), show_table=True, show_all=True)
+        print(f'real classes {y[i_data,:]}: {[label_encoder.classes_[j] for j, yi in enumerate(y[i_data,:]) if yi]}')
+        print(f'x = {x}')
+        for model, string in ((mlr_model, 'mlr'), (mlp_model, 'mlp'), (xgb_model, 'xgb')):
+            print(f"{string} log LR prediction: {np.log10(model.predict_lrs(x, target_classes))}"
+                  )
+            fn = lambda x: np.log10(model.predict_lrs(x, target_classes=target_classes)[:,i_target_class])
+            exp = explainer.explain_instance(X[i_data], fn, num_features=3, top_labels=1)
+            exp.save_to_file(os.path.join('scratch',f'lime_{string}'), show_table=True, show_all=True)
