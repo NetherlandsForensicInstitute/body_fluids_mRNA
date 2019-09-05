@@ -4,6 +4,7 @@
 
 import os
 import pickle
+import csv
 
 import numpy as np
 import rna.settings as settings
@@ -14,12 +15,48 @@ from sklearn.model_selection import train_test_split
 
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds
-from rna.augment import MultiLabelEncoder, augment_splitted_data
-from rna.constants import single_cell_types
+from rna.augment import MultiLabelEncoder, augment_splitted_data, augment_data
+from rna.constants import single_cell_types, marker_names
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
     plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs, plot_pavs_all_methods
+from rna.lr_system import MarginalMLRClassifier
+
+
+def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from_penile, model_name):
+    mle = MultiLabelEncoder(len(single_cell_types))
+
+    X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
+        get_data_per_cell_type(single_cell_types=single_cell_types, markers=False)
+    y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
+    target_classes = string2vec(tc, label_encoder)
+
+    if retrain:
+        model = MarginalMLRClassifier()
+        X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
+                                                     n_samples_per_combination, label_encoder, prior=None,
+                                                     binarize=binarize, from_penile=from_penile)
+
+        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+        y_train = np.array([np.max(np.array(y_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+
+        model.fit_classifier(X_augmented, y_train)
+        pickle.dump(model, open('{}'.format(model_name), 'wb'))
+    else:
+        model = pickle.load(open('{}'.format(model_name), 'rb'))
+
+    intercept = model._classifier.intercept_
+    coefficients = model._classifier.coef_
+    all_coefficients = np.append(intercept, coefficients).tolist()
+    all_coefficients_str = [str(coef) for coef in all_coefficients]
+    all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
+    present_markers.insert(0, 'intercept')
+
+    with open('coefs_{}.csv'.format(model_name), mode='w') as coefs:
+        coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        coefs_writer.writerow(present_markers)
+        coefs_writer.writerow(all_coefficients_strr)
 
 
 def nfold_analysis(nfolds, run, tc, savepath):
@@ -40,7 +77,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
-        n = n + (nfolds * run)
+        n = n + (nfolds * run) - 1
         print(n)
 
         # ======= Initialize =======
@@ -191,7 +228,7 @@ def makeplots(nfolds, run, tc, path, savepath):
         cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
 
     for n in range(nfolds):
-        lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
+        # lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
         # os.remove('lrs_for_model_in_fold_{}'.format(n))
 
         for target_class in target_classes:
@@ -218,28 +255,28 @@ def makeplots(nfolds, run, tc, path, savepath):
             cllr_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
                 open(os.path.join(path,'cllr_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
 
-    types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
-
-    for type_data in types_data:
-        lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
-            lrs_for_model_per_fold, type=type_data)
-
-        plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
-                                  target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
-
-        plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                  savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
-
-        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
-                                          label_encoder,
-                                          savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
-
-        if len(settings.priors) == 2:
-            plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
-                                                       target_classes, label_encoder,
-                                                       savefig=os.path.join(savepath,
-                                                                            'LRs_for_different_priors_{}'.format(
-                                                                                type_data)))
+    # types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
+    #
+    # for type_data in types_data:
+    #     lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
+    #         lrs_for_model_per_fold, type=type_data)
+    #
+    #     plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
+    #                               target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
+    #
+    #     plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+    #               savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
+    #
+    #     plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+    #                                       label_encoder,
+    #                                       savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+    #
+    #     if len(settings.priors) == 2:
+    #         plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
+    #                                                    target_classes, label_encoder,
+    #                                                    savefig=os.path.join(savepath,
+    #                                                                         'LRs_for_different_priors_{}'.format(
+    #                                                                             type_data)))
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         target_class_save = target_class_str.replace(" ", "_")

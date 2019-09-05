@@ -86,7 +86,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     Generate data for the power set of single cell types.
 
     :param X: n_samples x n_measurements per sample x n_markers array of measurements
-    :param y: n_samples x n_celltypes array of int labels of which cell type was measured
+    :param y: list of length N_single_cell_experimental_samples filled with int labels of which cell type was measured
     :param n_celltypes: int: number of single cell types
     :param n_features: int: n_markers
     :param N_SAMPLES_PER_COMBINATION: number of samples per combination. Note that this number differs when the prior
