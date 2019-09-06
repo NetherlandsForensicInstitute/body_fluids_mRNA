@@ -169,6 +169,15 @@ def nfold_analysis(nfolds, run, tc, savepath):
                                                                           lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
                                                                           lrs_before_calib_mixt, lrs_after_calib_mixt, y_nhot_mixtures)
 
+                    ## Check which samples the method makes an error with
+                    # indices_values_above_one = np.argwhere(lrs_for_model_in_fold['[1, 1, 1, 1, 1, 1, 1, 1]'].lrs_before_calib > 1)[:, 0]
+                    # indices_values_below_one = np.argwhere(lrs_for_model_in_fold['[1, 1, 1, 1, 1, 1, 1, 1]'].lrs_before_calib < 1)[:, 0]
+                    # labels = np.max(np.multiply(augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].y_test_nhot_augmented, target_class), axis=1)
+                    # indices_fp = np.argwhere(labels[indices_values_above_one] == 0)
+                    # indices_fn = np.argwhere(labels[indices_values_below_one] == 1)
+                    # augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].y_test_nhot_augmented[indices_values_above_one][indices_fp][:, 0, :]
+                    # augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]'].y_test_nhot_augmented[indices_values_below_one][indices_fn][:, 0, :]
+
 
                     # ======= Calculate performance metrics =======
                     for t, target_class in enumerate(target_classes):

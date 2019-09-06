@@ -29,28 +29,28 @@ Options:
                                 samples with that distribution will be the test data.
 """
 
+# split_before=False
+# augment=True
+# binarize=[True, False]
+# markers=False
+# softmax=[True, False]
+# nsamples=(33, 33, 22)
+# test_size=0.2
+# calibration_size=0.5
+# calibration_on_loglrs=True
+# from_penile=False # !only checked for 'MLR' and softmax=False whether from_penile=True works!
+# models=[['MLR', False], ['MLP', True], ['XGB', True], ['DL', True]]
+# priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
+
 split_before=False
 augment=True
-binarize=[True, False]
+binarize=[True]
 markers=False
-softmax=[True, False]
+softmax=[False]
 nsamples=(33, 33, 22)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
-from_penile=False # !only checked for 'MLR' and softmax=False whether from_penile=True works!
-models=[['MLR', False], ['MLP', True], ['XGB', True], ['DL', True]]
+from_penile=False
+models=[['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
-
-# split_before=False
-# augment=True # False does not work
-# binarize=[True]
-# markers=False
-# softmax=[False]
-# nsamples=(11, 11, 11)
-# test_size=0.2
-# calibration_size=0.5
-# calibration_on_loglrs=True
-# from_penile=True # !only checked for 'MLR' and softmax=False whether from_penile=True works!
-# models=[['XGB', False]]
-# priors=[[1, 1, 1, 1, 1, 1, 1, 1, 1]]
