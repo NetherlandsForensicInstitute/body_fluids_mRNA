@@ -60,6 +60,17 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
 
 
 def nfold_analysis(nfolds, run, tc, savepath):
+    if settings.from_penile == True:
+        if True in settings.softmax:
+            raise ValueError("The results following from these settings have not been validated and hence cannot be "
+                             "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
+                settings.from_penile))
+        for models_and_calib in settings.models:
+            if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
+                raise ValueError("The results following from these settings have not validated and hence cannot be "
+                                 "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
+                                 "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], settings.from_penile))
+
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(settings.priors[0])
 
@@ -202,7 +213,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
 
 
 def makeplots(nfolds, run, tc, path, savepath):
-    nfolds = nfolds + (run * nfolds)
+    # nfolds = nfolds + (run * nfolds)
 
     _, _, _, _, _, label_encoder, _, _ = \
         get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
