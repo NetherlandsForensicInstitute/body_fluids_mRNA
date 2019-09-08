@@ -135,17 +135,29 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
 
         label_encoder.fit(all_celltypes)
 
-    n_per_celltype = OrderedDict()
+    all_celltypes = list(label_encoder.classes_)
+    all_celltypes.append('Skin.penile')
 
+    n_per_celltype = OrderedDict()
+    amplification_rate_per_celltype = dict()
     if ground_truth_known:
-        for celltype in list(label_encoder.classes_):
+        for celltype in all_celltypes:
+            X_single = []
             data_for_this_celltype = np.array(df.loc[celltype])
             rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
             assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
 
             n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
                                                                         indices_per_replicate, rvset_for_this_celltype,
-                                                                        discard=False)
+                                                                        discard=True)
+
+            for repeated_measurements in X_for_this_celltype:
+                for sinlge_measurement in repeated_measurements:
+                    X_single.append(sinlge_measurement)
+
+            X_single = np.array(X_single)
+            X_single_bin = np.where(X_single > 150, 1, 0)
+            amplification_rate_per_celltype[celltype] = np.mean(X_single_bin, axis=0)[:-4]
 
             n_per_celltype[celltype] = n_full_samples
 
@@ -157,7 +169,7 @@ def plot_distribution_of_samples(filename='Datasets/Dataset_NFI_rv.xlsx', single
         celltypes.append(values)
         n_celltype.append(keys)
     cmap = plt.get_cmap("tab10")
-    colors = cmap(np.arange(8))
+    colors = cmap(np.arange(9))
 
     fig, ax = plt.subplots()
     plt.barh(y_pos, n_celltype, tick_label=y_pos, color=colors)

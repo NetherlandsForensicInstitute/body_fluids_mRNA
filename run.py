@@ -16,7 +16,8 @@ if __name__ == '__main__':
 
     # TODO: finish making this plot
     # plot_distribution_of_samples(single_cell_types=single_cell_types, savefig=os.path.join('Plots', 'distribution_of_samples_singles_data'))
-    plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
+    plot_distribution_of_samples(single_cell_types=single_cell_types)
+    # plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
 
 
     # assume that this is what comes from the GUI

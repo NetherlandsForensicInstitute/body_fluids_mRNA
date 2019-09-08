@@ -244,7 +244,7 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
         else:
             X_for_this_celltype.append(candidate_samples)
 
-    # print("{} sample(s) from {}".format(n_discarded, celltype))
+    print("{} sample(s) from {}".format(n_discarded, celltype))
 
     return n_full_samples, X_for_this_celltype
 

@@ -1,4 +1,5 @@
 single_cell_types = \
+single_cell_types = \
     ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
      'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
 
