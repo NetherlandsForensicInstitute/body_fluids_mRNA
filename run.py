@@ -16,10 +16,10 @@ if __name__ == '__main__':
     retrain = True
 
     # TODO: finish making this plot
-    plot_correlation_between_markers(single_cell_types=single_cell_types)
+    # plot_correlation_between_markers(savefig=os.path.join('Plots', 'correlation'))
     # plot_distribution_of_samples(single_cell_types=single_cell_types, savefig=os.path.join('Plots', 'distribution_of_samples_singles_data'))
     # plot_distribution_of_samples(single_cell_types=single_cell_types)
-    # plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
+    plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
 
 
     # assume that this is what comes from the GUI
