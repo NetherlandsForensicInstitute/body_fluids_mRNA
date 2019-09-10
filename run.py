@@ -5,7 +5,8 @@ from rna.nfold_analysis import nfold_analysis
 
 ## TEMPORARY
 import os
-from rna.plotting import plot_distribution_of_samples, plot_distribution_of_mixture_samples
+from rna.plotting import plot_distribution_of_samples, plot_distribution_of_mixture_samples, \
+    plot_correlation_between_markers
 from rna.constants import single_cell_types
 
 
@@ -15,8 +16,9 @@ if __name__ == '__main__':
     retrain = True
 
     # TODO: finish making this plot
+    plot_correlation_between_markers(single_cell_types=single_cell_types)
     # plot_distribution_of_samples(single_cell_types=single_cell_types, savefig=os.path.join('Plots', 'distribution_of_samples_singles_data'))
-    plot_distribution_of_samples(single_cell_types=single_cell_types)
+    # plot_distribution_of_samples(single_cell_types=single_cell_types)
     # plot_distribution_of_mixture_samples(savefig=os.path.join('Plots', 'distribution_of_samples_mixtures_data'))
 
 

@@ -3,6 +3,7 @@ Plotting functions.
 """
 
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
@@ -236,6 +237,61 @@ def plot_distribution_of_mixture_samples(savefig=None, show=None):
         plt.show()
 
     plt.close()
+
+def plot_correlation_between_markers(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
+                                 ground_truth_known=True, savefig=None, show=None):
+
+    df, rv = read_df(filename, nreplicates)
+
+    corr = df.corr()
+    mask = np.zeros_like(corr)
+    mask[np.triu_indices_from(mask)] = True
+    sns.heatmap(corr,
+                xticklabels=corr.columns.values,
+                yticklabels=corr.columns.values,
+                mask=mask,
+                square=True)
+
+    # label_encoder = LabelEncoder()
+    #
+    # if single_cell_types:
+    #     single_cell_types = list(set(single_cell_types))
+    #     label_encoder.fit(single_cell_types)
+    # else:
+    #     # TODO: Make code clearer (not sure how --> comment Rolf pull request)
+    #     if not ground_truth_known:
+    #         raise ValueError('if no cell types are provided, ground truth should be known')
+    #     # if not provided, learn the cell types from the data
+    #     all_celltypes = np.array(df.index)
+    #     for celltype in all_celltypes:
+    #         if celltype not in single_cell_types and celltype != 'Skin.penile':
+    #             raise ValueError('unknown cell type: {}'.format(celltype))
+    #     label_encoder.fit(all_celltypes)
+    #
+    # all_celltypes = list(label_encoder.classes_)
+    # all_celltypes.append('Skin.penile')
+    #
+    # n_per_celltype = OrderedDict()
+    # X_single = []
+    # if ground_truth_known:
+    #     for celltype in all_celltypes:
+    #         data_for_this_celltype = np.array(df.loc[celltype])
+    #         rvset_for_this_celltype = np.array(rv.loc[celltype]).flatten()
+    #         assert data_for_this_celltype.shape[0] == rvset_for_this_celltype.shape[0]
+    #
+    #         n_full_samples, X_for_this_celltype = get_data_for_celltype(celltype, data_for_this_celltype,
+    #                                                                     indices_per_replicate, rvset_for_this_celltype,
+    #                                                                     discard=False)
+    #
+    #         for repeated_measurements in X_for_this_celltype:
+    #             for single_measurements in repeated_measurements:
+    #                 X_single.append(single_measurements)
+    #         n_per_celltype[celltype] = n_full_samples
+    #
+    # X_single = np.array(X_single)
+    # correlation_matrix = np.corrcoef(X_single, rowvar=False)
+
+
 
 def plot_histogram_log_lr(lrs, y_nhot, target_classes, label_encoder, n_bins=30,
                           title='before', title2=None, density=True, savefig=None, show=None):
