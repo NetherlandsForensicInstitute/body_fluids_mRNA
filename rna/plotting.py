@@ -510,14 +510,16 @@ def plot_progress_of_metric(n_metric, label_encoder, name_metric, savefig=None, 
     markers = cycle(('+', 'o', 'x', '.', 'v', 'p', 's', 'P', '*', 'h', 'X', 'd', 'D'))
 
     for i in range(i_transformations):
-        for j in range(j_probscalulations):
-            for k in range(k_models):
-                for p in range(p_priors):
-                    name = int2string_models(k, 3) + ' ' + int2string_models(i, 1) + ' ' + int2string_models(j, 2) + ' ' + int2string_models(p, 4)
-                    ax.plot(x_lim, n_metric[:, i, j, k, p], color=next(colors), label=name, marker=next(markers), linewidth=0.5, linestyle='--')
-                    min_vals.append(np.min(n_metric[:, i, j, k, p]))
-                    max_vals.append(np.max(n_metric[:, i, j, k, p]))
-                    a += 1
+        if i is not 1:
+            for j in range(j_probscalulations):
+                for k in range(k_models):
+                    if k is not 2:
+                        for p in range(p_priors):
+                            name = int2string_models(k, 3) + ' ' + int2string_models(i, 1) + ' ' + int2string_models(j, 2) + ' ' + int2string_models(p, 4)
+                            ax.plot(x_lim, n_metric[:, i, j, k, p], color=next(colors), label=name, marker=next(markers), linewidth=0.5, linestyle='--')
+                            min_vals.append(np.min(n_metric[:, i, j, k, p]))
+                            max_vals.append(np.max(n_metric[:, i, j, k, p]))
+                            a += 1
     ax.set_xticks(x_lim)
     ax.set_xlabel("n fold")
     ax.set_ylabel(name_metric)

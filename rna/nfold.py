@@ -99,7 +99,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
-        n = n + (nfolds * run) - 1
+        n = n + (nfolds * run) + 1
         print(n)
 
         # ======= Initialize =======
@@ -342,8 +342,8 @@ def makeplots(nfolds, run, tc, path, savepath):
         plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
                                 savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
+        # plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
+        #                        savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
         plot_progress_of_metric(cllr_test[target_class_str], label_encoder, 'Cllr',
                                 savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
 
