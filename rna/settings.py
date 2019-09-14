@@ -25,7 +25,7 @@ Options:
     priors                      List of length 2 with vectors of length number of single cell types representing the prior distribution
                                 of the augmented samples. [1, 1, 1, 1, 1, 1, 1, 1] are uniform priors. [10, 1, 1, 1, 1, 1, 1, 1] means
                                 that samples with cell type at index 0 occurs 10 times more often than samples without that cell type.
-                                Note that the first vector in the sample is considered the baseline distribution. So the augmented test
+                                Note that the first vector in the sample is considered the after_adjusting_dl distribution. So the augmented test
                                 samples with that distribution will be the test data.
 """
 
@@ -47,10 +47,10 @@ priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
 # binarize=[True]
 # markers=False
 # softmax=[False]
-# nsamples=(33, 33, 22)
+# nsamples=(11, 11, 11)
 # test_size=0.2
 # calibration_size=0.5
 # calibration_on_loglrs=True
 # from_penile=False
-# models=[['MLR', False]]
+# models=[['MLP', True]]
 # priors=[[1, 1, 1, 1, 1, 1, 1, 1]]

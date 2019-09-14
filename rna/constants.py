@@ -27,7 +27,6 @@ def make_nhot_matrix_of_combinations(N):
 
 nhot_matrix_all_combinations = make_nhot_matrix_of_combinations(len(single_cell_types))
 
-
 celltype_specific_markers = dict()
 celltype_specific_markers['Blood'] = ['HBB', 'ALAS2', 'CD93']
 celltype_specific_markers['Saliva'] = ['HTN3', 'STATH']
@@ -37,3 +36,10 @@ celltype_specific_markers['Semen.fertile'] = ['SEMG1', 'KLK3', 'PRM1']
 celltype_specific_markers['Semen.sterile'] = ['SEMG1', 'KLK3', 'PRM1']
 celltype_specific_markers['Nasal.mucosa'] = ['STATH', 'BPIFA1']
 celltype_specific_markers['Skin'] = [None]
+
+model_names = {
+    'Vaginal mucosa and/or Menstrual secretion no Skin Penile': 'vagmenstr_no_penile',
+    'Vaginal mucosa and/or Menstrual secretion Skin Penile': 'vagmenstr_penile',
+    'Saliva no Skin Penile': 'saliva_no_penile',
+    'Saliva Skin Penile': 'saliva_penile'
+}

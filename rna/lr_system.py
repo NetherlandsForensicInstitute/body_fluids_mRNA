@@ -274,7 +274,7 @@ class MarginalXGBClassifier():
 
 class MarginalDLClassifier():
 
-    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=500, n_features=15,
+    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=80, n_features=15,
                  calibrator=KDECalibrator, MAX_LR=10):
         self.units = units
         self.n_classes = n_classes
@@ -298,23 +298,25 @@ class MarginalDLClassifier():
         :param n_features: number of features
         :return: a keras model
         """
-        # set drop out
-        drop = 0.5
+        drop = 0.05
 
         # inout shape
-        x = Input(shape=(n_features, ))
+        x = Input(shape=(n_features,))
         # flatten input shape (i.e. remove the ,1)
         # first dense (hidden) layer
-        cnn = Dense(units//4, activation="sigmoid")(x)
+        cnn = Dense(units // 4, activation="sigmoid")(x)
         # dropout
         cnn = Dropout(rate=drop)(cnn)
         # second dense (hidden) layer
         cnn = Dense(units, activation="sigmoid")(cnn)
-        # dropout
+
+        # # adjusted DL:
+        # input=500
+        # drop = 0.5
+        # x = Input(shape=(n_features, ))
+        # cnn = Dense(units//4, activation="sigmoid")(x)
         # cnn = Dropout(rate=drop)(cnn)
-        # third dense (hidden) layer
-        cnn = Dense(units//2, activation="sigmoid")(cnn)
-        # fourth dense (hidden) layer
+        # cnn = Dense(units, activation="sigmoid")(cnn)
         # cnn = Dense(units//2, activation="sigmoid")(cnn)
 
         # output layer (corresponding to the number of classes)

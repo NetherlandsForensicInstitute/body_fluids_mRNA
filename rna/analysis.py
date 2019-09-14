@@ -99,7 +99,8 @@ def nfold_analysis(nfolds, run, tc, savepath):
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
-        n = n + (nfolds * run) + 1
+        # n = n + (nfolds * run)
+        n = n + 5
         print(n)
 
         # ======= Initialize =======
@@ -260,7 +261,6 @@ def makeplots(nfolds, run, tc, path, savepath):
 
     for n in range(nfolds):
         # lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
-        # os.remove('lrs_for_model_in_fold_{}'.format(n))
 
         for target_class in target_classes:
             target_class_str = vec2string(target_class, label_encoder)
@@ -286,28 +286,28 @@ def makeplots(nfolds, run, tc, path, savepath):
             cllr_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
                 open(os.path.join(path,'cllr_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
 
-    # types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
-    #
-    # for type_data in types_data:
-    #     lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
-    #         lrs_for_model_per_fold, type=type_data)
-    #
-    #     plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
-    #                               target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
-    #
-    #     plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-    #               savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
-    #
-    #     plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
-    #                                       label_encoder,
-    #                                       savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
-    #
-    #     if len(settings.priors) == 2:
-    #         plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
-    #                                                    target_classes, label_encoder,
-    #                                                    savefig=os.path.join(savepath,
-    #                                                                         'LRs_for_different_priors_{}'.format(
-    #                                                                             type_data)))
+    types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
+
+    for type_data in types_data:
+        lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
+            lrs_for_model_per_fold, type=type_data)
+
+        # plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
+        #                           target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
+
+        # plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
+                  # savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
+
+        # plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+        #                                   label_encoder,
+        #                                   savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+        #
+        # if len(settings.priors) == 2:
+        #     plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
+        #                                                target_classes, label_encoder,
+        #                                                savefig=os.path.join(savepath,
+        #                                                                     'LRs_for_different_priors_{}'.format(
+        #                                                                         type_data)))
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         target_class_save = target_class_str.replace(" ", "_")
@@ -323,41 +323,41 @@ def makeplots(nfolds, run, tc, path, savepath):
                                savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
         plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, 'accuracy',
                                 savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
-                               savefig=os.path.join(savepath,
-                                                    'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, 'accuracy',
-                                savefig=os.path.join(savepath,
-                                                     'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, 'accuracy',
-                                savefig=os.path.join(savepath,
-                                                     'progress_accuracy_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
-                                savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
-
-        # plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
-        #                        savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
+    #                            savefig=os.path.join(savepath,
+    #                                                 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+    #     plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, 'accuracy',
+    #                             savefig=os.path.join(savepath,
+    #                                                  'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
+    #                            savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
+    #     plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, 'accuracy',
+    #                             savefig=os.path.join(savepath,
+    #                                                  'progress_accuracy_mixtures_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
+    #                            savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
+    #     plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
+    #                             savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
+    #
+        plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
         plot_progress_of_metric(cllr_test[target_class_str], label_encoder, 'Cllr',
                                 savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
-                               savefig=os.path.join(savepath,
-                                                    'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, 'Cllr',
-                                savefig=os.path.join(savepath,
-                                                     'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, 'Cllr',
-                                savefig=os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
+    #                            savefig=os.path.join(savepath,
+    #                                                 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
+    #     plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, 'Cllr',
+    #                             savefig=os.path.join(savepath,
+    #                                                  'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
+    #
+    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
+    #                            savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+    #     plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, 'Cllr',
+    #                             savefig=os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
 
 
 # TODO: Want to change to dict?

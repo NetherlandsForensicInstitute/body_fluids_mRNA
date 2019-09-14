@@ -791,7 +791,7 @@ def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder
         target_class_str = vec2string(target_class, label_encoder)
         fpr, tpr = plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class)
 
-        # derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class)
+        derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class)
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -809,6 +809,7 @@ def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder
 
 def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class):
     from statsmodels.nonparametric.kernel_regression import KernelReg
+    from scipy.misc import derivative
 
     loglrs = np.log10(lrs_all_methods['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'][:, t])
     y_nhot = y_nhot_all_methods['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]']
@@ -823,10 +824,14 @@ def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, ta
     look 'inside' the data we originally had. This tool, interpolation, is not only useful in statistics, but is also 
     useful in science, business, or when there is a need to predict values that fall within two existing data points.
     '''
-    f = interp1d(fpr[0], tpr[0], kind='linear')
+    f = interp1d(fpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'], tpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'], kind='linear')
     # When score is 1
-    x = np.linspace(fpr[0].min(), fpr[0].max(), len(fpr[0]))
+    x = np.linspace(fpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'].min(), fpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'].max(),
+                    len(fpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]']))
     y = f(x)
+    plt.plot(x, y)
+    plt.show()
+
     dy = np.zeros(x.shape[0])
     dy[0:-1] = np.diff(y) / np.diff(x)
     dy[-1] = (y[-1] - y[-2]) / (x[-1] - x[-2])
@@ -851,11 +856,12 @@ def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, ta
 
     logscore = 0
     T = f_F_d_(logscore).max()
-    # true_LR = derivative(f, T, dx=1e-2)
+    true_LR = derivative(f, T, dx=1e-2)
     fig, ax = plt.subplots()
-    ax.scatter(fpr[0], tpr[0], color='orange', alpha=0.2, label='true coordinates')
+    ax.scatter(fpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'], tpr['bin_sig_MLR_[1, 1, 1, 1, 1, 1, 1, 1]'],
+               color='orange', alpha=0.2, label='true coordinates')
     ax.plot(x, f(x), color='black', lw=1, label='approximated function')
-    ax.plot(x, y_pred, color='green', lw=1, linstyle='--', label='smoothed function')
+    # ax.plot(x, y_pred, color='green', lw=1, linstyle='--', label='smoothed function')
     ax.axvline(x=T, color='red', label='x (10logScore) = 0')
     ax.legend()
     ax.set_title('True LR at Fd({})={} is {}'.format(logscore, T, true_LR))
@@ -867,6 +873,8 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     n_methods = len(lrs_all_methods.keys())
     fpr = dict()
     tpr = dict()
+    fpr_method = dict()
+    tpr_method = dict()
     roc_auc = dict()
     method_name = dict()
     for i, method in enumerate(lrs_all_methods.keys()):
@@ -877,6 +885,7 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
 
         fpr[i], tpr[i], _ = roc_curve(labels, lrs)
+        fpr_method[method], tpr_method[method], _ = roc_curve(labels, lrs)
         roc_auc[i] = auc(fpr[i], tpr[i])
 
         method = method.replace("_", " ")
@@ -901,7 +910,7 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     plt.title("ROC")
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    return fpr, tpr
+    return fpr_method, tpr_method
 
 
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
@@ -950,12 +959,17 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         max_probability = 1 / (1 + np.exp(-(np.sum(all_coefficients))))
         max_lr = max_probability / (1 - max_probability)
         if max_lr > 10 ** 10:
-            return 10 ** 10
+            return np.log10(10 ** 10)
         else:
-            return max_lr
+            return np.log10(max_lr)
 
     coefficients = np.reshape(coefficients, -1)
     max_lr = calculate_maximum_lr(intercept, coefficients)
+
+    # change values of coefficients into interpretable scale --> log10
+    coefficients = [1/(1+np.exp(-(coefficient))) for coefficient in coefficients]
+    coefficients = [coefficient / (1 - coefficient) for coefficient in coefficients]
+    coefficients = np.log10(coefficients)
 
     # sort
     sorted_indices = np.argsort(coefficients)
@@ -982,8 +996,8 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         pass
     plt.yticks(x, present_markers)
 
-    plt.title('Max lr = {}'.format(math.ceil(max_lr)))
-    plt.xlabel('Coefficient value')
+    plt.title('Max 10log LR = {}'.format(math.ceil(max_lr)))
+    plt.xlabel('10log Coefficient value')
     plt.ylabel('Marker names')
 
     plt.legend(loc='lower right')
