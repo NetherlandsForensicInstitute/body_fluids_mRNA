@@ -241,6 +241,7 @@ def plot_distribution_of_mixture_samples(savefig=None, show=None):
 def plot_correlation_between_markers(filename='Datasets/Dataset_NFI_rv.xlsx', nreplicates=None, savefig=None, show=None):
 
     df, rv = read_df(filename, nreplicates)
+    df = df.drop([df.columns[-1], df.columns[-2], df.columns[-3], df.columns[-4]], axis=1)
 
     corr = df.corr()
     mask = np.zeros_like(corr)
@@ -250,6 +251,7 @@ def plot_correlation_between_markers(filename='Datasets/Dataset_NFI_rv.xlsx', nr
                 yticklabels=corr.columns.values,
                 mask=mask,
                 cmap=sns.diverging_palette(20, 220, n=200),
+                square=True,
                 vmin=-1,
                 vmax=1)
 
