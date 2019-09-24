@@ -24,7 +24,7 @@ def read_df(filename, nreplicates=None):
     :param nreplicates: number of repeated measurements
     :return: df: pd.DataFrame and rv: pf.DataFrame
     """
-    os.chdir('/Users/Naomi/Documents/Documenten - MacBook Pro van Naomi/statistical_science/jaar_2/internship/method')
+    # os.chdir('/Users/Naomi/Documents/Documenten - MacBook Pro van Naomi/statistical_science/jaar_2/internship/method')
 
     pd.options.mode.chained_assignment = None # to silence warning
     raw_df = pd.read_excel(filename, delimiter=';', index_col=0)

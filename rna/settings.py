@@ -34,12 +34,12 @@ augment=True
 binarize=[True, False]
 markers=False
 softmax=[True, False]
-nsamples=(33, 33, 22)
+nsamples=(5, 5, 5)
 test_size=0.2
 calibration_size=0.5
 calibration_on_loglrs=True
 from_penile=False # !only checked for 'MLR' and softmax=False whether from_penile=True works!
-models=[['MLR', False], ['MLP', True], ['XGB', True], ['DL', True]]
+models=[['MLR', True], ['MLR', False]]
 priors=[[1, 1, 1, 1, 1, 1, 1, 1]]
 
 # split_before=False

@@ -14,7 +14,7 @@ from keras.layers import Dense, Dropout
 from keras.initializers import Zeros
 from keras.callbacks import TensorBoard, Callback, ModelCheckpoint
 
-from lir import KDECalibrator
+from lir import KDECalibrator, LogitCalibrator
 from rna.constants import single_cell_types
 
 
@@ -99,7 +99,7 @@ class MarginalMLPClassifier():
 
 class MarginalMLRClassifier():
 
-    def __init__(self, random_state=0, calibrator=KDECalibrator, multi_class='ovr', solver='liblinear', MAX_LR=10):
+    def __init__(self, random_state=0, calibrator=LogitCalibrator, multi_class='ovr', solver='liblinear', MAX_LR=10):
         if multi_class == 'ovr':
             self._classifier = OneVsRestClassifier(LogisticRegression(multi_class=multi_class, solver=solver))
         else:
@@ -164,10 +164,10 @@ class MarginalMLRClassifier():
                     calibrator = self._calibrators_per_target_class[str(target_class)]
                     if calibration_on_loglrs:
                         loglrs_for_target_class = np.log10(lrs_per_target_class[:, i])
-                        lrs_per_target_class[:, i] = calibrator.transform(loglrs_for_target_class)
+                        lrs_per_target_class[:, i] = calibrator.transform(loglrs_for_target_class.reshape(-1,1))
                     else:
                         probs_for_target_class = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
-                        lrs_per_target_class[:, i] = calibrator.transform(probs_for_target_class)
+                        lrs_per_target_class[:, i] = calibrator.transform(probs_for_target_class.reshape(-1,1))
             except AttributeError:
                 lrs_per_target_class = lrs_per_target_class
 

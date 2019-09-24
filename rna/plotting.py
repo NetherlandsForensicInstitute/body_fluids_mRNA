@@ -90,7 +90,7 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
 
     # 2 histogram log10LRs without calibration + KDE curves
     LRs = np.ravel(sorted(data))
-    calibrator.transform(LRs)
+    calibrator.transform(LRs.reshape(-1,1))
     axes[0, 1].hist(data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
     axes[0, 1].hist(data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
     axes[0, 1].plot(LRs, calibrator.p1, color='orange', label='p1')
@@ -111,11 +111,11 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
     ratio = calibrator.p1 / calibrator.p0
     if calibration_on_loglrs:
         X_abovemin10 = np.unique(np.linspace(min_val, min(LRs), 200))
-        calibrator.transform(X_abovemin10)
+        calibrator.transform(X_abovemin10.reshape(-1,1))
         ratio_abovemin10 = calibrator.p1 / calibrator.p0
 
         X_below10 = np.unique(np.linspace(max(LRs), max_val, 200))
-        calibrator.transform(X_below10)
+        calibrator.transform(X_below10.reshape(-1,1))
         ratio_below10 = calibrator.p1 / calibrator.p0
 
     axes[1, 1].set_xlim(min_val, max_val)
@@ -162,7 +162,7 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
         axes[2, 1].legend(handles=[h1, h2], loc='upper right')
 
     # 7
-    LRs = calibrator.transform(data)
+    LRs = calibrator.transform(data.reshape(-1,1))
 
     if calibration_on_loglrs:
         calibrated_data = np.log10(LRs)
@@ -171,11 +171,16 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
         calibrated_data = LRs / (1 + LRs)
         xlabel = 'Calibrated probability'
 
+    calibrated_data[calibrated_data==np.inf] = 10
+    calibrated_data[calibrated_data==-np.inf] = -10
+
+
     calibrated_data1 = calibrated_data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1)]
     calibrated_data2 = calibrated_data[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)]
 
     calibrated_data1 = np.reshape(calibrated_data1, -1)
     calibrated_data2 = np.reshape(calibrated_data2, -1)
+
 
     axes[3, 0].hist(calibrated_data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
     axes[3, 0].hist(calibrated_data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
@@ -422,7 +427,7 @@ def plot_boxplot_of_metric(n_metric, label_encoder, name_metric, savefig=None, s
         elif specify_which == 3:
             for i in range(len(settings.models)):
                 if int == i:
-                    return settings.models[i][0]
+                    return settings.models[i][0] + ' cal' if settings.models[i][1] else settings.models[i][0]
         elif specify_which == 4:
             for i in range(len(settings.priors)):
                 if int == i:
