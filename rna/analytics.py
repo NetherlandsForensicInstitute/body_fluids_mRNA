@@ -66,18 +66,27 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
         model.fit_calibration(X_calib, y_calib, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
-    lrs_after_calib = model.predict_lrs(X_test, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    if do_calibration:
+        lrs_after_calib = model.predict_lrs(X_test, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    else:
+        lrs_after_calib = lrs_before_calib
 
     try:
         lrs_before_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
-        lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+        if do_calibration:
+            lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+        else:
+            lrs_after_calib_test_as_mixtures=lrs_before_calib_test_as_mixtures
     except TypeError:
         # When there are no samples from the synthetic data with the same labels as in the original mixtures data.
         lrs_before_calib_test_as_mixtures = np.zeros([1, lrs_before_calib.shape[1]])
         lrs_after_calib_test_as_mixtures = np.zeros([1, lrs_before_calib.shape[1]])
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
-    lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    if do_calibration:
+        lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    else:
+        lrs_after_calib_mixt=lrs_before_calib_mixt
 
     return model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
            lrs_before_calib_mixt, lrs_after_calib_mixt

@@ -1,5 +1,8 @@
 import os
 import os
+from collections import defaultdict
+from functools import partial
+
 import numpy as np
 import tensorflow as tf
 
@@ -14,7 +17,7 @@ from keras.layers import Dense, Dropout
 from keras.initializers import Zeros
 from keras.callbacks import TensorBoard, Callback, ModelCheckpoint
 
-from lir import KDECalibrator, LogitCalibrator
+from lir import KDECalibrator, LogitCalibrator, NormalizedCalibrator, ELUBbounder
 from rna.constants import single_cell_types
 
 
@@ -99,7 +102,7 @@ class MarginalMLPClassifier():
 
 class MarginalMLRClassifier():
 
-    def __init__(self, random_state=0, calibrator=LogitCalibrator, multi_class='ovr', solver='liblinear', MAX_LR=10):
+    def __init__(self, random_state=0, calibrator=partial(ELUBbounder, first_step_calibrator=LogitCalibrator()), multi_class='ovr', solver='liblinear', MAX_LR=10):
         if multi_class == 'ovr':
             self._classifier = OneVsRestClassifier(LogisticRegression(multi_class=multi_class, solver=solver))
         else:
@@ -116,21 +119,17 @@ class MarginalMLRClassifier():
         Makes calibrated model for each target class
         :param calibration_on_loglrs:
         """
-        try:
-            lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
+        lrs_per_target_class = self.predict_lrs(X, target_classes, with_calibration=False)
 
-            for i, target_class in enumerate(target_classes):
-                calibrator = self._calibrator()
-                labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-                if calibration_on_loglrs:
-                    loglrs = np.log10(lrs_per_target_class[:, i])
-                    self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
-                else:
-                    probs = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
-                    self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
-        except ValueError or TypeError:
-            for target_class in target_classes:
-                self._calibrators_per_target_class[str(target_class)] = None
+        for i, target_class in enumerate(target_classes):
+            calibrator = self._calibrator()
+            labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+            if calibration_on_loglrs:
+                loglrs = np.log10(lrs_per_target_class[:, i]).reshape(-1,1)
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(loglrs, labels)
+            else:
+                probs = lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i])
+                self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs, labels)
 
     def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True,
                     calibration_on_loglrs=True):
