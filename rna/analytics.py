@@ -31,7 +31,7 @@ def combine_samples(data_for_class):
 
 
 def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures, X_mixtures, target_classes, model, mle,
-                 softmax, calibration_on_loglrs):
+                 softmax, calibration_on_loglrs, do_calibration):
     """
     When softmax the model must be fitted on labels, whereas with sigmoid the model must be fitted on
     an nhot encoded vector representing the labels. Ensure that labels take the correct form, fit the
@@ -62,7 +62,8 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
         pass
 
     model.fit_classifier(X_train, y_train)
-    model.fit_calibration(X_calib, y_calib, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+    if do_calibration:
+        model.fit_calibration(X_calib, y_calib, target_classes, calibration_on_loglrs=calibration_on_loglrs)
 
     lrs_before_calib = model.predict_lrs(X_test, target_classes, with_calibration=False)
     lrs_after_calib = model.predict_lrs(X_test, target_classes, calibration_on_loglrs=calibration_on_loglrs)
@@ -151,7 +152,7 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                          X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, model, mle,
-                         softmax, calibration_on_loglrs)
+                         softmax, calibration_on_loglrs, do_calibration=True)
 
         if output_folder:
             try:
@@ -183,7 +184,7 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         lrs_before_calib_mixt, lrs_after_calib_mixt = generate_lrs(X_train, y_train, X_calib, y_calib, X_test_augmented,
                                                                    X_test_as_mixtures_augmented, X_mixtures,
                                                                    target_classes, model, mle, softmax,
-                                                                   calibration_on_loglrs)
+                                                                   calibration_on_loglrs, do_calibration=False)
 
         assert np.array_equal(lrs_before_calib, lrs_after_calib), \
             "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
