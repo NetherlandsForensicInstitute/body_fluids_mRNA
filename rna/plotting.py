@@ -155,8 +155,8 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
 
         axes[2, 1].scatter(loglrs_before, loglrs_after, s=3, color=colors, alpha=0.2)
         axes[2, 1].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-        axes[2, 1].set_xlim(min(min_vals), max(max_vals))
-        axes[2, 1].set_ylim(min(min_vals), max(max_vals))
+        axes[2, 1].set_xlim(np.max(-10,min(min_vals)), np.min(10,max(max_vals)))
+        axes[2, 1].set_ylim(np.max(-10,min(min_vals)), np.min(10,max(max_vals)))
         axes[2, 1].set_xlabel("True 10logLRs before")
         axes[2, 1].set_ylabel("True 10logLRs after")
         axes[2, 1].legend(handles=[h1, h2], loc='upper right')
