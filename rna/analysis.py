@@ -154,15 +154,12 @@ def nfold_analysis(nfolds, tc, savepath):
 
                     # ======= Calculate LRs before and after calibration =======
                     key_name_per_fold = str(n) + '_' + bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
-                    if settings.augment:
-                        model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
-                        lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, \
-                        lrs_before_calib_mixt, lrs_after_calib_mixt = \
-                            calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior,
-                                                               present_markers, models, mle, label_encoder, key_name_per_fold,
-                                                               softmax, settings.calibration_on_loglrs, savepath)
-                    else:
-                        raise ValueError("There is no option to set settings.augment = {}".format(settings.augment))
+                    model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
+                    lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, \
+                    lrs_before_calib_mixt, lrs_after_calib_mixt = \
+                        calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior,
+                                                           present_markers, models, mle, label_encoder, key_name_per_fold,
+                                                           softmax, settings.calibration_on_loglrs, savepath)
 
                     key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0]) + str(models[1])
                     lrs_for_model_in_fold[key_name] = LrsBeforeAfterCalib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,

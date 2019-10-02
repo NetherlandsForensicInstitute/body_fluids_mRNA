@@ -4,7 +4,6 @@ Settings
 Options:
     split_before                If provided, split the original data set before the nfold analysis starts, otherwise split the
                                 original data set again at the start of each fold.
-    augment                     If provided, use augmented data to train/calibrate the model with, otherwise use original data # TODO: make this work
     binarize                    If provided, make data binary, otherwise use the normalized original signal values
     markers                     If provided, include all markers, otherwise exclude 4 markers for control and gender
     softmax                     If provided, calculate the probabilities with softmax, otherwise use sigmoids
@@ -30,7 +29,6 @@ Options:
 """
 
 split_before=False
-augment=True
 binarize=[True, False]
 markers=False
 softmax=[True, False]
