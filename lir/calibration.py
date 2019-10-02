@@ -9,6 +9,9 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KernelDensity
+from sklearn.exceptions import NotFittedError
+
+from .bayeserror import elub
 
 from .util import Xy_to_Xn, Xn_to_Xy
 
@@ -34,7 +37,7 @@ class NormalizedCalibrator(BaseEstimator, TransformerMixin):
         X0, X1 = Xy_to_Xn(X, y)
         self.X0n = X0.shape[0]
         self.X1n = X1.shape[0]
-        self.calibrator.fit_classifier(X, y)
+        self.calibrator.fit(X, y)
         self.calibrator.transform(np.arange(self.value_range[0], self.value_range[1], self.step_size))
         self.p0mass = np.sum(self.calibrator.p0) / 100
         self.p1mass = np.sum(self.calibrator.p1) / 100
@@ -231,3 +234,78 @@ class DummyCalibrator(BaseEstimator, TransformerMixin):
         self.p0 = self._base_value0 + (1 - X)
         self.p1 = self._base_value0 + X
         return self.p1 / self.p0
+
+
+class ELUBbounder(BaseEstimator, TransformerMixin):
+    """
+    Class that, given an LR system, outputs the same LRs as the system but bounded by the Empirical Upper and Lower
+    Bounds as described in
+    P. Vergeer, A. van Es, A. de Jongh, I. Alberink, R.D. Stoel,
+    Numerical likelihood ratios outputted by LR systems are often based on extrapolation:
+    when to stop extrapolating?
+    Sci. Justics 56 (2016) 482-491
+    """
+
+    # MATLAB code from the authors:
+
+    # clear all; close all;
+    # llrs_hp=csvread('...');
+    # llrs_hd=csvread('...');
+    # start=-7; finish=7;
+    # rho=start:0.01:finish; theta=10.^rho;
+    # nbe=[];
+    # for k=1:length(rho)
+    #     if rho(k)<0
+    #         llrs_hp=[llrs_hp;rho(k)];
+    #         nbe=[nbe;(theta(k)^(-1))*mean(llrs_hp<=rho(k))+...
+    #             mean(llrs_hd>rho(k))];
+    #     else
+    #         llrs_hd=[llrs_hd;rho(k)];
+    #         nbe=[nbe;theta(k)*mean(llrs_hd>=rho(k))+...
+    #             mean(llrs_hp<rho(k))];
+    #     end
+    # end
+    # plot(rho,-log10(nbe)); hold on;
+    # plot([start finish],[0 0]);
+    # a=rho(-log10(nbe)>0);
+    # empirical_bounds=[min(a) max(a)]
+
+    def __init__(self, first_step_calibrator, also_fit_calibrator=True):
+        """
+        a calibrator should be provided (optionally already fitted to data). This calibrator is called on scores,
+        the resulting LRs are then bounded. If also_fit_calibrator, the first step calibrator will be fit on the same
+        data used to derive the ELUB bounds
+        :param first_step_calibrator: the calibrator to use. Should already have been fitted if also_fit_calibrator is False
+        :param also_fit_calibrator: whether to also fit the first step calibrator when calling fit
+        """
+
+        self.first_step_calibrator = first_step_calibrator
+        self.also_fit_calibrator = also_fit_calibrator
+        self._lower_lr_bound = None
+        self._upper_lr_bound = None
+        if not also_fit_calibrator:
+            # check the model was fitted.
+            try:
+                first_step_calibrator.transform(0.5)
+            except NotFittedError:
+                print('calibrator should have been fit when setting also_fit_calibrator = False!')
+
+    def fit(self, X, y):
+        """
+        assuming that y=1 corresponds to Hp, y=0 to Hd
+        """
+        if self.also_fit_calibrator:
+            self.first_step_calibrator.fit(X,y)
+        lrs  = self.first_step_calibrator.transform(X)
+
+        y = np.asarray(y).squeeze()
+        self._lower_lr_bound, self._upper_lr_bound = elub(lrs, y, add_misleading=1)
+
+    def transform(self, X):
+        """
+        a transform entails calling the first step calibrator and applying the bounds found
+        """
+        unadjusted_lrs = np.array(self.first_step_calibrator.transform(X))
+        lower_adjusted_lrs = np.where(self._lower_lr_bound < unadjusted_lrs, unadjusted_lrs, self._lower_lr_bound)
+        adjusted_lrs = np.where(self._upper_lr_bound > lower_adjusted_lrs, lower_adjusted_lrs, self._upper_lr_bound)
+        return adjusted_lrs
