@@ -70,7 +70,7 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
         coefs_writer.writerow(all_coefficients_strr)
 
 
-def nfold_analysis(nfolds, run, tc, savepath):
+def nfold_analysis(nfolds, tc, savepath):
     if settings.from_penile == True:
         if True in settings.softmax:
             raise ValueError("The results following from these settings have not been validated and hence cannot be "
@@ -232,8 +232,7 @@ def nfold_analysis(nfolds, run, tc, savepath):
             pickle.dump(cllr_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
 
 
-def makeplots(nfolds, run, tc, path, savepath):
-    # nfolds = nfolds + (run * nfolds)
+def makeplots(nfolds, tc, path, savepath):
 
     _, _, _, _, _, label_encoder, _, _ = \
         get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)

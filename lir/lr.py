@@ -141,7 +141,7 @@ def calculate_cllr(lr_class0, lr_class1):
     cllr, cllr_class0, cllr_class1 = _cllr(lr_class0, lr_class1)
 
     irc = calibration.IsotonicCalibrator()
-    lr, y = Xn_to_Xy(lr_class0 / (lr_class0 + 1), lr_class1 / (lr_class1 + 1))  # translate LRs to range 0..1
+    lr, y = Xn_to_Xy(np.where(lr_class0 == np.inf, 1, lr_class0 / (lr_class0 + 1)), np.where(lr_class1 == np.inf, 1, lr_class1 / (lr_class1 + 1)))  # translate LRs to range 0..1
     lrmin = irc.fit_transform(lr, y)
     cllrmin, cllrmin_class0, cllrmin_class1 = _cllr(*Xy_to_Xn(lrmin, y))
 

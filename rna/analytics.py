@@ -154,20 +154,24 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          softmax, calibration_on_loglrs)
 
         if output_folder:
-            # calibration data
-            plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-                                     y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
-                                     label_encoder, calibration_on_loglrs,
-                                     savefig=os.path.join(output_folder, 'plots',
-                                                          'calib_process_calib_{}'.format(method_name_prior)))
+            try:
+                # calibration data
+                plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                                         y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
+                                         label_encoder, calibration_on_loglrs,
+                                         savefig=os.path.join(output_folder, 'plots',
+                                                              'calib_process_calib_{}'.format(method_name_prior)))
 
-            # test data
-            plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
-                                     y_test_nhot_augmented, model._calibrators_per_target_class,
-                                     (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
-                                     calibration_on_loglrs,
-                                     savefig=os.path.join(output_folder, 'plots',
-                                                          'calib_process_test_{}'.format(method_name_prior)))
+                # test data
+                plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
+                                         y_test_nhot_augmented, model._calibrators_per_target_class,
+                                         (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
+                                         calibration_on_loglrs,
+                                         savefig=os.path.join(output_folder, 'plots',
+                                                              'calib_process_test_{}'.format(method_name_prior)))
+            except:
+                # plotting with Infs etc
+                pass
 
     else: # no calibration
         X_train = np.concatenate((X_train_augmented, X_calib_augmented), axis=0)
@@ -215,12 +219,15 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
 
     # Plot the values of the coefficients to see if MLR uses the correct features (markers).
     if output_folder:
-        if classifier == 'MLR':
-            plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
-                                         savefig=os.path.join(output_folder, 'plots', 'coefficient_importance_{}'.format(method_name_prior)))
+        try:
+            if classifier == 'MLR':
+                plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
+                                             savefig=os.path.join(output_folder, 'plots', 'coefficient_importance_{}'.format(method_name_prior)))
 
-        plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
-                           savefig=os.path.join(output_folder, 'plots', 'insights_cllr_calculation_{}'.format(method_name_prior)))
+            plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
+                               savefig=os.path.join(output_folder, 'plots', 'insights_cllr_calculation_{}'.format(method_name_prior)))
+        except:
+            pass
 
     return model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, \
            lrs_after_calib_test_as_mixtures, lrs_before_calib_mixt, lrs_after_calib_mixt
