@@ -8,11 +8,11 @@ import csv
 
 import numpy as np
 import matplotlib.pyplot as plt
-import rna.settings as settings
 
 from collections import OrderedDict
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
+from typing import List, Tuple
 
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds
@@ -30,7 +30,7 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
     mle = MultiLabelEncoder(len(single_cell_types))
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, markers=False)
+        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=False)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
@@ -70,32 +70,28 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
         coefs_writer.writerow(all_coefficients_strr)
 
 
-def nfold_analysis(nfolds, tc, savepath):
-    if settings.from_penile == True:
-        if True in settings.softmax:
+def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool], priors_list: List[List], binarize_list: List[bool], test_size: float, calibration_size: float, remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
+    if from_penile == True:
+        if True in softmax_list:
             raise ValueError("The results following from these settings have not been validated and hence cannot be "
                              "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
-                settings.from_penile))
-        for models_and_calib in settings.models:
+                from_penile))
+        for models_and_calib in models_list:
             if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
                 raise ValueError("The results following from these settings have not validated and hence cannot be "
                                  "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
-                                 "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], settings.from_penile))
+                                 "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], from_penile))
 
     mle = MultiLabelEncoder(len(single_cell_types))
-    baseline_prior = str(settings.priors[0])
+    baseline_prior = str(priors_list[0])
 
     # ======= Load data =======
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
+        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=remove_structural)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
 
-    if settings.split_before:
-        # ======= Split data =======
-        X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
-        X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
@@ -104,7 +100,7 @@ def nfold_analysis(nfolds, tc, savepath):
 
         # ======= Initialize =======
         lrs_for_model_in_fold = OrderedDict()
-        emtpy_numpy_array = np.zeros((len(settings.binarize), len(settings.softmax), len(settings.models), len(settings.priors)))
+        emtpy_numpy_array = np.zeros((len(binarize_list), len(softmax_list), len(models_list), len(priors_list)))
         accuracies_train_n, accuracies_test_n, accuracies_test_as_mixtures_n, accuracies_mixtures_n, accuracies_single_n,\
         cllr_test_n, cllr_test_as_mixtures_n, cllr_mixtures_n = [dict() for i in range(8)]
 
@@ -121,48 +117,47 @@ def nfold_analysis(nfolds, tc, savepath):
             cllr_test_as_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
             cllr_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
 
-        if not settings.split_before:
-            # ======= Split data =======
-            X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=settings.test_size)
-            X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=settings.calibration_size)
+        # ======= Split data =======
+        X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=test_size)
+        X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=calibration_size)
 
-        for i, binarize in enumerate(settings.binarize):
-            X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, markers=settings.markers)
+        for i, binarize in enumerate(binarize_list):
+            X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, remove_structural=remove_structural)
 
 
             # ======= Augment data for all priors =======
             augmented_data = OrderedDict()
-            for p, priors in enumerate(settings.priors):
+            for p, priors in enumerate(priors_list):
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
-                                                                    label_encoder, AugmentedData, priors, binarize,
-                                                                    settings.from_penile)
+                                                                    label_encoder, AugmentedData, priors, binarize_list,
+                                                                    from_penile, nsamples)
 
             # ======= Transform data accordingly =======
             if binarize:
                 X_test_transformed = [
                     [np.where(X_test[i][j] > 150, 1, 0) for j in range(len(X_test[i]))] for i in
                     range(len(X_test))]
-                X_test_transformed = combine_samples(np.array(X_test_transformed))
+                X_test_transformed = combine_samples(X_test_transformed)
             else:
                 X_test_transformed = combine_samples(X_test) / 1000
 
-            for j, softmax in enumerate(settings.softmax):
-                for k, models in enumerate(settings.models):
-                    print(models[0])
+            for j, softmax in enumerate(softmax_list):
+                for k, model_calib in enumerate(models_list):
+                    print(model_calib[0])
 
 
                     # ======= Calculate LRs before and after calibration =======
-                    key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(models[0])
-                    if models[1]:
+                    key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(model_calib)
+                    if model_calib[1]:
                         key_name+='_cal'
                     key_name_per_fold = str(n) + '_' + key_name
                     model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
                     lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, \
                     lrs_before_calib_mixt, lrs_after_calib_mixt = \
                         calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior,
-                                                           present_markers, models, mle, label_encoder, key_name_per_fold,
-                                                           softmax, settings.calibration_on_loglrs, savepath)
+                                                           present_markers, model_calib, mle, label_encoder, key_name_per_fold,
+                                                           softmax, calibration_on_loglrs, savepath)
 
                     lrs_for_model_in_fold[key_name] = LrsBeforeAfterCalib(lrs_before_calib, lrs_after_calib, y_test_nhot_augmented,
                                                                           lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented,
@@ -180,7 +175,7 @@ def nfold_analysis(nfolds, tc, savepath):
 
                     # ======= Calculate performance metrics =======
                     for t, target_class in enumerate(target_classes):
-                        for p, priors in enumerate(settings.priors):
+                        for p, priors in enumerate(priors_list):
                             str_prior = str(priors)
                             target_class_str = vec2string(target_class, label_encoder)
 
@@ -231,15 +226,15 @@ def nfold_analysis(nfolds, tc, savepath):
             pickle.dump(cllr_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
 
 
-def makeplots(nfolds, tc, path, savepath):
+def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
 
     _, _, _, _, _, label_encoder, _, _ = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, markers=settings.markers)
+        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=remove_structural)
     target_classes = string2vec(tc, label_encoder)
 
     lrs_for_model_per_fold = OrderedDict()
     emtpy_numpy_array = np.zeros(
-        (nfolds, len(settings.binarize), len(settings.softmax), len(settings.models), len(settings.priors)))
+        (nfolds, len(binarize_list), len(softmax_list), len(models_list), len(priors_list)))
     accuracies_train, accuracies_test, accuracies_test_as_mixtures, accuracies_mixtures, accuracies_single, \
     cllr_test, cllr_test_as_mixtures, cllr_mixtures = [dict() for i in range(8)]
 
@@ -299,7 +294,7 @@ def makeplots(nfolds, tc, path, savepath):
                                           label_encoder,
                                           savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
 
-        if len(settings.priors) == 2:
+        if len(priors_list) == 2:
             plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
                                                        target_classes, label_encoder,
                                                        savefig=os.path.join(savepath,
@@ -311,50 +306,19 @@ def makeplots(nfolds, tc, path, savepath):
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
-        plot_boxplot_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
                                savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_train[target_class_str], label_encoder, 'accuracy',
+        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
                                 savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(accuracies_test[target_class_str], label_encoder, "accuracy",
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, "accuracy",
                                savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(accuracies_test[target_class_str], label_encoder, 'accuracy',
+        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
                                 savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, "accuracy",
-    #                            savefig=os.path.join(savepath,
-    #                                                 'boxplot_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-    #     plot_progress_of_metric(accuracies_test_as_mixtures[target_class_str], label_encoder, 'accuracy',
-    #                             savefig=os.path.join(savepath,
-    #                                                  'progress_accuracy_test_as_mixtures_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(accuracies_mixtures[target_class_str], label_encoder, "accuracy",
-    #                            savefig=os.path.join(savepath, 'boxplot_accuracy_mixtures_{}'.format(target_class_save)))
-    #     plot_progress_of_metric(accuracies_mixtures[target_class_str], label_encoder, 'accuracy',
-    #                             savefig=os.path.join(savepath,
-    #                                                  'progress_accuracy_mixtures_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(accuracies_single[target_class_str], label_encoder, "accuracy",
-    #                            savefig=os.path.join(savepath, 'boxplot_accuracy_single_{}'.format(target_class_save)))
-    #     plot_progress_of_metric(accuracies_single[target_class_str], label_encoder, 'accuracy',
-    #                             savefig=os.path.join(savepath, 'progress_accuracy_single_{}'.format(target_class_save)))
-    #
-        plot_boxplot_of_metric(cllr_test[target_class_str], label_encoder, "Cllr",
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "Cllr",
                                savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(cllr_test[target_class_str], label_encoder, 'Cllr',
+        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, 'Cllr',
                                 savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
-    #                            savefig=os.path.join(savepath,
-    #                                                 'boxplot_cllr_test_as_mixtures_{}'.format(target_class_save)))
-    #     plot_progress_of_metric(cllr_test_as_mixtures[target_class_str], label_encoder, 'Cllr',
-    #                             savefig=os.path.join(savepath,
-    #                                                  'progress_cllr_test_as_mixtures_{}'.format(target_class_save)))
-    #
-    #     plot_boxplot_of_metric(cllr_mixtures[target_class_str], label_encoder, "Cllr",
-    #                            savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-    #     plot_progress_of_metric(cllr_mixtures[target_class_str], label_encoder, 'Cllr',
-    #                             savefig=os.path.join(savepath, 'progress_cllr_mixtures_{}'.format(target_class_save)))
 
 
 # TODO: Want to change to dict?

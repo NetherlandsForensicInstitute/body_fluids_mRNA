@@ -56,7 +56,7 @@ def read_df(filename, nreplicates=None):
 
 
 def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
-                           ground_truth_known=True, markers=True):
+                           ground_truth_known=True, remove_structural=True):
     """
     Returns data per specified cell types.
 
@@ -64,7 +64,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
     :param single_cell_types: iterable of strings of all single cell types that exist
     :param nreplicates: number of repeated measurements
     :param ground_truth_known: does this data file have labels for the real classes?
-    :param markers: bool: if True remove the housekeeping and gender markers
+    :param remove_structural: bool: if True remove the housekeeping and gender markers
     :return: X_single: (N_single_cell_experimental_samples x N_measurements per sample x N_markers array of measurements,
         y_nhot_single: N_samples x N_single_cell_type n_hot encoding of the labels NB in single cell type space!
         n_celltypes: N_cell types,
@@ -128,7 +128,7 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
-    if not markers:
+    if remove_structural:
         X_single = remove_markers(X_single)
         n_features = n_features-4
 
@@ -136,14 +136,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
            label_encoder, list(df.columns), list(df.index)
 
 
-def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
+def read_mixture_data(n_celltypes, label_encoder, binarize=True, remove_structural=True):
     """
     Reads in the experimental mixture data that is used as test data.
 
     :param n_celltypes: int: number of single cell types excluding penile skin
     :param label_encoder: LabelEncoder: cell type index -> cell type name and cell type name -> cell type index
     :param binarize: bool: whether to binarize values
-    :param markers: bool: whether to remove the housekeeping and gender markers
+    :param remove_structural: bool: whether to remove the housekeeping and gender markers
     :return: X_mixtures: N_samples x N_markers array of measurements NB only one replicate per sample,
         y_nhot_mixtures : N_samples x N_single_cell_type n_hot encoding of the labels NB in in single cell type space!,
         mixture_label_encoder: LabelEncoder: mixture cell type index -> mixture cell type name and
@@ -180,12 +180,11 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, markers=True):
 
         y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
 
-    X_mixtures = np.array(X_mixtures)
     X_mixtures = combine_samples(X_mixtures)
     if not binarize:
         X_mixtures = X_mixtures / 1000
 
-    if not markers:
+    if remove_structural:
         X_mixtures = remove_markers(X_mixtures)
 
     assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]

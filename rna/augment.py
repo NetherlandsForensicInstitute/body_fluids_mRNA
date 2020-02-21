@@ -4,7 +4,6 @@ Both functions to augment data and to manipulate augmented data.
 
 import numpy as np
 
-from rna import settings as settings
 from rna.analytics import combine_samples
 
 
@@ -35,7 +34,7 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
         for j, clas in enumerate(classes_to_include):
 
             n_in_class = sum(np.array(y) == clas)
-            sampled_sample = data_for_class[j][np.random.randint(n_in_class)]
+            sampled_sample = data_for_class[j][np.random.randint(n_in_class)[0]]
             n_replicates = len(sampled_sample)
             sampled.append(sampled_sample[np.random.permutation(n_replicates)])
         # TODO thus lower replicates for more cell types. is this an issue?
@@ -45,15 +44,15 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
         for i_replicate in range(smallest_replicates):
             combined_sample.append(np.max(np.array([sample[i_replicate] for sample in sampled]), axis=0))
 
-        augmented_samples.append(combined_sample)
+        augmented_samples.append(np.array(combined_sample))
 
     if binarize:
         augmented_samples_bin = [
-            [np.where(augmented_samples[i][j] > 150, 1, 0) for j in range(len(augmented_samples[i]))] for i in
+            np.where(augmented_samples[i] > 150, 1, 0) for i in
             range(len(augmented_samples))]
-        combined_samples = combine_samples(np.array(augmented_samples_bin))
+        combined_samples = combine_samples(augmented_samples_bin)
     else:
-        combined_samples = combine_samples(np.array(augmented_samples))
+        combined_samples = combine_samples(augmented_samples)
 
     return combined_samples
 
@@ -177,7 +176,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
             except:
                 Np = 1
 
-            end = int(begin + N_SAMPLES_PER_COMBINATION * Np)
+            end = round(begin + N_SAMPLES_PER_COMBINATION * Np)
             if not from_penile:
                 for i_celltype in range(len(label_encoder.classes_)):
                     if binary[-i_celltype - 1] == '1':
@@ -203,7 +202,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
 
 def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_nhot_mixtures, n_celltypes, n_features,
-                          label_encoder, class_to_save, prior, binarize, from_penile):
+                          label_encoder, class_to_save, prior, binarize, from_penile, nsamples):
     """
     Creates augmented samples for train, calibration and test data and saves it within a class.
 
@@ -227,13 +226,13 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     """
 
     X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
-                                                             settings.nsamples[0], label_encoder, prior,
+                                                             nsamples[0], label_encoder, prior,
                                                              binarize=binarize, from_penile=from_penile)
     X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
-                                                             settings.nsamples[1], label_encoder, prior,
+                                                             nsamples[1], label_encoder, prior,
                                                              binarize=binarize, from_penile=from_penile)
     X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
-                                                           settings.nsamples[2], label_encoder, prior,
+                                                           nsamples[2], label_encoder, prior,
                                                            binarize=binarize, from_penile=from_penile)
     X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
         X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)

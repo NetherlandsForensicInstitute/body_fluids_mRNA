@@ -5,7 +5,6 @@ Plotting functions.
 import math
 import scipy
 import numpy as np
-import rna.settings as settings
 
 from matplotlib import rc, pyplot as plt, patches as mpatches
 # from matplotlib import colors as mcolors
@@ -17,12 +16,11 @@ from scipy.interpolate import interp1d
 # from scipy.misc import derivative
 
 # from rna.analytics import combine_samples
-
 from rna.constants import celltype_specific_markers
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 from rna.lr_system import get_mixture_columns_for_class
 
-from lir import PavLogLR
+from lir import PavLogLR, plot
 from lir.calibration import IsotonicCalibrator
 
 
@@ -61,12 +59,12 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
                                               calibration_on_loglrs):
     if calibration_on_loglrs:
         data = np.log10(lr)
-        xlabel = '10logLR'
-        min_val = -11
-        max_val = 11
+        xlabel = '10logLR (no calibration)'
+        min_val = -4
+        max_val = 4
     else:
         data = lr / (1 + lr)
-        xlabel = 'Probability'
+        xlabel = 'Probability (no calibration)'
         min_val = -0.1
         max_val = 1.1
 
@@ -89,51 +87,51 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
     axes[0, 0].legend(loc='upper right')
 
     # 2 histogram log10LRs without calibration + KDE curves
-    LRs = np.ravel(sorted(data))
-    calibrator.transform(LRs.reshape(-1,1))
+    uncalibrated_lrs = np.ravel(sorted(data))
+    calibrated_lrs = calibrator.transform(uncalibrated_lrs.reshape(-1,1))
     axes[0, 1].hist(data1, color='orange', density=True, bins=30, label="h1", alpha=0.5)
     axes[0, 1].hist(data2, color='blue', density=True, bins=30, label="h2", alpha=0.5)
-    axes[0, 1].plot(LRs, calibrator.p1, color='orange', label='p1')
-    axes[0, 1].plot(LRs, calibrator.p0, color='blue', label='p2')
+    axes[0, 1].plot(uncalibrated_lrs, calibrated_lrs / ( 1 + calibrated_lrs), color='orange', label='p1')
+    axes[0, 1].plot(uncalibrated_lrs, 1/ ( 1 + calibrated_lrs), color='blue', label='p2')
     axes[0, 1].set_xlabel(xlabel)
     axes[0, 1].set_ylabel('Density')
     axes[0, 1].set_xlim(min_val, max_val)
 
     # 3 KDE curves
-    axes[1, 0].plot(LRs, calibrator.p1, color='orange', label='p1')
-    axes[1, 0].plot(LRs, calibrator.p0, color='blue', label='p2')
+    axes[1, 0].plot(uncalibrated_lrs,  calibrated_lrs / ( 1 + calibrated_lrs), color='orange', label='p1')
+    axes[1, 0].plot(uncalibrated_lrs, 1/ ( 1 + calibrated_lrs), color='blue', label='p2')
     axes[1, 0].set_xlabel(xlabel)
     axes[1, 0].set_ylabel('Density')
     axes[1, 0].set_xlim(min_val, max_val)
     axes[1, 0].legend(loc='upper right')
 
     # 4 Ratio of two curves
-    ratio = calibrator.p1 / calibrator.p0
     if calibration_on_loglrs:
-        X_abovemin10 = np.unique(np.linspace(min_val, min(LRs), 200))
-        calibrator.transform(X_abovemin10.reshape(-1,1))
-        ratio_abovemin10 = calibrator.p1 / calibrator.p0
+        X_abovemin10 = np.unique(np.linspace(min_val, min(uncalibrated_lrs), 200))
 
-        X_below10 = np.unique(np.linspace(max(LRs), max_val, 200))
-        calibrator.transform(X_below10.reshape(-1,1))
-        ratio_below10 = calibrator.p1 / calibrator.p0
+        ratio_abovemin10 = calibrator.transform(X_abovemin10.reshape(-1,1))
+
+        X_below10 = np.unique(np.linspace(max(uncalibrated_lrs), max_val, 200))
+
+        ratio_below10 = calibrator.transform(X_below10.reshape(-1,1))
 
     axes[1, 1].set_xlim(min_val, max_val)
-    axes[1, 1].plot(LRs, ratio, color='green', label='ratio')
+    axes[1, 1].plot(uncalibrated_lrs, calibrated_lrs, color='green', label='ratio')
     if calibration_on_loglrs:
         axes[1, 1].plot(X_abovemin10, ratio_abovemin10, color='green', linestyle=':', linewidth=1)
         axes[1, 1].plot(X_below10, ratio_below10, color='green', linestyle=':', linewidth=1)
     axes[1, 1].set_xlabel(xlabel)
-    axes[1, 1].set_ylabel('Ratio p1/p2')
+    axes[1, 1].set_ylabel('LR')
+
+    # plot(uncalibrated_lrs, true_lrs, show_scatter=True, on_screen=False, path='scratch/pav.png')
 
     # 5
-    logratio = np.log10(ratio)
-    axes[2, 0].plot(LRs, logratio, color='green', label='ratio')
+    axes[2, 0].plot(uncalibrated_lrs, np.log10(calibrated_lrs), color='green', label='ratio')
     if calibration_on_loglrs:
         axes[2, 0].plot(X_abovemin10, np.log10(ratio_abovemin10), color='green', linestyle=':', linewidth=1)
         axes[2, 0].plot(X_below10, np.log10(ratio_below10), color='green', linestyle=':', linewidth=1)
     axes[2, 0].set_xlabel(xlabel)
-    axes[2, 0].set_ylabel('10log Ratio p1/p2')
+    axes[2, 0].set_ylabel('10log LR')
     axes[2, 0].set_xlim(min_val, max_val)
 
     # 6
@@ -155,20 +153,20 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
 
         axes[2, 1].scatter(loglrs_before, loglrs_after, s=3, color=colors, alpha=0.2)
         axes[2, 1].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-        axes[2, 1].set_xlim(np.max(-10,min(min_vals)), np.min(10,max(max_vals)))
-        axes[2, 1].set_ylim(np.max(-10,min(min_vals)), np.min(10,max(max_vals)))
+        axes[2, 1].set_xlim(max(-10,min(min_vals)), min(10,max(max_vals)))
+        axes[2, 1].set_ylim(max(-10,min(min_vals)), min(10,max(max_vals)))
         axes[2, 1].set_xlabel("True 10logLRs before")
         axes[2, 1].set_ylabel("True 10logLRs after")
         axes[2, 1].legend(handles=[h1, h2], loc='upper right')
 
     # 7
-    LRs = calibrator.transform(data.reshape(-1,1))
+    uncalibrated_lrs = calibrator.transform(data.reshape(-1,1))
 
     if calibration_on_loglrs:
-        calibrated_data = np.log10(LRs)
+        calibrated_data = np.log10(uncalibrated_lrs)
         xlabel = 'Calibrated 10logLR'
     else:
-        calibrated_data = LRs / (1 + LRs)
+        calibrated_data = uncalibrated_lrs / (1 + uncalibrated_lrs)
         xlabel = 'Calibrated probability'
 
     calibrated_data[calibrated_data==np.inf] = 10
@@ -317,38 +315,44 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
 
     for keys, values in test_dict.items():
         for t, target_class in enumerate(target_classes):
-            try:
-                fig, (axs1, axs2, axs3) = plt.subplots(nrows=1, ncols=3, figsize=(16, 5))
 
-                loglrs = OrderedDict()
-                y_nhot = OrderedDict()
-                full_name = []
-                priors = []
-                for method, data in values.items():
-                    loglrs[method] = np.log10(data[0][:, t])
-                    y_nhot[method] = data[1]
-                    full_name.append(method)
-                    priors.append('[' + method.split('[')[1])
-                assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
+            loglrs = OrderedDict()
+            y_nhot = OrderedDict()
+            full_name = []
+            priors = []
+            methods=[]
+            for method, data in values.items():
+                loglrs[method] = np.log10(data[0][:, t])
+                y_nhot[method] = data[1]
+                full_name.append(method)
 
-                target_class = np.reshape(target_class, -1, 1)
-                labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
+                priors.append('[' + method.split('[')[2])
+                methods.append('[' + method.split('[')[1].replace('_',' '))
+            assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
-                colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-                colors_positive = ['orange'] * int(np.sum(labels))
-                colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
+            fig, axes = plt.subplots(nrows=len(priors)//2, ncols=3, figsize=(16, 10))
 
-                h1 = mpatches.Patch(color='orange', label='h1')
-                h2 = mpatches.Patch(color='blue', label='h2')
+            target_class = np.reshape(target_class, -1, 1)
+            labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
+            colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+            colors_positive = ['orange'] * int(np.sum(labels))
+            colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
+
+            h1 = mpatches.Patch(color='orange', label='h1')
+            h2 = mpatches.Patch(color='blue', label='h2')
+
+            for i_method in range(len(priors)//2):
                 # make sure uniform priors always on bottom
                 if any(str([1] * len(target_class)) in x for x in priors):
                     index1 = priors.index(str([1] * len(target_class)))
+                    index2 = 1-index1+i_method*2
+                    index1+=i_method*2
                     loglrs1 = loglrs[full_name[index1]]
                     loglrs2 = loglrs[full_name[1 - index1]]
                 else:
-                    index1 = 0
-                    index2 = 1
+                    index1 = i_method*2
+                    index2 = 1+i_method*2
                     loglrs1 = loglrs[full_name[index1]]
                     loglrs2 = loglrs[full_name[index2]]
 
@@ -362,29 +366,28 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
                 max_val_neg = math.ceil(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
 
-                plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, 11), colors, (h1, h2), ax=axs1)
+                plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, max_val_pos), colors, (h1, h2), ax=axes[i_method, 0])
+                axes[i_method, 0].set_ylabel(methods[i_method*2][:10])
                 plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
-                                                      (h1), ax=axs2)
+                                                      (h1), ax=axes[i_method, 1])
                 plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
-                                                      (h2), ax=axs3)
+                                                      (h2), ax=axes[i_method, 2])
 
-                fig.text(0.5, 0.002, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
-                fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[1 - index1], label_encoder)), va='center', rotation='vertical')
+            fig.text(0.5, 0.002, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
+            fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[index2], label_encoder)), va='center', rotation='vertical')
 
-                target_class_str = vec2string(target_class, label_encoder)
-                target_class_save = target_class_str.replace(" ", "_")
-                target_class_save = target_class_save.replace(".", "_")
-                target_class_save = target_class_save.replace("/", "_")
-                if savefig is not None:
-                    plt.tight_layout()
-                    plt.savefig(savefig + '_' + keys + '_' + target_class_save)
-                    plt.close()
-                if show or savefig is None:
-                    plt.tight_layout()
-                    plt.show()
+            target_class_str = vec2string(target_class, label_encoder)
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
+            if savefig is not None:
+                plt.tight_layout()
+                plt.savefig(savefig + '_' + keys + '_' + target_class_save)
+                plt.close()
+            if show or savefig is None:
+                plt.tight_layout()
+                plt.show()
 
-            except ValueError:
-                pass
 
 
 def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, handles, ax=None):
@@ -411,27 +414,26 @@ def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, 
     return ax
 
 
-def plot_boxplot_of_metric(n_metric, label_encoder, name_metric, savefig=None, show=None):
-
+def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
     def int2string_models(int, specify_which=None):
         if specify_which == None:
             raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
         elif specify_which == 1:
-            for i in range(len(settings.binarize)):
+            for i in range(len(binarize)):
                 if int == i:
-                    return bool2str_binarize(settings.binarize[i])
+                    return bool2str_binarize(binarize[i])
         elif specify_which == 2:
-            for i in range(len(settings.softmax)):
+            for i in range(len(softmax)):
                 if int == i:
-                    return bool2str_softmax(settings.softmax[i])
+                    return bool2str_softmax(softmax[i])
         elif specify_which == 3:
-            for i in range(len(settings.models)):
+            for i in range(len(models)):
                 if int == i:
-                    return settings.models[i][0] + ' cal' if settings.models[i][1] else settings.models[i][0]
+                    return models[i][0] + ' cal' if models[i][1] else models[i][0]
         elif specify_which == 4:
-            for i in range(len(settings.priors)):
+            for i in range(len(priors)):
                 if int == i:
-                    return prior2string(str(settings.priors[i]), label_encoder)
+                    return prior2string(str(priors[i]), label_encoder)
         else:
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 
@@ -471,27 +473,27 @@ def plot_boxplot_of_metric(n_metric, label_encoder, name_metric, savefig=None, s
     plt.close(fig)
 
 
-def plot_progress_of_metric(n_metric, label_encoder, name_metric, savefig=None, show=None):
+def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
 
     def int2string_models(int, specify_which=None):
         if specify_which == None:
             raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
         elif specify_which == 1:
-            for i in range(len(settings.binarize)):
+            for i in range(len(binarize)):
                 if int == i:
-                    return bool2str_binarize(settings.binarize[i])
+                    return bool2str_binarize(binarize[i])
         elif specify_which == 2:
-            for i in range(len(settings.softmax)):
+            for i in range(len(softmax)):
                 if int == i:
-                    return bool2str_softmax(settings.softmax[i])
+                    return bool2str_softmax(softmax[i])
         elif specify_which == 3:
-            for i in range(len(settings.models)):
+            for i in range(len(models)):
                 if int == i:
-                    return settings.models[i][0]
+                    return models[i][0]
         elif specify_which == 4:
-            for i in range(len(settings.priors)):
+            for i in range(len(priors)):
                 if int == i:
-                    return prior2string(str(settings.priors[i]), label_encoder)
+                    return prior2string(str(priors[i]), label_encoder)
         else:
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 

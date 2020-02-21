@@ -3,30 +3,30 @@ Performs project specific.
 """
 
 import os
-import keras
-
-import numpy as np
-
 from collections import OrderedDict
-from sklearn.metrics import accuracy_score
 
+import keras
+import numpy as np
 from lir.lr import calculate_cllr
-from rna.plotting import plot_calibration_process, plot_pavs, plot_insights_cllr, plot_coefficient_importances, \
-    plot_lrs_with_bootstrap_ci
+from sklearn.metrics import accuracy_score
+from typing import List
 
 from rna.constants import nhot_matrix_all_combinations
-from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier
-# from rna.utils import vec2string
+from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier, \
+    MarginalRFClassifier
+from rna.plotting import plot_calibration_process, plot_insights_cllr, plot_coefficient_importances
 
-def combine_samples(data_for_class):
+
+
+def combine_samples(data_for_class: List):
     """
     Combines the repeated measurements per sample.
 
-    :param data_for_class: N_samples x N_observations_per_sample x N_markers measurements numpy array
+    :param data_for_class: List of  N_observations_per_sample x N_markers measurements numpy array, where number of observations may differ per sample
     :return: N_samples x N_markers measurements numpy array
     """
     data_for_class_mean = np.array([np.mean(data_for_class[i], axis=0)
-                                    for i in range(data_for_class.shape[0])])
+                                    for i in range(len(data_for_class))])
     return data_for_class_mean
 
 
@@ -38,27 +38,27 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
     model and predict the lrs before and after calibration for both X_test and X_mixtures.
     """
 
-    if softmax: # y_train must be list with labels
+    if softmax:  # y_train must be list with labels
         try:
             y_train = mle.nhot_to_labels(y_train)
             # y_test = mle.nhot_to_labels(y_test)
-        except: # already are labels
+        except:  # already are labels
             pass
         # for DL model y_train must always be nhot encoded
         # TODO: Find better solution
         if isinstance(model._classifier, keras.engine.training.Model):
             y_train = np.eye(2 ** 8)[y_train]
-    else: # y_train must be nhot encoded labels
+    else:  # y_train must be nhot encoded labels
         try:
             y_train = mle.labels_to_nhot(y_train)
-        except: # already is nhot encoded
+        except:  # already is nhot encoded
             pass
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
         y_train = np.array([np.max(np.array(y_train[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
-    try: # y_calib must always be nhot encoded
+    try:  # y_calib must always be nhot encoded
         y_calib = mle.labels_to_nhot(y_calib)
-    except: # already is nhot encoded
+    except:  # already is nhot encoded
         pass
 
     model.fit_classifier(X_train, y_train)
@@ -72,11 +72,13 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
         lrs_after_calib = lrs_before_calib
 
     try:
-        lrs_before_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, with_calibration=False)
+        lrs_before_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes,
+                                                              with_calibration=False)
         if do_calibration:
-            lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+            lrs_after_calib_test_as_mixtures = model.predict_lrs(X_test_as_mixtures, target_classes,
+                                                                 calibration_on_loglrs=calibration_on_loglrs)
         else:
-            lrs_after_calib_test_as_mixtures=lrs_before_calib_test_as_mixtures
+            lrs_after_calib_test_as_mixtures = lrs_before_calib_test_as_mixtures
     except TypeError:
         # When there are no samples from the synthetic data with the same labels as in the original mixtures data.
         lrs_before_calib_test_as_mixtures = np.zeros([1, lrs_before_calib.shape[1]])
@@ -84,15 +86,16 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
 
     lrs_before_calib_mixt = model.predict_lrs(X_mixtures, target_classes, with_calibration=False)
     if do_calibration:
-        lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes, calibration_on_loglrs=calibration_on_loglrs)
+        lrs_after_calib_mixt = model.predict_lrs(X_mixtures, target_classes,
+                                                 calibration_on_loglrs=calibration_on_loglrs)
     else:
-        lrs_after_calib_mixt=lrs_before_calib_mixt
+        lrs_after_calib_mixt = lrs_before_calib_mixt
 
     return model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
-def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
+def clf_with_correct_settings(clf_no_settings, softmax: bool, n_classes):
     """
     Ensures that the correct classifier with correct settings is used in the analysis. This is based on a string
     'model_no_settings' and a boolean deciding how the probabilties are calculated 'softmax': either with the softmax
@@ -103,8 +106,9 @@ def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
     :param n_classes: int: number of classes
     :return: classifier with correct settings
     """
-
+    assert type(softmax) == bool
     if clf_no_settings == 'MLP':
+        # TODO this does not appear to be what we want it to be?
         if softmax:
             classifier = MarginalMLPClassifier()
         else:
@@ -114,7 +118,7 @@ def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
         if softmax:
             classifier = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
         else:
-            classifier = MarginalMLRClassifier()
+            classifier = MarginalMLRClassifier(multi_class='ovr')
 
     elif clf_no_settings == 'XGB':
         if softmax:
@@ -125,13 +129,18 @@ def clf_with_correct_settings(clf_no_settings, softmax, n_classes):
     elif clf_no_settings == 'DL':
         if softmax:
             classifier = MarginalDLClassifier(n_classes=2 ** 8, activation_layer='softmax',
-                                         optimizer="adam", loss="categorical_crossentropy", epochs=30)
+                                              optimizer="adam", loss="categorical_crossentropy", epochs=30)
         else:
             classifier = MarginalDLClassifier(n_classes=n_classes, activation_layer='sigmoid',
-                                         optimizer="adam", loss="binary_crossentropy", epochs=30)
+                                              optimizer="adam", loss="binary_crossentropy", epochs=30)
+    elif clf_no_settings == 'RF':
+        if softmax:
+            classifier = MarginalRFClassifier()
+        else:
+            classifier = MarginalRFClassifier(multi_label='ovr')
 
     else:
-        raise ValueError("No class exists for this classifier")
+        raise ValueError("No class exists for this classifier: {}".format(clf_no_settings))
 
     return classifier
 
@@ -156,34 +165,30 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
 
     model = clf_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
 
-    if with_calibration: # with calibration
+    if with_calibration:  # with calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
         lrs_before_calib_mixt, lrs_after_calib_mixt = \
             generate_lrs(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
                          X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, model, mle,
-                         softmax, calibration_on_loglrs, do_calibration=True)
+                         softmax, calibration_on_loglrs, do_calibration=with_calibration)
 
         if output_folder:
-            try:
-                # calibration data
-                plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
-                                         y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
-                                         label_encoder, calibration_on_loglrs,
-                                         savefig=os.path.join(output_folder, 'plots',
-                                                              'calib_process_calib_{}'.format(method_name_prior)))
+            # calibration data
+            plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
+                                     y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
+                                     label_encoder, calibration_on_loglrs,
+                                     savefig=os.path.join(output_folder, 'plots',
+                                                          'calib_process_calib_{}'.format(method_name_prior)))
 
-                # test data
-                plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
-                                         y_test_nhot_augmented, model._calibrators_per_target_class,
-                                         (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
-                                         calibration_on_loglrs,
-                                         savefig=os.path.join(output_folder, 'plots',
-                                                              'calib_process_test_{}'.format(method_name_prior)))
-            except:
-                # plotting with Infs etc
-                pass
+            # test data
+            plot_calibration_process(model.predict_lrs(X_test_augmented, target_classes, with_calibration=False),
+                                     y_test_nhot_augmented, model._calibrators_per_target_class,
+                                     (lrs_before_calib, lrs_after_calib), target_classes, label_encoder,
+                                     calibration_on_loglrs,
+                                     savefig=os.path.join(output_folder, 'plots',
+                                                          'calib_process_test_{}'.format(method_name_prior)))
 
-    else: # no calibration
+    else:  # no calibration
         X_train = np.concatenate((X_train_augmented, X_calib_augmented), axis=0)
         y_train = np.concatenate((y_train_nhot_augmented, y_calib_nhot_augmented), axis=0)
         X_calib = np.array([])
@@ -193,14 +198,18 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         lrs_before_calib_mixt, lrs_after_calib_mixt = generate_lrs(X_train, y_train, X_calib, y_calib, X_test_augmented,
                                                                    X_test_as_mixtures_augmented, X_mixtures,
                                                                    target_classes, model, mle, softmax,
-                                                                   calibration_on_loglrs, do_calibration=False)
+                                                                   calibration_on_loglrs,
+                                                                   do_calibration=with_calibration)
 
         assert np.array_equal(lrs_before_calib, lrs_after_calib), \
-            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(
+                with_calibration)
         assert np.array_equal(lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures), \
-            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(
+                with_calibration)
         assert np.array_equal(lrs_before_calib_mixt, lrs_after_calib_mixt), \
-            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(with_calibration)
+            "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(
+                with_calibration)
 
         # bootstrap LRs
         # B = 1
@@ -232,10 +241,13 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
         try:
             if classifier == 'MLR':
                 plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
-                                             savefig=os.path.join(output_folder, 'plots', 'coefficient_importance_{}'.format(method_name_prior)))
+                                             savefig=os.path.join(output_folder, 'plots',
+                                                                  'coefficient_importance_{}'.format(
+                                                                      method_name_prior)))
 
             plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
-                               savefig=os.path.join(output_folder, 'plots', 'insights_cllr_calculation_{}'.format(method_name_prior)))
+                               savefig=os.path.join(output_folder, 'plots',
+                                                    'insights_cllr_calculation_{}'.format(method_name_prior)))
         except:
             pass
 
@@ -244,7 +256,8 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
 
 
 def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classes, baseline_prior, present_markers,
-                                       models, mle, label_encoder, method_name, softmax, calibration_on_loglrs, save_path):
+                                       models, mle, label_encoder, method_name, softmax, calibration_on_loglrs,
+                                       save_path):
     """
     Calculates the likelihood-ratio's before and after calibration for all priors. The after_adjusting_dl prior is used to
     select the test data (i.e. the data with which the likelihood ratio's are calculated) with. Returns for each test
@@ -314,7 +327,8 @@ def calculate_accuracy_all_target_classes(X, y_true, target_classes, model, mle)
         # this is only the case for the DL model
         if y_pred.shape[1] == 2 ** 8:
             unique_vectors = np.flip(np.unique(nhot_matrix_all_combinations, axis=0), axis=1)
-            y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in range(unique_vectors.shape[1])]).T
+            y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in
+                               range(unique_vectors.shape[1])]).T
             y_pred = np.where(y_pred > 0.5, 1, 0)
         else:
             y_pred = np.where(y_pred > 0.5, 1, 0)
@@ -385,17 +399,28 @@ def append_lrs_for_all_folds(lrs_for_model, type):
 
                 if prior_method in lrs_after_for_all_methods:
                     if type == 'test augm':
-                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib[prior], axis=0)
-                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib[prior], axis=0)
-                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_nhot_augmented, axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method],
+                                                                             data.lrs_before_calib[prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method],
+                                                                            data.lrs_after_calib[prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method],
+                                                                         data.y_test_nhot_augmented, axis=0)
                     elif type == 'test augm as mixt':
-                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib_test_as_mixtures[prior], axis=0)
-                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib_test_as_mixtures[prior], axis=0)
-                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_test_as_mixtures_nhot_augmented, axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method],
+                                                                             data.lrs_before_calib_test_as_mixtures[
+                                                                                 prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method],
+                                                                            data.lrs_after_calib_test_as_mixtures[
+                                                                                prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method],
+                                                                         data.y_test_as_mixtures_nhot_augmented, axis=0)
                     elif type == 'mixt':
-                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method], data.lrs_before_calib_mixt[prior], axis=0)
-                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method], data.lrs_after_calib_mixt[prior], axis=0)
-                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method], data.y_mixtures_nhot, axis=0)
+                        lrs_before_for_all_methods[prior_method] = np.append(lrs_before_for_all_methods[prior_method],
+                                                                             data.lrs_before_calib_mixt[prior], axis=0)
+                        lrs_after_for_all_methods[prior_method] = np.append(lrs_after_for_all_methods[prior_method],
+                                                                            data.lrs_after_calib_mixt[prior], axis=0)
+                        y_nhot_for_all_methods[prior_method] = np.append(y_nhot_for_all_methods[prior_method],
+                                                                         data.y_mixtures_nhot, axis=0)
                 else:
                     if type == 'test augm':
                         lrs_before_for_all_methods[prior_method] = data.lrs_before_calib[prior]
@@ -411,7 +436,6 @@ def append_lrs_for_all_folds(lrs_for_model, type):
                         y_nhot_for_all_methods[prior_method] = data.y_mixtures_nhot
 
     return lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods
-
 
 # TODO: Check if want to keep
 # def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):

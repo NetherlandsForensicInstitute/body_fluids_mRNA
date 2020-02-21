@@ -3,11 +3,11 @@ import os
 from typing import Tuple
 
 import numpy as np
+from sklearn.metrics import accuracy_score, classification_report
 import tensorflow as tf
 from keras import Input, Model
 from keras.callbacks import TensorBoard, Callback, ModelCheckpoint
 from keras.layers import Dense, Dropout
-from sklearn.metrics import accuracy_score, classification_report
 from tensorflow import Tensor
 from tensorflow.contrib.labeled_tensor.python.ops.core import Scalar
 

@@ -1,9 +1,10 @@
 matplotlib
 pandas
-numpy
+numpy>=1.17 # for nan_to_num with arguments
 sklearn
 tqdm
 xlrd
 xgboost
 keras
 tensorflow
+lir
