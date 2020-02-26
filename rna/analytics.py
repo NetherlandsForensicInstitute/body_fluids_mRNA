@@ -5,7 +5,7 @@ Performs project specific.
 import os
 from collections import OrderedDict
 
-import keras
+# import keras
 import numpy as np
 from lir.lr import calculate_cllr
 from sklearn.metrics import accuracy_score
@@ -44,10 +44,13 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
             # y_test = mle.nhot_to_labels(y_test)
         except:  # already are labels
             pass
-        # for DL model y_train must always be nhot encoded
-        # TODO: Find better solution
-        if isinstance(model._classifier, keras.engine.training.Model):
-            y_train = np.eye(2 ** 8)[y_train]
+        try:
+            # for DL model y_train must always be nhot encoded
+            # TODO: Find better solution
+            if isinstance(model._classifier, keras.engine.training.Model):
+                y_train = np.eye(2 ** 8)[y_train]
+        except:
+            pass
     else:  # y_train must be nhot encoded labels
         try:
             y_train = mle.labels_to_nhot(y_train)
@@ -95,7 +98,7 @@ def generate_lrs(X_train, y_train, X_calib, y_calib, X_test, X_test_as_mixtures,
            lrs_before_calib_mixt, lrs_after_calib_mixt
 
 
-def clf_with_correct_settings(clf_no_settings, softmax: bool, n_classes):
+def clf_with_correct_settings(clf_no_settings, softmax: bool, n_classes: int, with_calibration: bool):
     """
     Ensures that the correct classifier with correct settings is used in the analysis. This is based on a string
     'model_no_settings' and a boolean deciding how the probabilties are calculated 'softmax': either with the softmax
@@ -163,7 +166,10 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
     classifier = models[0]
     with_calibration = models[1]
 
-    model = clf_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0])
+    model = clf_with_correct_settings(classifier, softmax, n_classes=target_classes.shape[0], with_calibration=with_calibration)
+    if not with_calibration:
+        # hacky, nicer to do at instantiation
+        model._calibrator=None
 
     if with_calibration:  # with calibration
         model, lrs_before_calib, lrs_after_calib, lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, \
@@ -322,16 +328,19 @@ def calculate_accuracy_all_target_classes(X, y_true, target_classes, model, mle)
     """
 
     y_pred = model._classifier.predict(X)
-    if isinstance(model._classifier, keras.engine.training.Model):
-        # when the model predicts probabilities rather than the binary classes
-        # this is only the case for the DL model
-        if y_pred.shape[1] == 2 ** 8:
-            unique_vectors = np.flip(np.unique(nhot_matrix_all_combinations, axis=0), axis=1)
-            y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in
-                               range(unique_vectors.shape[1])]).T
-            y_pred = np.where(y_pred > 0.5, 1, 0)
-        else:
-            y_pred = np.where(y_pred > 0.5, 1, 0)
+    try:
+        if isinstance(model._classifier, keras.engine.training.Model):
+            # when the model predicts probabilities rather than the binary classes
+            # this is only the case for the DL model
+            if y_pred.shape[1] == 2 ** 8:
+                unique_vectors = np.flip(np.unique(nhot_matrix_all_combinations, axis=0), axis=1)
+                y_pred = np.array([np.sum(y_pred[:, np.argwhere(unique_vectors[:, i] == 1).flatten()], axis=1) for i in
+                                   range(unique_vectors.shape[1])]).T
+                y_pred = np.where(y_pred > 0.5, 1, 0)
+            else:
+                y_pred = np.where(y_pred > 0.5, 1, 0)
+    except:
+        pass
 
     try:
         y_true = mle.labels_to_nhot(y_true)

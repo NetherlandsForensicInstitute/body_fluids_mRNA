@@ -71,16 +71,16 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
 
 
 def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool], priors_list: List[List], binarize_list: List[bool], test_size: float, calibration_size: float, remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
-    if from_penile == True:
-        if True in softmax_list:
-            raise ValueError("The results following from these settings have not been validated and hence cannot be "
-                             "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
-                from_penile))
-        for models_and_calib in models_list:
-            if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
-                raise ValueError("The results following from these settings have not validated and hence cannot be "
-                                 "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
-                                 "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], from_penile))
+    # if from_penile == True:
+    #     if True in softmax_list:
+    #         raise ValueError("The results following from these settings have not been validated and hence cannot be "
+    #                          "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
+    #             from_penile))
+    #     for models_and_calib in models_list:
+    #         if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
+    #             raise ValueError("The results following from these settings have not validated and hence cannot be "
+    #                              "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
+    #                              "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], from_penile))
 
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(priors_list[0])
@@ -319,6 +319,10 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
                                savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
         plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, 'Cllr',
                                 savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
+                               savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
 
 
 # TODO: Want to change to dict?

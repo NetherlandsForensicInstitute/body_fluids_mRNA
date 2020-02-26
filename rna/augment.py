@@ -105,10 +105,10 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
     else:
         n_celltypes_without_penile = n_celltypes - 1
 
-    if prior is None: # uniform priors
-        prior = [1] * n_celltypes
+    if prior is None: # uniform priors, exception for penile skin (should be coded more generally!)
+        prior = [1] * n_celltypes_without_penile
 
-    assert len(prior) == n_celltypes, "Not all cell types are given a prior value" \
+    assert len(prior) == n_celltypes_without_penile, "Not all cell types are given a prior value" \
                                       "Make sure the length of the list(s) in 'prior' in settings is equal to" \
                                       "the number of cell types."
 
@@ -205,6 +205,7 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
                           label_encoder, class_to_save, prior, binarize, from_penile, nsamples):
     """
     Creates augmented samples for train, calibration and test data and saves it within a class.
+    NB priors are always uniform for test data
 
     :param X_train: n_train_samples x n_features array of measurements
     :param y_train: list of length n_train_samples of labels
@@ -231,8 +232,9 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
                                                              nsamples[1], label_encoder, prior,
                                                              binarize=binarize, from_penile=from_penile)
+    # use uniform priors for test data
     X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
-                                                           nsamples[2], label_encoder, prior,
+                                                           nsamples[2], label_encoder, [1] * n_celltypes,
                                                            binarize=binarize, from_penile=from_penile)
     X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
         X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)

@@ -82,7 +82,6 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         single_cell_types = list(set(single_cell_types))
         label_encoder.fit(single_cell_types)
     else:
-        # TODO: Make code clearer (not sure how --> comment Rolf pull request)
         if not ground_truth_known:
             raise ValueError('if no cell types are provided, ground truth should be known')
         # if not provided, learn the cell types from the data

@@ -44,7 +44,7 @@ params = {
 
 'softmax_list':[True, False],
 
-'nsamples':(10, 10, 10),
+'nsamples':(4, 4, 2),
 
 'test_size':0.2,
 
@@ -52,7 +52,7 @@ params = {
 
 'calibration_on_loglrs':True,
 
-'from_penile':False, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
+'from_penile':True, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
 'models_list':[
     ['MLR', True],
@@ -60,7 +60,9 @@ params = {
     ['XGB', True],
     # ['DL', True],
     ['MLP', True],
-    ['RF', True]],
+    ['RF', True]
+    ],
+
 
 # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
 # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
@@ -78,7 +80,7 @@ if __name__ == '__main__':
     nfolds=10
 
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path = os.path.join('scratch','all_logreg_elub_more_nasal')
+    save_path = os.path.join('scratch','all_logreg_elub_more_nasal_442_samples_from_penile')
 
     shutil.rmtree(save_path,ignore_errors=True)
     os.makedirs(save_path)

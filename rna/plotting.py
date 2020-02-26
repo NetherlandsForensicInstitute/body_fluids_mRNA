@@ -460,6 +460,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
     ax.set_yticks(range(total_boxplots))
     ax.set_yticklabels(names)
     ax.set_ylim(-0.5, total_boxplots-0.5)
+    ax.set_xlim(0, 1)
     ax.set_xlabel(name_metric)
 
     if savefig is not None:
@@ -926,15 +927,26 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
         # TODO: Is this correct for MLP with softmax?
+        # NO
         if len(model._classifier.coef_) == 2 ** 8:
+            # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
+            # (although the mean will probably correlate)
+            return
             indices_target_class = get_mixture_columns_for_class(target_class, None)
             intercept = np.mean(model._classifier.intercept_[indices_target_class])
             coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
         else:
-            intercept = model._classifier.intercept_[t, :]
-            coefficients = model._classifier.coef_[t, :]
+            intercept = model._classifier.intercept_[t, :].squeeze()/np.log(10)
+            coefficients = model._classifier.coef_[t, :].squeeze()/np.log(10)
 
-        plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
+
+        if model._calibrator:
+            beta1=model._calibrators_per_target_class[str(target_class)]._logit.coef_[0][0]/np.log(10)
+            beta0=model._calibrators_per_target_class[str(target_class)]._logit.intercept_[0]/np.log(10)
+            plot_coefficient_importance(intercept*beta1+beta0, coefficients*beta1, present_markers, celltype)
+        else:
+            plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
+
 
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
@@ -954,29 +966,18 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
     """
 
     :param intercept:
-    :param coefficients:
+    :param coefficients: these are assumed to already be transformed to base 10
     :param present_markers:
     :param celltypes: list of strings: list of celltypes
     :return:
     """
 
-    def calculate_maximum_lr(intercept, coefficients):
-        positive_coefficients = coefficients[np.argwhere(coefficients > 0).ravel()]
-        all_coefficients = np.append(intercept, positive_coefficients)
-        max_probability = 1 / (1 + np.exp(-(np.sum(all_coefficients))))
-        max_lr = max_probability / (1 - max_probability)
-        if max_lr > 10 ** 10:
-            return np.log10(10 ** 10)
-        else:
-            return np.log10(max_lr)
+    def calculate_max_base_log_lr(intercept, coefficients):
+        return np.sum([coef for coef in coefficients.squeeze() if coef > 0] + [intercept])
 
     coefficients = np.reshape(coefficients, -1)
-    max_lr = calculate_maximum_lr(intercept, coefficients)
 
-    # change values of coefficients into interpretable scale --> log10
-    coefficients = [1/(1+np.exp(-(coefficient))) for coefficient in coefficients]
-    coefficients = [coefficient / (1 - coefficient) for coefficient in coefficients]
-    coefficients = np.log10(coefficients)
+    max_base = calculate_max_base_log_lr(intercept, coefficients)
 
     # sort
     sorted_indices = np.argsort(coefficients)
@@ -1003,7 +1004,7 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         pass
     plt.yticks(x, present_markers)
 
-    plt.title('Max 10log LR = {}'.format(math.ceil(max_lr)))
+    plt.title('Max, base 10log LR = {}, {}'.format(max_base, intercept))
     plt.xlabel('10log Coefficient value')
     plt.ylabel('Marker names')
 
