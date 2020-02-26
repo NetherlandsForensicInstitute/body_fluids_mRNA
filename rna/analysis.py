@@ -22,7 +22,7 @@ from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
     plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs, plot_pavs_all_methods, \
-    plot_coefficient_importance
+    plot_coefficient_importance, plot_coefficient_importances, get_coefficients
 from rna.lr_system import MarginalMLRClassifier
 
 
@@ -48,17 +48,12 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
     else:
         model = pickle.load(open('{}'.format(model_name), 'rb'))
 
-    intercept = model._classifier.intercept_
-    coefficients = model._classifier.coef_
+
 
     # plot the coefficients
-    for list_object in tc:
-        celltype = list_object.split(' and/or ')
-    plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
-    plt.tight_layout()
-    plt.savefig('coefs_{}'.format(model_name))
-    plt.close()
+    plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig='coefs_{}'.format(model_name), show=None)
 
+    intercept, coefficients = get_coefficients(model, 0, target_classes[0])
     all_coefficients = np.append(intercept, coefficients).tolist()
     all_coefficients_str = [str(coef) for coef in all_coefficients]
     all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]

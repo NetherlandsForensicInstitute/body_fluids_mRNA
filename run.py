@@ -1,8 +1,10 @@
+import random
 import shutil
 import warnings
 import os
 
 import rna.constants as constants
+import numpy as np
 
 from rna.analysis import  nfold_analysis, makeplots
 
@@ -52,11 +54,11 @@ params = {
 
 'calibration_on_loglrs':True,
 
-'from_penile':True, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
+'from_penile':False, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
 'models_list':[
     ['MLR', True],
-    ['MLR', False],
+    # ['MLR', False],
     ['XGB', True],
     # ['DL', True],
     ['MLP', True],
@@ -76,11 +78,14 @@ params = {
 
 
 if __name__ == '__main__':
+    random.seed(42)
+    np.random.seed(42)
+
     warnings.filterwarnings("ignore") # to ignore RuntimeError: divide by zero.
     nfolds=10
 
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path = os.path.join('scratch','all_logreg_elub_more_nasal_442_samples_from_penile')
+    save_path = os.path.join('scratch','all_logreg_more_nasal_seeded')
 
     shutil.rmtree(save_path,ignore_errors=True)
     os.makedirs(save_path)

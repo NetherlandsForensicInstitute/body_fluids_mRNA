@@ -105,9 +105,9 @@ class MarginalRFClassifier(MarginalClassifier):
 
     def __init__(self, calibrator=LogitCalibrator, multi_label='ovr', MAX_LR=10):
         if multi_label=='ovr':
-            self._classifier = OneVsRestClassifier(RandomForestClassifier(class_weight='balanced'))
+            self._classifier = OneVsRestClassifier(RandomForestClassifier(class_weight='balanced', max_depth=3))
         else:
-            self._classifier = RandomForestClassifier(class_weight='balanced')
+            self._classifier = RandomForestClassifier(class_weight='balanced', max_depth=3)
         self._calibrator = calibrator
         self._calibrators_per_target_class = {}
         self.MAX_LR = MAX_LR

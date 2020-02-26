@@ -429,7 +429,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         elif specify_which == 3:
             for i in range(len(models)):
                 if int == i:
-                    return models[i][0] + ' cal' if models[i][1] else models[i][0]
+                    return models[i][0]
         elif specify_which == 4:
             for i in range(len(priors)):
                 if int == i:
@@ -921,31 +921,37 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     return fpr_method, tpr_method
 
 
+def get_coefficients(model, t, target_class):
+    if len(model._classifier.coef_) == 2 ** 8:
+        # TODO: Is this correct for MLP with softmax?
+        # NO
+        # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
+        # (although the mean will probably correlate)
+        return None, None
+        # indices_target_class = get_mixture_columns_for_class(target_class, None)
+        # intercept = np.mean(model._classifier.intercept_[indices_target_class])
+        # coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
+    else:
+        intercept = model._classifier.intercept_[t, :].squeeze() / np.log(10)
+        coefficients = model._classifier.coef_[t, :].squeeze() / np.log(10)
+
+    if model._calibrator:
+        beta1 = model._calibrators_per_target_class[str(target_class)]._logit.coef_[0][0] / np.log(10)
+        beta0 = model._calibrators_per_target_class[str(target_class)]._logit.intercept_[0] / np.log(10)
+        intercept = intercept * beta1 + beta0
+        coefficients = coefficients * beta1
+    return intercept, coefficients
+
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
 
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
-        # TODO: Is this correct for MLP with softmax?
-        # NO
-        if len(model._classifier.coef_) == 2 ** 8:
-            # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
-            # (although the mean will probably correlate)
+
+        intercept, coefficients = get_coefficients(model, t, target_class)
+        if not intercept:
             return
-            indices_target_class = get_mixture_columns_for_class(target_class, None)
-            intercept = np.mean(model._classifier.intercept_[indices_target_class])
-            coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
-        else:
-            intercept = model._classifier.intercept_[t, :].squeeze()/np.log(10)
-            coefficients = model._classifier.coef_[t, :].squeeze()/np.log(10)
-
-
-        if model._calibrator:
-            beta1=model._calibrators_per_target_class[str(target_class)]._logit.coef_[0][0]/np.log(10)
-            beta0=model._calibrators_per_target_class[str(target_class)]._logit.intercept_[0]/np.log(10)
-            plot_coefficient_importance(intercept*beta1+beta0, coefficients*beta1, present_markers, celltype)
-        else:
-            plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
+        plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
 
 
         target_class_save = target_class_str.replace(" ", "_")
