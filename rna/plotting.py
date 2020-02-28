@@ -1010,7 +1010,7 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         pass
     plt.yticks(x, present_markers)
 
-    plt.title('Max, base 10log LR = {}, {}'.format(max_base, intercept))
+    plt.title('Max, base 10log LR = {:.1f}, {:.1f}'.format(max_base, intercept))
     plt.xlabel('10log Coefficient value')
     plt.ylabel('Marker names')
 

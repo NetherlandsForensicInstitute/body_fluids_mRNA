@@ -6,8 +6,7 @@ import os
 import rna.constants as constants
 import numpy as np
 
-from rna.analysis import  nfold_analysis, makeplots
-
+from rna.analysis import nfold_analysis, makeplots, get_final_trained_mlr_model
 
 """
 Settings
@@ -69,7 +68,7 @@ params = {
 # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
 # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
 'priors_list':[
-    [1, 1, 10, 1, 1, 1, 1, 1],
+    [10, 1, 1, 1, 1, 1, 1, 1],
     [1, 1, 1, 1, 1, 1, 1, 1],
 ]
 }
@@ -85,7 +84,7 @@ if __name__ == '__main__':
     nfolds=10
 
     target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path = os.path.join('scratch','all_logreg_more_nasal_seeded')
+    save_path = os.path.join('scratch','all_logreg_more_blood_seeded')
 
     shutil.rmtree(save_path,ignore_errors=True)
     os.makedirs(save_path)
@@ -96,6 +95,10 @@ if __name__ == '__main__':
     makeplots(nfolds=nfolds, tc=target_classes_str, path=os.path.join(save_path, 'picklesaves'),
               savepath=save_path, **params)
 
-    # get_trained_mlr_model(tc=['Vaginal.mucosa and/or Menstrual.secretion'], retrain=False, n_samples_per_combination=50,
-    #                       binarize=True, from_penile=False, model_name=
-    #                       constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'])
+
+    save_path = 'final_model'
+    os.makedirs(save_path, exist_ok=True)
+    get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(constants.single_cell_types)), retrain=True, n_samples_per_combination=10,
+                                binarize=True, from_penile=False, prior=[10]+[1]*7, model_name=
+                          constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
+

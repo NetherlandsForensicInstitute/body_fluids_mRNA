@@ -7,59 +7,75 @@ import pickle
 import csv
 
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 
 from collections import OrderedDict
+
+from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from typing import List, Tuple
 
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
-    calculate_lrs_for_different_priors, append_lrs_for_all_folds
-from rna.augment import MultiLabelEncoder, augment_splitted_data, augment_data
+    calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
+from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
 from rna.constants import single_cell_types, marker_names
 from rna.input_output import get_data_per_cell_type, read_mixture_data
-from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
+from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
-    plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs, plot_pavs_all_methods, \
-    plot_coefficient_importance, plot_coefficient_importances
-from rna.lr_system import MarginalMLRClassifier
+    plot_progress_of_metric, plot_coefficient_importances
+from rna.lr_system import MarginalClassifier
 
 
-def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from_penile, model_name):
+def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize=True, from_penile=False, prior=(1,1,1,1,1,1,1,1), model_name='best_MLR', remove_structural=True, save_path=None):
+    """
+    computes or loads the MLR based on all data
+    """
     mle = MultiLabelEncoder(len(single_cell_types))
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=False)
+        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=True)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
     if retrain:
-        model = MarginalMLRClassifier()
-        X_augmented, y_nhot_augmented = augment_data(X_single, y_single, n_celltypes, n_features,
-                                                     n_samples_per_combination, label_encoder, prior=None,
-                                                     binarize=binarize, from_penile=from_penile)
+        model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
+        X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
+
+        X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, remove_structural=remove_structural)
+
+        augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
+                                                            y_nhot_mixtures, n_celltypes, n_features,
+                                                            label_encoder, prior, [binarize],
+                                                            from_penile, [n_samples_per_combination]*3)
 
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
-        y_train = np.array([np.max(np.array(y_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        y_train = np.array([np.max(np.array(augmented_data.y_train_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        y_calib = np.array([np.max(np.array(augmented_data.y_calib_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
-        model.fit_classifier(X_augmented, y_train)
+        model.fit_classifier(augmented_data.X_train_augmented, y_train)
+        model.fit_calibration(augmented_data.X_calib_augmented, augmented_data.y_calib_nhot_augmented, target_classes)
         pickle.dump(model, open('{}'.format(model_name), 'wb'))
     else:
         model = pickle.load(open('{}'.format(model_name), 'rb'))
 
 
+    compare_to_multiclass(model, np.array([[1,1,1,0,0,0,1,1,1,1,1,1,0,0,0], [0]*4+[1,1]+[0]*9, [0]*3+[1, 1,1, 1]+[0]*8]), remove_structural=remove_structural, tc=tc, save_path=save_path)
 
     # plot the coefficients
-    plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig='coefs_{}'.format(model_name), show=None)
+    plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
 
-    intercept, coefficients = model.get_coefficients(0, target_classes[0])
+
+    t = np.argwhere(np.array(tc)=='Vaginal.mucosa and/or Menstrual.secretion').squeeze()
+    intercept, coefficients = model.get_coefficients(t, target_classes[t].squeeze())
     all_coefficients = np.append(intercept, coefficients).tolist()
     all_coefficients_str = [str(coef) for coef in all_coefficients]
     all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
     present_markers.insert(0, 'intercept')
 
-    with open('coefs_{}.csv'.format(model_name), mode='w') as coefs:
+    with open(os.path.join(save_path,'coefs_{}_{}.csv'.format(prior, model_name)), mode='w') as coefs:
         coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         coefs_writer.writerow(present_markers)
         coefs_writer.writerow(all_coefficients_strr)
@@ -125,7 +141,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             for p, priors in enumerate(priors_list):
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
-                                                                    label_encoder, AugmentedData, priors, binarize_list,
+                                                                    label_encoder, priors, binarize_list,
                                                                     from_penile, nsamples)
 
             # ======= Transform data accordingly =======
@@ -228,6 +244,42 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             pickle.dump(cllr_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
 
             pickle.dump(coeffs[target_class_str], open(os.path.join(savepath, 'picklesaves/coeffs_{}_{}'.format(target_class_save, n)), 'wb'))
+
+
+def compare_to_multiclass(model: MarginalClassifier, samples, tc, remove_structural=True, binarize=True, save_path=None):
+    """
+    trains a multiclass model and compares its output to the given multilabel model, on a certain sample
+    """
+
+    mle = MultiLabelEncoder(len(single_cell_types))
+
+    # ======= Load data =======
+    X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
+        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=remove_structural)
+    y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
+    target_classes = string2vec(tc, label_encoder)
+
+    X = binarize_and_combine_samples(X_single, binarize)
+
+    multi_class_model = LogisticRegression()
+    multi_class_model.fit(X, y_single)
+    for sample in samples:
+        sample=sample.reshape(1, -1)
+        multi_pred = multi_class_model.predict_proba(sample)[0]
+        prob_vag_menst = multi_pred[1]+multi_pred[7]
+        multi_log_lrs = np.log10(np.append(multi_pred/(1-multi_pred), prob_vag_menst/(1-prob_vag_menst)))
+        # take single cell target classes
+        log_lrs = np.log10(model.predict_lrs(sample, target_classes))
+        plt.figure()
+        df=pd.DataFrame({'multiclass log(LR)': multi_log_lrs, 'multi-label log(LR)': log_lrs[0]})
+        p =  sns.scatterplot(data=df, x='multiclass log(LR)', y= 'multi-label log(LR)')
+
+        # add annotations one by one with a loop
+        for line in range(0, df.shape[0]):
+            p.text(multi_log_lrs[line] + 0.2, log_lrs[0][line], tc[line], horizontalalignment='left', size='medium', color='black',
+                    weight='semibold')
+
+        plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample)))
 
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
@@ -334,33 +386,3 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
                                savefig=os.path.join(savepath, 'boxplot_coefficients_{}'.format(target_class_save)), ylim=[-3,3])
 
-
-# TODO: Want to change to dict?
-class AugmentedData():
-
-    def __init__(self, X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
-           X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented):
-        self.X_train_augmented = X_train_augmented
-        self.y_train_nhot_augmented = y_train_nhot_augmented
-        self.X_calib_augmented = X_calib_augmented
-        self.y_calib_nhot_augmented = y_calib_nhot_augmented
-        self.X_test_augmented = X_test_augmented
-        self.y_test_nhot_augmented = y_test_nhot_augmented
-        self.X_test_as_mixtures_augmented = X_test_as_mixtures_augmented
-        self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
-
-# TODO: Want to change to dict?
-class LrsBeforeAfterCalib():
-
-    def __init__(self, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, lrs_before_calib_test_as_mixtures,
-                 lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, lrs_before_calib_mixt,
-                 lrs_after_calib_mixt, y_mixtures_nhot):
-        self.lrs_before_calib = lrs_before_calib
-        self.lrs_after_calib = lrs_after_calib
-        self.y_test_nhot_augmented = y_test_nhot_augmented
-        self.lrs_before_calib_test_as_mixtures = lrs_before_calib_test_as_mixtures
-        self.lrs_after_calib_test_as_mixtures = lrs_after_calib_test_as_mixtures
-        self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
-        self.lrs_before_calib_mixt = lrs_before_calib_mixt
-        self.lrs_after_calib_mixt = lrs_after_calib_mixt
-        self.y_mixtures_nhot = y_mixtures_nhot

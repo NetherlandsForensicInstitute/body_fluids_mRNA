@@ -4,6 +4,7 @@ Both functions to augment data and to manipulate augmented data.
 
 import numpy as np
 
+from rna.utils import AugmentedData
 from rna.analytics import combine_samples
 
 
@@ -46,6 +47,12 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
 
         augmented_samples.append(np.array(combined_sample))
 
+    combined_samples = binarize_and_combine_samples(augmented_samples, binarize)
+
+    return combined_samples
+
+
+def binarize_and_combine_samples(augmented_samples, binarize):
     if binarize:
         augmented_samples_bin = [
             np.where(augmented_samples[i] > 150, 1, 0) for i in
@@ -53,7 +60,6 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
         combined_samples = combine_samples(augmented_samples_bin)
     else:
         combined_samples = combine_samples(augmented_samples)
-
     return combined_samples
 
 
@@ -79,7 +85,7 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     return X_as_mixt, y_nhot_as_mixt
 
 
-def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, prior=None, binarize=False,
+def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, prior=None, binarize=False,
                  from_penile=False):
     """
     Generate data for the power set of single cell types.
@@ -202,7 +208,7 @@ def augment_data(X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label
 
 
 def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_nhot_mixtures, n_celltypes, n_features,
-                          label_encoder, class_to_save, prior, binarize, from_penile, nsamples):
+                          label_encoder, prior, binarize, from_penile, nsamples) -> AugmentedData:
     """
     Creates augmented samples for train, calibration and test data and saves it within a class.
     NB priors are always uniform for test data
@@ -217,7 +223,6 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     :param n_celltypes: int: number of single cell types
     :param n_features: int: N_markers (=N_features)
     :param label_encoder: encoder that encodes labels with value between 0 and n_cell types-1
-    :param class_to_save: class in which the augmented samples are stored
     :param prior: list of length n_celltypes representing the distribution of the augmented samples
     :param binarize:  bool: if True transform samples into binary samples with threshold 150 and if False keep the
         original signal values but normalize (/1000).
@@ -233,18 +238,22 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
                                                              nsamples[1], label_encoder, prior,
                                                              binarize=binarize, from_penile=from_penile)
     # use uniform priors for test data
-    X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
-                                                           nsamples[2], label_encoder, [1] * n_celltypes,
-                                                           binarize=binarize, from_penile=from_penile)
-    X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
-        X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
+    if X_test:
+        X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
+                                                               nsamples[2], label_encoder, [1] * n_celltypes,
+                                                               binarize=binarize, from_penile=from_penile)
+        X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
+            X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
+        print('test:', X_test_augmented.shape)
+        print('testasm:', X_test_as_mixtures_augmented.shape)
+    else:
+        X_test_as_mixtures_augmented=y_test_nhot_augmented=y_test_as_mixtures_nhot_augmented=None
+        X_test_augmented=None
 
     print('train:', X_train_augmented.shape)
     print('calib:', X_calib_augmented.shape)
-    print('test:', X_test_augmented.shape)
-    print('testasm:', X_test_as_mixtures_augmented.shape)
 
-    class_to_return = class_to_save(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
+    class_to_return = AugmentedData(X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented, \
            X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented)
 
 

@@ -120,3 +120,33 @@ def prior2string(prior, label_encoder):
         name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
 
         return '{} {}x {} likely'.format(name, value, difference)
+
+
+class AugmentedData():
+
+    def __init__(self, X_train_augmented, y_train_nhot_augmented, X_calib_augmented, y_calib_nhot_augmented,
+           X_test_augmented, y_test_nhot_augmented, X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented):
+        self.X_train_augmented = X_train_augmented
+        self.y_train_nhot_augmented = y_train_nhot_augmented
+        self.X_calib_augmented = X_calib_augmented
+        self.y_calib_nhot_augmented = y_calib_nhot_augmented
+        self.X_test_augmented = X_test_augmented
+        self.y_test_nhot_augmented = y_test_nhot_augmented
+        self.X_test_as_mixtures_augmented = X_test_as_mixtures_augmented
+        self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
+
+
+class LrsBeforeAfterCalib():
+
+    def __init__(self, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, lrs_before_calib_test_as_mixtures,
+                 lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, lrs_before_calib_mixt,
+                 lrs_after_calib_mixt, y_mixtures_nhot):
+        self.lrs_before_calib = lrs_before_calib
+        self.lrs_after_calib = lrs_after_calib
+        self.y_test_nhot_augmented = y_test_nhot_augmented
+        self.lrs_before_calib_test_as_mixtures = lrs_before_calib_test_as_mixtures
+        self.lrs_after_calib_test_as_mixtures = lrs_after_calib_test_as_mixtures
+        self.y_test_as_mixtures_nhot_augmented = y_test_as_mixtures_nhot_augmented
+        self.lrs_before_calib_mixt = lrs_before_calib_mixt
+        self.lrs_after_calib_mixt = lrs_after_calib_mixt
+        self.y_mixtures_nhot = y_mixtures_nhot
