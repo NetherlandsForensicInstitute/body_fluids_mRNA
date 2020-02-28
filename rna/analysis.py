@@ -22,7 +22,7 @@ from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
     plot_histograms_all_lrs_all_folds, plot_progress_of_metric, plot_rocs, plot_pavs_all_methods, \
-    plot_coefficient_importance, plot_coefficient_importances, get_coefficients
+    plot_coefficient_importance, plot_coefficient_importances
 from rna.lr_system import MarginalMLRClassifier
 
 
@@ -53,7 +53,7 @@ def get_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize, from
     # plot the coefficients
     plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig='coefs_{}'.format(model_name), show=None)
 
-    intercept, coefficients = get_coefficients(model, 0, target_classes[0])
+    intercept, coefficients = model.get_coefficients(0, target_classes[0])
     all_coefficients = np.append(intercept, coefficients).tolist()
     all_coefficients_str = [str(coef) for coef in all_coefficients]
     all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
@@ -97,7 +97,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
         lrs_for_model_in_fold = OrderedDict()
         emtpy_numpy_array = np.zeros((len(binarize_list), len(softmax_list), len(models_list), len(priors_list)))
         accuracies_train_n, accuracies_test_n, accuracies_test_as_mixtures_n, accuracies_mixtures_n, accuracies_single_n,\
-        cllr_test_n, cllr_test_as_mixtures_n, cllr_mixtures_n = [dict() for i in range(8)]
+        cllr_test_n, cllr_test_as_mixtures_n, cllr_mixtures_n, coeffs = [dict() for i in range(9)]
 
         for target_class in target_classes:
             target_class_str = vec2string(target_class, label_encoder)
@@ -111,7 +111,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             cllr_test_n[target_class_str] = emtpy_numpy_array.copy()
             cllr_test_as_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
             cllr_mixtures_n[target_class_str] = emtpy_numpy_array.copy()
-
+            coeffs[target_class_str] = np.zeros((len(binarize_list),1,X_single[0].shape[1]+1, len(priors_list)))
         # ======= Split data =======
         X_train, X_test, y_train, y_test = train_test_split(X_single, y_single, stratify=y_single, test_size=test_size)
         X_train, X_calib, y_train, y_calib = train_test_split(X_train, y_train, stratify=y_train, test_size=calibration_size)
@@ -144,8 +144,8 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
 
                     # ======= Calculate LRs before and after calibration =======
                     key_name = bool2str_binarize(binarize) + '_' + bool2str_softmax(softmax) + '_' + str(model_calib)
-                    if model_calib[1]:
-                        key_name+='_cal'
+                    if not model_calib[1]:
+                        key_name+='_uncal'
                     key_name_per_fold = str(n) + '_' + key_name
                     model, lrs_before_calib, lrs_after_calib, y_test_nhot_augmented, \
                     lrs_before_calib_test_as_mixtures, lrs_after_calib_test_as_mixtures, y_test_as_mixtures_nhot_augmented, \
@@ -198,6 +198,13 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
                                 lrs_after_calib_test_as_mixtures[str_prior][:, t], augmented_data[baseline_prior].y_test_as_mixtures_nhot_augmented, target_class)
                             cllr_mixtures_n[target_class_str][i, j, k, p] = cllr(
                                 lrs_after_calib_mixt[str_prior][:, t], y_nhot_mixtures, target_class)
+                            if model_calib[0] == 'MLR' and not softmax:
+                                # save coefficents
+                                intercept, coefficients = model[str(priors)].get_coefficients(t, target_class)
+                                coeffs[target_class_str][i, 0, 0, p] = intercept
+                                for i_coef, coef in enumerate(coefficients):
+                                    coeffs[target_class_str][i, 0, i_coef+1, p] = coef
+
         outer.update(1)
 
 
@@ -220,6 +227,8 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             pickle.dump(cllr_test_as_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_test_as_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
             pickle.dump(cllr_mixtures_n[target_class_str], open(os.path.join(savepath, 'picklesaves/cllr_mixt_{}_{}'.format(target_class_save, n)), 'wb'))
 
+            pickle.dump(coeffs[target_class_str], open(os.path.join(savepath, 'picklesaves/coeffs_{}_{}'.format(target_class_save, n)), 'wb'))
+
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
 
@@ -231,7 +240,7 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
     emtpy_numpy_array = np.zeros(
         (nfolds, len(binarize_list), len(softmax_list), len(models_list), len(priors_list)))
     accuracies_train, accuracies_test, accuracies_test_as_mixtures, accuracies_mixtures, accuracies_single, \
-    cllr_test, cllr_test_as_mixtures, cllr_mixtures = [dict() for i in range(8)]
+    cllr_test, cllr_test_as_mixtures, cllr_mixtures, coeffs = [dict() for i in range(9)]
 
     for target_class in target_classes:
         target_class_str = vec2string(target_class, label_encoder)
@@ -245,6 +254,7 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         cllr_test[target_class_str] = emtpy_numpy_array.copy()
         cllr_test_as_mixtures[target_class_str] = emtpy_numpy_array.copy()
         cllr_mixtures[target_class_str] = emtpy_numpy_array.copy()
+        coeffs[target_class_str] = np.zeros((nfolds, len(binarize_list),1, len(marker_names)-4+1, len(priors_list)))
 
     for n in range(nfolds):
         lrs_for_model_per_fold[str(n)] = pickle.load(open(os.path.join(path, 'lrs_for_model_in_fold_{}'.format(n)), 'rb'))
@@ -272,6 +282,8 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
                 open(os.path.join(path, 'cllr_test_as_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
             cllr_mixtures[target_class_str][n, :, :, :, :] = pickle.load(
                 open(os.path.join(path,'cllr_mixt_{}_{}'.format(target_class_save, n)), 'rb'))
+            coeffs[target_class_str][n, :, :, :, :] = pickle.load(
+                open(os.path.join(path,'coeffs_{}_{}'.format(target_class_save, n)), 'rb'))
 
     types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
 
@@ -279,15 +291,15 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
             lrs_for_model_per_fold, type=type_data)
 
-        plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
-                                  target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
-
-        # plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
-                  # savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
-
-        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
-                                          label_encoder,
-                                          savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+        # plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
+        #                           target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
+        #
+        # # plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
+        #           # savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
+        #
+        # plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+        #                                   label_encoder,
+        #                                   savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
 
         if len(priors_list) == 2:
             plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
@@ -310,14 +322,17 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
                                savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
         plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
                                 savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "Cllr",
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "$C_{llr}$",
                                savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, 'Cllr',
+        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, '$C_{llr}$',
                                 savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "Cllr",
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "$C_{llr}$",
                                savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "Cllr",
+        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "$C_{llr}$",
                                savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
+
+        plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
+                               savefig=os.path.join(savepath, 'boxplot_coefficients_{}'.format(target_class_save)), ylim=[-3,3])
 
 
 # TODO: Want to change to dict?

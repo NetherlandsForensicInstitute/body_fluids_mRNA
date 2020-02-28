@@ -24,3 +24,8 @@ To simplify I assume that there are three cell types in total.
 2. **priors within case work**
 
 Defined as `priors_numerator` and  `priors_denominator`.
+
+
+
+Currently, priors 0 or 1 are handled as one huge exceptional case for penile skin. To enable this, make your priors
+one longer (in run.py) and add 'Skin.penile' to the cell types in constants. Yes, I know.

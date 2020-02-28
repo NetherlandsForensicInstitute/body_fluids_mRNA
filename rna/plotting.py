@@ -3,8 +3,11 @@ Plotting functions.
 """
 
 import math
+import matplotlib
+
 import scipy
 import numpy as np
+import pandas as pd
 
 from matplotlib import rc, pyplot as plt, patches as mpatches
 # from matplotlib import colors as mcolors
@@ -14,6 +17,7 @@ from sklearn.metrics import roc_curve, auc
 from itertools import cycle
 from scipy.interpolate import interp1d
 # from scipy.misc import derivative
+import seaborn as sns
 
 # from rna.analytics import combine_samples
 from rna.constants import celltype_specific_markers
@@ -211,6 +215,7 @@ def plot_histograms_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_method
         plot_histogram_lr_all_folds(lrs_for_all_methods[method], y_nhot_for_all_methods[method], target_classes, label_encoder)
 
         if savefig is not None:
+            matplotlib.rcParams['text.usetex'] = False
             plt.tight_layout()
             plt.savefig(savefig + '_' + method)
             plt.close()
@@ -327,21 +332,24 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 full_name.append(method)
 
                 priors.append('[' + method.split('[')[2])
-                methods.append('[' + method.split('[')[1].replace('_',' '))
+                methods.append(method.split("'")[1])
             assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
-            fig, axes = plt.subplots(nrows=len(priors)//2, ncols=3, figsize=(16, 10))
-
+            # fig, axes = plt.subplots(nrows=len(priors)//2, ncols=1, figsize=(16, 10))
+            fig = plt.plot(figsize=(5,20    ))
             target_class = np.reshape(target_class, -1, 1)
             labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
-            colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-            colors_positive = ['orange'] * int(np.sum(labels))
-            colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
+            # colors = ['orange' if l == 1.0 else 'blue' for l in labels]
+            # colors_positive = ['orange'] * int(np.sum(labels))
+            # colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
 
-            h1 = mpatches.Patch(color='orange', label='h1')
-            h2 = mpatches.Patch(color='blue', label='h2')
-
+            # h1 = mpatches.Patch(color='orange', label='h1')
+            # h2 = mpatches.Patch(color='blue', label='h2')
+            loglrs1_list =[]
+            loglrs2_list =[]
+            methods_list =[]
+            labels_list =[]
             for i_method in range(len(priors)//2):
                 # make sure uniform priors always on bottom
                 if any(str([1] * len(target_class)) in x for x in priors):
@@ -356,32 +364,32 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                     loglrs1 = loglrs[full_name[index1]]
                     loglrs2 = loglrs[full_name[index2]]
 
-                loglrs1_pos = loglrs1[np.argwhere(labels == 1)]
-                loglrs2_pos = loglrs2[np.argwhere(labels == 1)]
-                loglrs1_neg = loglrs1[np.argwhere(labels == 0)]
-                loglrs2_neg = loglrs2[np.argwhere(labels == 0)]
+                loglrs1_list+=list(loglrs1)
+                loglrs2_list+=list(loglrs2)
 
-                min_val_pos = math.floor(min(np.min(loglrs1_pos), np.min(loglrs2_pos)))
-                max_val_pos = math.ceil(max(np.max(loglrs1_pos), np.max(loglrs2_pos)))
-                min_val_neg = math.floor(min(np.min(loglrs1_neg), np.min(loglrs2_neg)))
-                max_val_neg = math.ceil(max(np.max(loglrs1_neg), np.max(loglrs2_neg)))
+                methods_list+= [methods[i_method*2]] * len(labels)
+                labels_list+=list(labels.squeeze())
 
-                plot_scatterplot_lrs_different_priors((loglrs1, loglrs2), np.linspace(-4, max_val_pos), colors, (h1, h2), ax=axes[i_method, 0])
-                axes[i_method, 0].set_ylabel(methods[i_method*2][:10])
-                plot_scatterplot_lrs_different_priors((loglrs1_pos, loglrs2_pos), np.linspace(min_val_pos, max_val_pos), colors_positive,
-                                                      (h1), ax=axes[i_method, 1])
-                plot_scatterplot_lrs_different_priors((loglrs1_neg, loglrs2_neg), np.linspace(min_val_neg, max_val_neg), colors_negative,
-                                                      (h2), ax=axes[i_method, 2])
+            df = pd.DataFrame({'label': labels_list, 'method': methods_list,
+                               'log(LR) {}'.format(prior2string(priors[index1], label_encoder)): loglrs1_list,
+                               'log(LR) {}'.format(prior2string(priors[index2], label_encoder)): loglrs2_list,
+                               })
+            sns.set(font_scale=1.5, rc={'text.usetex': False})
 
-            fig.text(0.5, 0.002, "10logLR {}".format(prior2string(priors[index1], label_encoder)), ha='center')
-            fig.text(0.002, 0.5, "10logLR {}".format(prior2string(priors[index2], label_encoder)), va='center', rotation='vertical')
+            grid = sns.relplot(data=df, x='log(LR) {}'.format(prior2string(priors[index1], label_encoder)),
+                            y = 'log(LR) {}'.format(prior2string(priors[index2], label_encoder)),
+                           kind='scatter', col='method', hue = 'label', style='label', legend=False)
+            grid.map(sns.lineplot, y=[-15,15], x=[-15,15])
+
+            plt.xlim(-5,5)
+            plt.ylim(-5,5)
 
             target_class_str = vec2string(target_class, label_encoder)
             target_class_save = target_class_str.replace(" ", "_")
             target_class_save = target_class_save.replace(".", "_")
             target_class_save = target_class_save.replace("/", "_")
             if savefig is not None:
-                plt.tight_layout()
+                # plt.tight_layout()
                 plt.savefig(savefig + '_' + keys + '_' + target_class_save)
                 plt.close()
             if show or savefig is None:
@@ -414,7 +422,7 @@ def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, 
     return ax
 
 
-def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
+def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, prior_to_plot=None, savefig=None, show=None, ylim=[0,1]):
     def int2string_models(int, specify_which=None):
         if specify_which == None:
             raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
@@ -429,7 +437,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         elif specify_which == 3:
             for i in range(len(models)):
                 if int == i:
-                    return models[i][0]
+                    return models[i][0] if models[i][1] else models[i][0]+' uncal'
         elif specify_which == 4:
             for i in range(len(priors)):
                 if int == i:
@@ -437,31 +445,41 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         else:
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 
+
+    if not prior_to_plot:
+        prior_to_plot=priors[0]
+
+    n_per_fold = n_metric.shape[0]
     i_transformations = n_metric.shape[1]
     j_probscalulations = n_metric.shape[2]
     k_models = n_metric.shape[3]
     p_priors = n_metric.shape[4]
 
-    total_boxplots = i_transformations * j_probscalulations * p_priors * k_models
-
     fig = plt.figure(figsize=(14, 7))
-    # plt.suptitle(vec2string(target_class, label_encoder))
     ax = plt.subplot(111)
-    ax.set_axisbelow(True)
-    a = 0
-    names = []
+    trans_list = []
+    probs_list = []
+    models_list = []
+    priors_list = []
+    metric_list = []
     for i in range(i_transformations):
         for j in range(j_probscalulations):
             for k in range(k_models):
                 for p in range(p_priors):
-                    names.append(int2string_models(k, 3) + ' ' + int2string_models(i, 1) + ' ' + int2string_models(j, 2) + ' ' + int2string_models(p, 4))
-                    ax.boxplot(n_metric[:, i, j, k, p], vert=False, positions=[a], widths = 0.6)
-                    a += 1
-    ax.set_yticks(range(total_boxplots))
-    ax.set_yticklabels(names)
-    ax.set_ylim(-0.5, total_boxplots-0.5)
-    ax.set_xlim(0, 1)
-    ax.set_xlabel(name_metric)
+                    if p in prior_to_plot:
+                        trans_list+=[int2string_models(i, 1)]*n_per_fold
+                        probs_list+=[int2string_models(j, 2)]*n_per_fold
+                        models_list+=[int2string_models(k, 3)]*n_per_fold
+                        priors_list+=[int2string_models(p, 4)]*n_per_fold
+                        metric_list+=list(n_metric[:, i, j, k, p].squeeze())
+
+
+    df = pd.DataFrame({'multi-label strategy': probs_list, 'binarization': trans_list, 'prior': priors_list, 'model': models_list, name_metric: metric_list})
+    sns.set(font_scale=1.5, rc={'text.usetex': True})
+    sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
+               hue='model', col='binarization',
+               kind='box', legend=True, legend_out =True, ci=None)
+    plt.ylim(ylim)
 
     if savefig is not None:
         plt.tight_layout()
@@ -472,6 +490,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         plt.show()
 
     plt.close(fig)
+
 
 
 def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
@@ -921,26 +940,7 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     return fpr_method, tpr_method
 
 
-def get_coefficients(model, t, target_class):
-    if len(model._classifier.coef_) == 2 ** 8:
-        # TODO: Is this correct for MLP with softmax?
-        # NO
-        # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
-        # (although the mean will probably correlate)
-        return None, None
-        # indices_target_class = get_mixture_columns_for_class(target_class, None)
-        # intercept = np.mean(model._classifier.intercept_[indices_target_class])
-        # coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
-    else:
-        intercept = model._classifier.intercept_[t, :].squeeze() / np.log(10)
-        coefficients = model._classifier.coef_[t, :].squeeze() / np.log(10)
 
-    if model._calibrator:
-        beta1 = model._calibrators_per_target_class[str(target_class)]._logit.coef_[0][0] / np.log(10)
-        beta0 = model._calibrators_per_target_class[str(target_class)]._logit.intercept_[0] / np.log(10)
-        intercept = intercept * beta1 + beta0
-        coefficients = coefficients * beta1
-    return intercept, coefficients
 
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
 
@@ -948,7 +948,7 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
 
-        intercept, coefficients = get_coefficients(model, t, target_class)
+        intercept, coefficients = model.get_coefficients(t, target_class)
         if not intercept:
             return
         plot_coefficient_importance(intercept, coefficients, present_markers, celltype)

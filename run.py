@@ -46,7 +46,7 @@ params = {
 
 'softmax_list':[True, False],
 
-'nsamples':(4, 4, 2),
+'nsamples':(10, 10, 5),
 
 'test_size':0.2,
 

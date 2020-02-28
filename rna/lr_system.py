@@ -134,6 +134,34 @@ class MarginalMLRClassifier(MarginalClassifier):
     def fit_classifier(self, X, y):
         self._classifier.fit(X, y)
 
+    def get_coefficients(self, t, target_class):
+        """
+        Returns the intercept and coefficients, adjust for the calibrator.
+        Only works if calibrator is none or logistic regression as well and we use one vs rest.
+        :param t:
+        :param target_class:
+        :return:
+        """
+        if len(self._classifier.coef_) == 2 ** 8:
+            # TODO: Is this correct for MLP with softmax?
+            # NO
+            # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
+            # (although the mean will probably correlate)
+            return None, None
+            # indices_target_class = get_mixture_columns_for_class(target_class, None)
+            # intercept = np.mean(model._classifier.intercept_[indices_target_class])
+            # coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
+        else:
+            intercept = self._classifier.intercept_[t, :].squeeze() / np.log(10)
+            coefficients = self._classifier.coef_[t, :].squeeze() / np.log(10)
+
+        if self._calibrator:
+            beta1 = self._calibrators_per_target_class[str(target_class)]._logit.coef_[0][0] / np.log(10)
+            beta0 = self._calibrators_per_target_class[str(target_class)]._logit.intercept_[0] / np.log(10)
+            intercept = intercept * beta1 + beta0
+            coefficients = coefficients * beta1
+        return intercept, coefficients
+
 
 class MarginalXGBClassifier(MarginalClassifier):
 

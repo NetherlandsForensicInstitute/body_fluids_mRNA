@@ -67,9 +67,9 @@ def bool2str_binarize(binarize):
     :return: str
     """
     if binarize == True:
-        return 'bin'
+        return 'binarized'
     elif binarize == False:
-        return 'norm'
+        return 'not binarized'
 
 
 def bool2str_softmax(softmax):
@@ -81,9 +81,9 @@ def bool2str_softmax(softmax):
     :return: str
     """
     if softmax == True:
-        return 'soft'
+        return 'label powerset'
     elif softmax == False:
-        return 'sig'
+        return 'one vs rest'
 
 
 def prior2string(prior, label_encoder):
