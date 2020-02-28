@@ -96,9 +96,9 @@ if __name__ == '__main__':
               savepath=save_path, **params)
 
 
-    save_path = 'final_model'
-    os.makedirs(save_path, exist_ok=True)
-    get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(constants.single_cell_types)), retrain=True, n_samples_per_combination=10,
-                                binarize=True, from_penile=False, prior=[10]+[1]*7, model_name=
-                          constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
+    # save_path = 'final_model'
+    # os.makedirs(save_path, exist_ok=True)
+    # get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(constants.single_cell_types)), retrain=True, n_samples_per_combination=10,
+    #                             binarize=True, from_penile=False, prior=[10]+[1]*7, model_name=
+    #                       constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
 

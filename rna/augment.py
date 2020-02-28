@@ -238,7 +238,7 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
                                                              nsamples[1], label_encoder, prior,
                                                              binarize=binarize, from_penile=from_penile)
     # use uniform priors for test data
-    if X_test:
+    if not X_test is None:
         X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
                                                                nsamples[2], label_encoder, [1] * n_celltypes,
                                                                binarize=binarize, from_penile=from_penile)
