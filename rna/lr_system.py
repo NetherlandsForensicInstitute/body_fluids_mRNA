@@ -2,7 +2,6 @@ from functools import partial
 
 import numpy as np
 # import tensorflow as tf
-from ceml.sklearn import RandomForest
 # from keras import Input, Model
 # from keras.layers import Dense, Dropout
 from lir import LogitCalibrator, ELUBbounder
@@ -10,9 +9,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
-from xgboost import XGBClassifier
-
-from rna.constants import single_cell_types
+# from xgboost import XGBClassifier
+from typing import List
 
 
 class MarginalClassifier():
@@ -316,7 +314,7 @@ class MarginalDLClassifier(MarginalClassifier):
 
 
 
-def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):
+def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR):
     """
     Converts n_samples x n_mixtures matrix of probabilities to a n_samples x n_target_classes
     matrix by summing over the probabilities containing the celltype(s) of interest.
@@ -324,30 +322,22 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
     :param prob: n_samples x n_mixtures containing the predicted probabilities
     :param target_classes: n_target_classes x n_celltypes containing the n hot encoded classes of interest
     :param MAX_LR: int
-    :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
-    :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-    does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-    distribution
     :return: n_samples x n_target_classes of probabilities
     """
-    assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
-    assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
     lrs = np.zeros((len(prob), len(target_classes)))
     for i, target_class in enumerate(target_classes):
         assert sum(target_class) > 0, 'No cell type given as target class'
 
         if prob.shape[1] == 2 ** target_classes.shape[1]:  # lps
             # numerator
-            indices_of_target_class = get_mixture_columns_for_class(target_class, priors_numerator)
+            indices_of_target_class = get_mixture_columns_for_class(target_class)
             numerator = np.sum(prob[:, indices_of_target_class], axis=1)
 
             # denominator
             # TODO: Does this work when priors are defined?
             # TODO: Rewrite with priors.
             # indices_of_non_target_class = get_mixture_columns_for_class(1-target_class, priors_denominator)
-            all_indices = get_mixture_columns_for_class([1] * len(target_class), priors_denominator)
+            all_indices = range(2** len(target_class))
             indices_of_non_target_class = [idx for idx in all_indices if idx not in indices_of_target_class]
             denominator = np.sum(prob[:, indices_of_non_target_class], axis=1)
             lrs[:, i] = numerator / denominator
@@ -372,40 +362,24 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
     return lrs
 
 
-def get_mixture_columns_for_class(target_class, priors):
+def single_label_to_powerset_labels(label: int, n_cell_types) -> List[int]:
+    """
+    for a label in {0, 1, .. n_cell_types}, return all indices in {0, .., 2**n_cell_types} that contain it
+    """
+    return [i*(2**(label+1))+j for j in range(2**label) for i in range(2**(n_cell_types-1-label))]
+
+
+def get_mixture_columns_for_class(target_class):
     """
     for the target_class, a vector of length n_single_cell_types with 1 or more 1's, give
     back the columns in the mixtures that contain one or more of these single cell types
 
     :param target_class: vector of length n_single_cell_types with at least one 1
-    :param priors: vector of length n_single_cell_types with 0 or 1 to indicate single cell type has 0 or 1 prior,
-    uniform assumed otherwise
     :return: list of ints, in [0, 2 ** n_cell_types]
     """
-
-    def int_to_binary(i):
-        binary = bin(i)[2:]
-        while len(binary) < len(single_cell_types):
-            binary = '0' + binary
-        return np.flip([int(j) for j in binary]).tolist()
-
-    def binary_admissable(binary, target_class, priors):
-        """
-        gives back whether the binary (string of 0 and 1 of length n_single_cell_types) has at least one of
-        target_class in it, and all priors satisfied
-        """
-        if priors:
-            for i in range(len(target_class)):
-                # if prior is zero, the class should not occur
-                if binary[i] == 1 and priors[i] == 0:
-                    return False
-                # if prior is one, the class should occur
-                # as binary is zero it does not occur and return False
-                if binary[i] == 0 and priors[i] == 1:
-                    return False
-        # at least one of the target class should occur
-        if np.inner(binary, target_class) == 0:
-            return False
-        return True
-
-    return [i for i in range(2 ** len(single_cell_types)) if binary_admissable(int_to_binary(i), target_class, priors)]
+    labels=set()
+    for i in np.argwhere(target_class):
+        print(i)
+        print(single_label_to_powerset_labels(i[0], len(target_class)))
+        labels.update(single_label_to_powerset_labels(i[0], len(target_class)))
+    return list(labels)

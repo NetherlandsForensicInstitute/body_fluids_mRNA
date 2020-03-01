@@ -16,12 +16,12 @@ from collections import OrderedDict
 from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
 from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
-from rna.constants import single_cell_types, marker_names
+from rna.constants import marker_names
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
@@ -29,7 +29,7 @@ from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplo
 from rna.lr_system import MarginalClassifier
 
 
-def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize=True, from_penile=False, prior=(1,1,1,1,1,1,1,1), model_name='best_MLR', remove_structural=True, save_path=None):
+def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, single_cell_types, binarize=True, prior=(1,1,1,1,1,1,1,1), model_name='best_MLR', remove_structural=True, save_path=None):
     """
     computes or loads the MLR based on all data
     """
@@ -49,7 +49,7 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
         augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
                                                             y_nhot_mixtures, n_celltypes, n_features,
                                                             label_encoder, prior, [binarize],
-                                                            from_penile, [n_samples_per_combination]*3)
+                                                            [n_samples_per_combination]*3)
 
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
         y_train = np.array([np.max(np.array(augmented_data.y_train_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
@@ -62,7 +62,7 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
         model = pickle.load(open('{}'.format(model_name), 'rb'))
 
 
-    compare_to_multiclass(model, np.array([[1,1,1,0,0,0,1,1,1,1,1,1,0,0,0], [0]*4+[1,1]+[0]*9, [0]*3+[1, 1,1, 1]+[0]*8]), remove_structural=remove_structural, tc=tc, save_path=save_path)
+    compare_to_multiclass(model, np.array([[1,1,1,0,0,0,1,1,1,1,1,1,0,0,0], [0]*4+[1,1]+[0]*9, [0]*3+[1, 1,1, 1]+[0]*8]), single_cell_types, remove_structural=remove_structural, tc=tc, save_path=save_path)
 
     # plot the coefficients
     plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
@@ -81,20 +81,9 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
         coefs_writer.writerow(all_coefficients_strr)
 
 
-def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool], priors_list: List[List], binarize_list: List[bool], test_size: float, calibration_size: float, remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
-    # if from_penile == True:
-    #     if True in softmax_list:
-    #         raise ValueError("The results following from these settings have not been validated and hence cannot be "
-    #                          "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
-    #             from_penile))
-    #     for models_and_calib in models_list:
-    #         if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
-    #             raise ValueError("The results following from these settings have not validated and hence cannot be "
-    #                              "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
-    #                              "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], from_penile))
-
+def nfold_analysis(nfolds, tc, savepath, models_list, softmax_list: List[bool], priors_dict: Dict[str, List], binarize_list: List[bool], test_size: float, calibration_size: float, remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
+    single_cell_types = list(priors_dict.keys())
     mle = MultiLabelEncoder(len(single_cell_types))
-    baseline_prior = str(priors_list[0])
 
     # ======= Load data =======
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
@@ -102,17 +91,21 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
+    priors_list = [-1]*n_celltypes
+    for cell_type, priors in priors_dict.items():
+        priors_list[label_encoder.transform(cell_type)]=priors
+    priors_list =  np.array(priors_list).T.tolist()
+    baseline_prior = priors_list[0]
 
 
     outer = tqdm(total=nfolds, desc='{} folds'.format(nfolds), position=0, leave=False)
     for n in range(nfolds):
-        # n = n + (nfolds * run)
         print(n)
 
         # ======= Initialize =======
         lrs_for_model_in_fold = OrderedDict()
         emtpy_numpy_array = np.zeros((len(binarize_list), len(softmax_list), len(models_list), len(priors_list)))
-        accuracies_train_n, accuracies_test_n, accuracies_test_as_mixtures_n, accuracies_mixtures_n, accuracies_single_n,\
+        accuracies_train_n, accuracies_test_n, accuracies_test_as_mixtures_n, accuracies_mixtures_n, accuracies_single_n, \
         cllr_test_n, cllr_test_as_mixtures_n, cllr_mixtures_n, coeffs = [dict() for i in range(9)]
 
         for target_class in target_classes:
@@ -142,7 +135,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
                                                                     label_encoder, priors, binarize_list,
-                                                                    from_penile, nsamples)
+                                                                    nsamples)
 
             # ======= Transform data accordingly =======
             if binarize:
@@ -246,7 +239,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             pickle.dump(coeffs[target_class_str], open(os.path.join(savepath, 'picklesaves/coeffs_{}_{}'.format(target_class_save, n)), 'wb'))
 
 
-def compare_to_multiclass(model: MarginalClassifier, samples, tc, remove_structural=True, binarize=True, save_path=None):
+def compare_to_multiclass(model: MarginalClassifier, samples, tc, single_cell_types, remove_structural=True, binarize=True, save_path=None):
     """
     trains a multiclass model and compares its output to the given multilabel model, on a certain sample
     """
@@ -285,7 +278,7 @@ def compare_to_multiclass(model: MarginalClassifier, samples, tc, remove_structu
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
 
     _, _, _, _, _, label_encoder, _, _ = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=remove_structural)
+        get_data_per_cell_type(single_cell_types=list(priors_list.keys()), remove_structural=remove_structural)
     target_classes = string2vec(tc, label_encoder)
 
     lrs_for_model_per_fold = OrderedDict()

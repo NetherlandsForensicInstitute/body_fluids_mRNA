@@ -85,8 +85,7 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     return X_as_mixt, y_nhot_as_mixt
 
 
-def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, prior=None, binarize=False,
-                 from_penile=False):
+def augment_data( X, y, n_celltypes, n_features, n_samples, label_encoder, prior=None, binarize=False):
     """
     Generate data for the power set of single cell types.
 
@@ -94,49 +93,22 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
     :param y: list of length N_single_cell_experimental_samples filled with int labels of which cell type was measured
     :param n_celltypes: int: number of single cell types
     :param n_features: int: n_markers
-    :param N_SAMPLES_PER_COMBINATION: number of samples per combination. Note that this number differs when the prior
-        distribution is not uniform.
+    :param n_samples: number of augmented samples to generate
     :param label_encoder: encoder that encodes labels with value between 0 and n_cell types-1
-    :param prior: list of length n_celltypes representing the distribution of the augmented samples
+    :param prior: list of length n_celltypes representing the priors for the single cell types
     :param binarize: bool: if True transform samples into binary samples with threshold 150 and if False keep the
         original signal values but normalize (/1000).
-    :param from_penile: bool: if True generate sample that always also contain penile skin and if False will never
-        contain penile skin.
-    :return: n_experiments x n_markers array,
-             n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample which single cell type it
-                was made up of. Does not contain column for penile skin
+    :return: n_samples x n_markers array,
+             n_samples x n_celltypes matrix of 0, 1 indicating for each augmented sample which single cell type it
+                was made up of.
     """
-    if not from_penile:
-        n_celltypes_without_penile = n_celltypes
-    else:
-        n_celltypes_without_penile = n_celltypes - 1
-
     if prior is None: # uniform priors, exception for penile skin (should be coded more generally!)
-        prior = [1] * n_celltypes
+        prior = [0.5] * n_celltypes
 
     assert len(prior) == n_celltypes, "Not all cell types are given a prior value" \
                                       "Make sure the length of the list(s) in 'prior' in settings is equal to" \
                                       "the number of cell types."
 
-    if len(np.unique(prior)) == 1:
-        ratio_relevant_prior = 0.5
-        ratio_other_priors = 0.5
-    elif len(np.unique(prior)) == 2:
-        counts = {prior.count(value): value for value in list(set(prior))}
-        value_relevant_prior = counts[1]
-        index_of_relevant_prior = prior.index(value_relevant_prior)
-        counts.pop(1)
-        value_other_priors = list(counts.values())[0]
-
-        if value_relevant_prior > value_other_priors:
-            ratio_relevant_prior = value_relevant_prior / (1 + value_relevant_prior)
-            ratio_other_priors = 1-ratio_relevant_prior
-        elif value_relevant_prior < value_other_priors:
-            ratio_other_priors = value_other_priors / (1 + value_other_priors)
-            ratio_relevant_prior = 1-ratio_other_priors
-    else:
-        raise ValueError("Cannot augment samples if there are more than two unique prior values. "
-                         "Change 'priors' in settings.")
 
     if X.size == 0:
         # This is the case when calibration_size = 0.0, this is an implicit way to
@@ -145,70 +117,31 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
         y_nhot_augmented=np.zeros((0, n_celltypes))
 
     else:
-        X_augmented = np.zeros((0, n_features))
-        N_SAMPLES = int(2 * N_SAMPLES_PER_COMBINATION * ratio_relevant_prior * (2 ** (n_celltypes_without_penile-1)) + \
-                    2 * N_SAMPLES_PER_COMBINATION * ratio_other_priors * 2 ** ((n_celltypes_without_penile-1)))
-        assert N_SAMPLES == N_SAMPLES_PER_COMBINATION * 2 ** n_celltypes_without_penile
-        y_nhot_augmented = np.zeros((N_SAMPLES, n_celltypes), dtype=int)
+        X_augmented = np.zeros((n_samples, n_features))
+        y_nhot_augmented = np.zeros((n_samples, n_celltypes), dtype=int)
 
         begin = 0
-        for i in range(2 ** n_celltypes_without_penile):
-            binary = bin(i)[2:]
-            while len(binary) < n_celltypes:
-                binary = '0' + binary
+        for i in range(n_samples):
+            rand = np.random.rand(n_celltypes, 1)
 
             # figure out which classes will be in the combination each iteration
             classes_in_current_mixture = []
-            if not from_penile:
-                for i_celltype in range(len(label_encoder.classes_)):
-                    if binary[-i_celltype - 1] == '1':
-                        classes_in_current_mixture.append(i_celltype)
-            else:
-                classes_str = label_encoder.classes_.tolist()
-                classes_str.remove('Skin.penile')
-                classes = np.array([label_encoder.transform([class_str]) for class_str in classes_str]).ravel()
-                classes_map = {i:classes[i] for i in range(len(classes))}
-                for i_celltype in range(len(classes)):
-                    if binary[-i_celltype - 1] == '1':
-                        classes_in_current_mixture.append(classes_map[i_celltype])
-                # also (always) add penile skin samples.
-                classes_in_current_mixture.append(int(label_encoder.transform(['Skin.penile'])))
-
-            try:
-                if index_of_relevant_prior in classes_in_current_mixture:
-                    Np = 2 * ratio_relevant_prior
-                else:
-                    Np = 2 * ratio_other_priors
-            except:
-                Np = 1
-
-            end = round(begin + N_SAMPLES_PER_COMBINATION * Np)
-            if not from_penile:
-                for i_celltype in range(len(label_encoder.classes_)):
-                    if binary[-i_celltype - 1] == '1':
-                        y_nhot_augmented[begin:end, i_celltype] = 1
-            else:
-                for i_celltype in range(len(label_encoder.classes_)):
-                    if binary[-i_celltype - 1] == '1':
-                        y_nhot_augmented[begin:end, classes_map[i_celltype]] = 1
-                y_nhot_augmented[begin:end, int(label_encoder.transform(['Skin.penile']))] = 1
+            for i_celltype in range(n_celltypes):
+                if rand[i_celltype] < prior [i_celltype]:
+                    classes_in_current_mixture.append(i_celltype)
+                    y_nhot_augmented[i, i_celltype] = 1
 
             X_augmented = np.append(X_augmented,
-                                    construct_random_samples(X, y, end - begin, classes_in_current_mixture, n_features,
+                                    construct_random_samples(X, y, 1, classes_in_current_mixture, n_features,
                                                              binarize=binarize), axis=0)
-            begin = end
-
         if not binarize:
             X_augmented = X_augmented / 1000
-
-    if from_penile:
-        assert np.sum(y_nhot_augmented[:, int(label_encoder.transform(['Skin.penile']))]) == y_nhot_augmented.shape[0]
 
     return X_augmented, y_nhot_augmented[:, :n_celltypes]
 
 
 def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_nhot_mixtures, n_celltypes, n_features,
-                          label_encoder, prior, binarize, from_penile, nsamples) -> AugmentedData:
+                          label_encoder, prior, binarize, nsamples) -> AugmentedData:
     """
     Creates augmented samples for train, calibration and test data and saves it within a class.
     NB priors are always uniform for test data
@@ -226,22 +159,20 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     :param prior: list of length n_celltypes representing the distribution of the augmented samples
     :param binarize:  bool: if True transform samples into binary samples with threshold 150 and if False keep the
         original signal values but normalize (/1000).
-    :param from_penile: bool: if True generate sample that always also contain penile skin and if False will never
-        contain penile skin.
     :return: class with augmented samples for train, calibration, test and test as mixtures
     """
 
     X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
                                                              nsamples[0], label_encoder, prior,
-                                                             binarize=binarize, from_penile=from_penile)
+                                                             binarize=binarize)
     X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
                                                              nsamples[1], label_encoder, prior,
-                                                             binarize=binarize, from_penile=from_penile)
+                                                             binarize=binarize)
     # use uniform priors for test data
     if not X_test is None:
         X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
                                                                nsamples[2], label_encoder, [1] * n_celltypes,
-                                                               binarize=binarize, from_penile=from_penile)
+                                                               binarize=binarize)
         X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
             X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
         print('test:', X_test_augmented.shape)

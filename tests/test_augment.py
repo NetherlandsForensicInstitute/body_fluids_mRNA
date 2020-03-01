@@ -1,7 +1,6 @@
 import numpy as np
 
 from rna.augment import augment_data, MultiLabelEncoder
-from rna.constants import single_cell_types
 from rna.input_output import get_data_per_cell_type
 from rna.utils import string2vec
 
@@ -12,15 +11,12 @@ def test_augment_data():
     is the same as the prior infers.
     """
 
-
-    from_penile = False
-    mle = MultiLabelEncoder(len(single_cell_types))
+    mle = MultiLabelEncoder(9)
     tc = ['Skin', 'Vaginal.mucosa and/or Menstrual.secretion']
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
         get_data_per_cell_type(filename='../Datasets/Dataset_NFI_rv.xlsx', single_cell_types=single_cell_types, remove_structural=True)
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
-    target_classes = string2vec(tc, label_encoder)
 
     N_SAMPLES_PER_COMBINATION = [11, 22, 33]
     priors = [[1, 1, 1, 1, 1, 1, 1, 1],         # uniform priors
@@ -35,7 +31,7 @@ def test_augment_data():
             print(prior)
             X_augmented, y_nhot = augment_data(X_single, y_single, n_celltypes, n_features, N_SAMPLES,
                                                          label_encoder, prior, binarize=True,
-                                                         from_penile=from_penile)
+                                                         )
 
             occurrence_celltypes = np.sum(y_nhot, axis=0)
             if len(np.unique(prior)) == 1 or prior is None:

@@ -3,10 +3,10 @@ General calculations.
 """
 
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
-from rna.constants import single_cell_types
 
-def string2vec(list_of_strings, label_encoder):
+def string2vec(list_of_strings, label_encoder: LabelEncoder):
     """
     Converts a list of strings of length N to an N x n_single_cell_types representation of 0s and 1s
 
@@ -15,7 +15,7 @@ def string2vec(list_of_strings, label_encoder):
     :return: n_mixures x n_celltypes matrix
     """
 
-    target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
+    target_classes = np.zeros((len(list_of_strings), len(label_encoder.classes_)))
     for i, list_item in enumerate(list_of_strings):
         celltypes = list_item.split(' and/or ')
         for celltype in celltypes:

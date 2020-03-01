@@ -11,7 +11,6 @@ from lir.lr import calculate_cllr
 from sklearn.metrics import accuracy_score
 from typing import List
 
-from rna.constants import nhot_matrix_all_combinations
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier, \
     MarginalRFClassifier
 from rna.plotting import plot_calibration_process, plot_insights_cllr, plot_coefficient_importances

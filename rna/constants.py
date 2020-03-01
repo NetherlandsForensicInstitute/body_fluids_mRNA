@@ -1,8 +1,6 @@
 import numpy as np
 
-single_cell_types = \
-    ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
-     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
+
 
 # TODO: Remove last 4 marker names?
 marker_names = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',
@@ -25,7 +23,7 @@ def make_nhot_matrix_of_combinations(N):
 
     return np.array([int_to_binary(i) for i in range(2**N)])
 
-nhot_matrix_all_combinations = make_nhot_matrix_of_combinations(len(single_cell_types))
+# nhot_matrix_all_combinations = make_nhot_matrix_of_combinations(len(single_cell_types))
 
 celltype_specific_markers = dict()
 celltype_specific_markers['Blood'] = ['HBB', 'ALAS2', 'CD93']

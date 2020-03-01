@@ -5,7 +5,6 @@ sklearn
 tqdm
 xlrd
 xgboost
-keras
-tensorflow
 lir
 seaborn
+pytest

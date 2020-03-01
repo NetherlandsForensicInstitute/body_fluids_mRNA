@@ -25,7 +25,6 @@ Options:
                                 An example: if test_size=0.2 and calibration_size=0.0, than the train_size=0.8. If calibration=0.5, than the actual
                                 calibration_size=0.4 (and not 0.5!) and the actual train_size=0.4.
     calibration_on_loglrs       If provided, fit calibration model on 10loglrs, otherwise on the probabilities.
-    from_penile                 If provided, always add penile skin in the mixtures created when augmenting data.
     models [model, bool]        Models is a list of lists [str, bool]. The model used for the analysis: 'MLR', 'MLP', 'XGB', 'DL'.
                                 If boolean is True then perform with calibration otherwise no calibration.
                                 An example: [['MLP', True], ['MLR', False], ['XGB', True], ['DL', True]] --> four models that are trained
@@ -53,12 +52,11 @@ params = {
 
 'calibration_on_loglrs':True,
 
-'from_penile':False, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
 'models_list':[
     ['MLR', True],
     # ['MLR', False],
-    ['XGB', True],
+    # ['XGB', True],
     # ['DL', True],
     ['MLP', True],
     ['RF', True]
@@ -67,10 +65,17 @@ params = {
 
 # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
 # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
-'priors_list':[
-    [10, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1],
-]
+'priors_dict':{
+    'Blood': [0.5, 0.1],
+    'Saliva': [0.5, 0.1],
+    'Vaginal.mucosa': [0.5, 0.5],
+    'Menstrual.secretion': [0.5, 0.5],
+    'Semen.fertile': [0.5, 0.1],
+    'Semen.sterile': [0.5, 0.1],
+    'Nasal.mucosa': [0.5, 0.1],
+    'Skin': [0.5, 0.1],
+    'Skin.penile': [0, 0],
+}
 }
 
 
@@ -96,9 +101,10 @@ if __name__ == '__main__':
               savepath=save_path, **params)
 
 
-    # save_path = 'final_model'
-    # os.makedirs(save_path, exist_ok=True)
-    # get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(constants.single_cell_types)), retrain=True, n_samples_per_combination=10,
-    #                             binarize=True, from_penile=False, prior=[10]+[1]*7, model_name=
-    #                       constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
+    save_path = 'final_model'
+    os.makedirs(save_path, exist_ok=True)
+    get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(params['priors_dict'].keys())),
+                                retrain=True, n_samples_per_combination=10, single_cell_types=list(params['priors_dict'].keys()),
+                                binarize=True, prior=[.9]+[.5]*7+[0], model_name=
+                          constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
 
