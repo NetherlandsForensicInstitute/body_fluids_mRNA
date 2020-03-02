@@ -120,7 +120,6 @@ def augment_data( X, y, n_celltypes, n_features, n_samples, label_encoder, prior
         X_augmented = np.zeros((n_samples, n_features))
         y_nhot_augmented = np.zeros((n_samples, n_celltypes), dtype=int)
 
-        begin = 0
         for i in range(n_samples):
             rand = np.random.rand(n_celltypes, 1)
 
@@ -131,9 +130,8 @@ def augment_data( X, y, n_celltypes, n_features, n_samples, label_encoder, prior
                     classes_in_current_mixture.append(i_celltype)
                     y_nhot_augmented[i, i_celltype] = 1
 
-            X_augmented = np.append(X_augmented,
-                                    construct_random_samples(X, y, 1, classes_in_current_mixture, n_features,
-                                                             binarize=binarize), axis=0)
+            X_augmented[i,:]=construct_random_samples(X, y, 1, classes_in_current_mixture, n_features,
+                                                             binarize=binarize)
         if not binarize:
             X_augmented = X_augmented / 1000
 
@@ -171,7 +169,7 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
     # use uniform priors for test data
     if not X_test is None:
         X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
-                                                               nsamples[2], label_encoder, [1] * n_celltypes,
+                                                               nsamples[2], label_encoder, prior,
                                                                binarize=binarize)
         X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
             X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)

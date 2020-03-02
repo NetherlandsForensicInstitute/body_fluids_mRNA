@@ -289,7 +289,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
     lrs_after_calib_mixt = OrderedDict()
 
     for key, data in augmented_data.items():
-        method_name_prior = method_name + '_' + key
+        method_name_prior = method_name + '_' + str(key)
 
         X_train_augmented = data.X_train_augmented
         y_train_nhot_augmented = data.y_train_nhot_augmented
@@ -403,7 +403,7 @@ def append_lrs_for_all_folds(lrs_for_model, type):
             priors = list(data.lrs_after_calib.keys())
 
             for prior in priors:
-                prior_method = method + '_' + prior
+                prior_method = method + '_' + str(prior)
 
                 if prior_method in lrs_after_for_all_methods:
                     if type == 'test augm':

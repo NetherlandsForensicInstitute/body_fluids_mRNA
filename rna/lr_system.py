@@ -26,6 +26,9 @@ class MarginalClassifier():
             # np.max ensures that the nhot matrix is converted into a nhot list with the
             # lrs from the relevant target classes coded as a 1.
             labels = np.max(np.multiply(y_nhot, target_class), axis=1)
+            if np.sum(labels)==0:
+                # nothing to train on
+                return
             if calibration_on_loglrs:
                 loglrs = np.log10(lrs_per_target_class[:, i]).reshape(-1, 1)
                 # loglrs = np.nan_to_num(np.log10(lrs_per_target_class[:, i]).reshape(-1, 1), nan=-self.MAX_LR-1, posinf=self.MAX_LR, neginf=-self.MAX_LR)
@@ -35,7 +38,7 @@ class MarginalClassifier():
                 self._calibrators_per_target_class[str(target_class)] = calibrator.fit(probs.reshape(-1, 1), labels)
 
 
-    def predict_lrs(self, X, target_classes, priors_numerator=None, priors_denominator=None, with_calibration=True,
+    def predict_lrs(self, X, target_classes, with_calibration=True,
                     calibration_on_loglrs=True):
         """
         gives back an N x n_target_class array of LRs
@@ -43,27 +46,16 @@ class MarginalClassifier():
         :param X: the N x n_features data
         :param target_classes: vector of length n_single_cell_types with at least one 1
         :param with_calibration:
-        :param priors_numerator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-        does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-        distribution
-        :param priors_denominator: vector of length n_single_cell_types, specifying 0 indicates we know this single cell type
-        does not occur, specify 1 indicates we know this cell type certainly occurs, anything else assume implicit uniform
-        distribution
         :return:
         """
-        assert priors_numerator is None or type(priors_numerator) == list or type(priors_numerator) == np.ndarray
-        assert priors_denominator is None or type(priors_denominator) == list or type(priors_denominator) == np.ndarray
-
         lrs_per_target_class = None
         try:
             ypred_proba = self._classifier.predict_proba(X)
-            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
-                                                                      priors_numerator, priors_denominator)
+            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
         except AttributeError:
             ypred_proba = self._classifier.predict(X)
 
-            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
-                                                                      priors_numerator, priors_denominator)
+            lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR)
 
 
         if with_calibration:
@@ -76,7 +68,7 @@ class MarginalClassifier():
                     else:
                         probs_for_target_class = np.nan_to_num(lrs_per_target_class[:, i] / (1 + lrs_per_target_class[:, i]), nan=-self.MAX_LR-1, posinf=self.MAX_LR, neginf=-self.MAX_LR)
                         lrs_per_target_class[:, i] = calibrator.transform(probs_for_target_class.reshape(-1, 1))
-            except AttributeError:
+            except KeyError:
                 lrs_per_target_class = lrs_per_target_class
 
         return np.nan_to_num(lrs_per_target_class, nan=10**(-self.MAX_LR-1), posinf=10**self.MAX_LR, neginf=10**(-self.MAX_LR))
@@ -345,7 +337,7 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR):
         else:  # sigmoid
             if len(target_classes) > 1:
                 prob_target_class = prob[:, i].flatten()
-                prob_target_class = np.reshape(prob_target_class, -1, 1)
+                # prob_target_class = np.reshape(prob_target_class, (-1, 1))
                 lrs[:, i] = prob_target_class / (1 - prob_target_class)
             else:
                 # When only one target class some classifiers predict the positive and negative label (i.e. output two probs)

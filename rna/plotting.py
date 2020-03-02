@@ -33,7 +33,7 @@ rc('text', usetex=True)
 
 def plot_calibration_process(lrs, y_nhot, calibrators, true_lrs, target_classes, label_encoder, calibration_on_loglrs,
                              savefig=None, show=None):
-
+    plt.rc('text', usetex=False)
     for t, target_class in enumerate(target_classes):
         lr = lrs[:, t]
         calibrator = calibrators[str(target_class)]
@@ -51,7 +51,7 @@ def plot_calibration_process(lrs, y_nhot, calibrators, true_lrs, target_classes,
 
         if savefig is not None:
             plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
+            plt.savefig(savefig + '_' + target_class_save+'.png')
         if show or savefig is None:
             plt.tight_layout()
             plt.show()
@@ -303,7 +303,7 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
 
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
                                                label_encoder, show=None, savefig=None):
-
+    #TODO make this work for >2 priors
     methods_no_prior = []
     for method in lrs_for_all_methods.keys():
         methods_no_prior.append(method.split('[')[0])
@@ -331,24 +331,20 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 y_nhot[method] = data[1]
                 full_name.append(method)
 
-                priors.append('[' + method.split('[')[2])
+                priors.append('(' + method.split('(')[1])
                 methods.append(method.split("'")[1])
             assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
             # fig, axes = plt.subplots(nrows=len(priors)//2, ncols=1, figsize=(16, 10))
-            fig = plt.plot(figsize=(5,20    ))
-            target_class = np.reshape(target_class, -1, 1)
+            plt.rc('text', usetex=False)
+            # fig = plt.plot(figsize=(5,20    ))
             labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
-            # colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-            # colors_positive = ['orange'] * int(np.sum(labels))
-            # colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
 
-            # h1 = mpatches.Patch(color='orange', label='h1')
-            # h2 = mpatches.Patch(color='blue', label='h2')
             loglrs1_list =[]
             loglrs2_list =[]
             methods_list =[]
+            priors_list=[]
             labels_list =[]
             for i_method in range(len(priors)//2):
                 # make sure uniform priors always on bottom
@@ -366,6 +362,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
 
                 loglrs1_list+=list(loglrs1)
                 loglrs2_list+=list(loglrs2)
+                priors_list+=priors
 
                 methods_list+= [methods[i_method*2]] * len(labels)
                 labels_list+=list(labels.squeeze())
@@ -422,7 +419,7 @@ def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, 
     return ax
 
 
-def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, prior_to_plot=None, savefig=None, show=None, ylim=[0,1]):
+def plot_boxplot_of_metric(binarize, softmax, models, n_metric, label_encoder, name_metric, i_prior_to_plot:int =None, savefig=None, show=None, ylim=[0, 1]):
     def int2string_models(int, specify_which=None):
         if specify_which == None:
             raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
@@ -439,6 +436,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
                 if int == i:
                     return models[i][0] if models[i][1] else models[i][0]+' uncal'
         elif specify_which == 4:
+            return '__'
             for i in range(len(priors)):
                 if int == i:
                     return prior2string(str(priors[i]), label_encoder)
@@ -446,8 +444,8 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 
 
-    if not prior_to_plot:
-        prior_to_plot=priors[0]
+    if not i_prior_to_plot:
+        i_prior_to_plot=0
 
     n_per_fold = n_metric.shape[0]
     i_transformations = n_metric.shape[1]
@@ -466,7 +464,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         for j in range(j_probscalulations):
             for k in range(k_models):
                 for p in range(p_priors):
-                    if p in prior_to_plot:
+                    if p == i_prior_to_plot:
                         trans_list+=[int2string_models(i, 1)]*n_per_fold
                         probs_list+=[int2string_models(j, 2)]*n_per_fold
                         models_list+=[int2string_models(k, 3)]*n_per_fold
@@ -474,8 +472,8 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
                         metric_list+=list(n_metric[:, i, j, k, p].squeeze())
 
 
-    df = pd.DataFrame({'multi-label strategy': probs_list, 'binarization': trans_list, 'prior': priors_list, 'model': models_list, name_metric: metric_list})
-    sns.set(font_scale=1.5, rc={'text.usetex': True})
+    df = pd.DataFrame({'multi-label strategy': probs_list, 'binarization': trans_list, 'model': models_list, name_metric: metric_list})
+    sns.set(font_scale=1.5, rc={'text.usetex': False})
     sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
                hue='model', col='binarization',
                kind='box', legend=True, legend_out =True, ci=None)
@@ -493,7 +491,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
 
 
 
-def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
+def plot_progress_of_metric(binarize, softmax, models, n_metric, label_encoder, name_metric, savefig=None, show=None):
 
     def int2string_models(int, specify_which=None):
         if specify_which == None:
@@ -511,6 +509,7 @@ def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_e
                 if int == i:
                     return models[i][0]
         elif specify_which == 4:
+            return ''
             for i in range(len(priors)):
                 if int == i:
                     return prior2string(str(priors[i]), label_encoder)

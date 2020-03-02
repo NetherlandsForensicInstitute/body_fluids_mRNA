@@ -95,10 +95,10 @@ def prior2string(prior, label_encoder):
     :param label_encoder:
     :return: str
     """
-
+    return prior
     # convert string into list of integers
-    prior = prior.strip('][').split(', ')
-    prior = [int(prior[i]) for i in range(len(prior))]
+    prior = prior.strip(')(').split(', ')
+    prior = [float(prior[i]) for i in range(len(prior))]
 
     if len(np.unique(prior)) == 1:
         return 'Uniform'
@@ -150,3 +150,13 @@ class LrsBeforeAfterCalib():
         self.lrs_before_calib_mixt = lrs_before_calib_mixt
         self.lrs_after_calib_mixt = lrs_after_calib_mixt
         self.y_mixtures_nhot = y_mixtures_nhot
+
+
+def priors_dict_to_list(label_encoder, n_celltypes, priors_dict):
+    priors_list = [-1] * n_celltypes
+    for cell_type, priors in priors_dict.items():
+        priors_list[label_encoder.transform([cell_type])[0]] = priors
+    priors_list = np.array(priors_list).T.tolist()
+    priors_list = [tuple(p) for p in priors_list]
+    baseline_prior = priors_list[0]
+    return baseline_prior, priors_list
