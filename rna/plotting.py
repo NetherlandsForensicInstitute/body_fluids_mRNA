@@ -24,11 +24,12 @@ from rna.constants import celltype_specific_markers
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 from rna.lr_system import get_mixture_columns_for_class
 
-from lir import PavLogLR, plot
+from lir import plot, Xn_to_Xy
+from lir.plotting import plot_log_lr_distributions
 from lir.calibration import IsotonicCalibrator
 
 
-rc('text', usetex=True)
+rc('text', usetex=False)
 
 
 def plot_calibration_process(lrs, y_nhot, calibrators, true_lrs, target_classes, label_encoder, calibration_on_loglrs,
@@ -217,7 +218,7 @@ def plot_histograms_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_method
         if savefig is not None:
             matplotlib.rcParams['text.usetex'] = False
             plt.tight_layout()
-            plt.savefig(savefig + '_' + method)
+            plt.savefig(savefig + '_' + method+'.png')
             plt.close()
         if show or savefig is None:
             plt.tight_layout()
@@ -234,9 +235,9 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
     if n_target_classes > 1:
         n_rows = math.ceil(n_target_classes / 2)
         if title == 'after':
-            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(6, int(4 / 4 * n_target_classes)), sharex=True, sharey=False)
         else:
-            fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=True)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(6, int(4 / 4 * n_target_classes)), sharex=True, sharey=True)
         # plt.suptitle('Histograms {} calibration'.format(title))
 
         j = 0
@@ -246,59 +247,72 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
 
         celltype = vec2string(target_class, label_encoder)
 
-        try:
-            loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
-            loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
+        loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
+        loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
+        # loglrs_, y = Xn_to_Xy(loglrs1, loglrs2)
+        # plot_log_lr_distributions(loglrs_, y, savefig = f'lrs_hist_{target_class}.png')
+        # plot_log_lr_distributions(loglrs_, y, kind='tippett', savefig = f'lrs_tippet_{target_class}.png')
+        if n_target_classes == 1:
+            plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            plt.title(celltype)
+            plt.xlabel("10logLR")
+            if density:
+                plt.ylabel("Density")
+            else:
+                plt.ylabel("Frequency")
+            plt.legend(loc='upper right')
 
-            if n_target_classes == 1:
-                plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                plt.title(celltype)
-                plt.xlabel("10logLR")
-                if density:
-                    plt.ylabel("Density")
+        elif n_rows == 1:
+            axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
+            axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
+            axs[t].set_title(celltype)
+
+            handles, labels = axs[0].get_legend_handles_labels()
+
+            fig.text(0.5, 0.002, "10logLR", ha='center')
+            if density:
+                fig.text(0.002, 0.5, "Density", va='center', rotation='vertical')
+            else:
+                fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
+
+            fig.legend(handles, labels, 'center right')
+
+        elif n_rows > 1:
+                # axs[j, k].hist(loglrs1, color='orange', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h1")
+                # axs[j, k].hist(loglrs2, color='blue', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h2")
+                axs[j, k].axvline(0, color='k', linestyle='--')
+
+                n = np.arange(1, len(loglrs2) + 1) / np.float(len(loglrs2))
+                print(len(loglrs2))
+                Xs = np.sort(loglrs2.squeeze())[::-1]
+                axs[j, k].step(Xs, n, color='blue', label='h2', alpha=.5)
+
+                n = np.arange(1, len(loglrs1) + 1) / np.float(len(loglrs1))
+                Xs = np.sort(loglrs1.squeeze())[::-1]
+                axs[j, k].step(Xs, n, color='orange', label='h1', alpha=.5)
+
+
+
+
+                axs[j, k].set_title(celltype.lower().replace('.', ' '))
+
+                if (t % 2) == 0:
+                    k = 1
                 else:
-                    plt.ylabel("Frequency")
-                plt.legend(loc='upper right')
+                    k = 0
+                    j = j + 1
 
-            elif n_rows == 1:
-                axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                axs[t].set_title(celltype)
+                handles, labels = axs[0, 0].get_legend_handles_labels()
 
-                handles, labels = axs[0].get_legend_handles_labels()
-
-                fig.text(0.5, 0.002, "10logLR", ha='center')
+                fig.text(0.5, 0.002, "10log(LR)", ha='center')
                 if density:
-                    fig.text(0.002, 0.5, "Density", va='center', rotation='vertical')
+                    fig.text(0.002, 0.5, "Cumulative density", va='center', rotation='vertical')
                 else:
                     fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
 
                 fig.legend(handles, labels, 'center right')
 
-            elif n_rows > 1:
-                    axs[j, k].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
-                    axs[j, k].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
-                    axs[j, k].set_title(celltype)
-
-                    if (t % 2) == 0:
-                        k = 1
-                    else:
-                        k = 0
-                        j = j + 1
-
-                    handles, labels = axs[0, 0].get_legend_handles_labels()
-
-                    fig.text(0.5, 0.002, "10logLR", ha='center')
-                    if density:
-                        fig.text(0.002, 0.5, "Density", va='center', rotation='vertical')
-                    else:
-                        fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
-
-                    fig.legend(handles, labels, 'center right')
-
-        except ValueError:
-            pass
 
 
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
@@ -466,7 +480,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         for j in range(j_probscalulations):
             for k in range(k_models):
                 for p in range(p_priors):
-                    if p in prior_to_plot:
+                    if priors[p] == prior_to_plot:
                         trans_list+=[int2string_models(i, 1)]*n_per_fold
                         probs_list+=[int2string_models(j, 2)]*n_per_fold
                         models_list+=[int2string_models(k, 3)]*n_per_fold
@@ -475,7 +489,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
 
 
     df = pd.DataFrame({'multi-label strategy': probs_list, 'binarization': trans_list, 'prior': priors_list, 'model': models_list, name_metric: metric_list})
-    sns.set(font_scale=1.5, rc={'text.usetex': True})
+    sns.set(font_scale=1.5, rc={'text.usetex': False})
     sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
                hue='model', col='binarization',
                kind='box', legend=True, legend_out =True, ci=None)
@@ -618,7 +632,7 @@ def plot_pav(loglr, labels, title, ax, show_scatter=True):
     ax=ax
 
     try:
-        pav = PavLogLR()
+        pav = IsotonicCalibrator()
         pav_loglrs = pav.fit_transform(loglr, labels)
         xrange = [-10, 10]
 

@@ -25,7 +25,7 @@ from rna.constants import single_cell_types, marker_names
 from rna.input_output import get_data_per_cell_type, read_mixture_data
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
-    plot_progress_of_metric, plot_coefficient_importances
+    plot_progress_of_metric, plot_coefficient_importances, plot_histograms_all_lrs_all_folds
 from rna.lr_system import MarginalClassifier
 
 
@@ -349,9 +349,9 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         # # plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
         #           # savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
         #
-        # plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
-        #                                   label_encoder,
-        #                                   savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+                                          label_encoder,
+                                          savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
 
         if len(priors_list) == 2:
             plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,

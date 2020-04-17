@@ -2,7 +2,6 @@ from functools import partial
 
 import numpy as np
 # import tensorflow as tf
-from ceml.sklearn import RandomForest
 # from keras import Input, Model
 # from keras.layers import Dense, Dropout
 from lir import LogitCalibrator, ELUBbounder
@@ -10,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
-from xgboost import XGBClassifier
+# from xgboost import XGBClassifier
 
 from rna.constants import single_cell_types
 

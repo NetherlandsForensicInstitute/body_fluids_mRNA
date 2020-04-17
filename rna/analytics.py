@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 # import keras
 import numpy as np
-from lir.lr import calculate_cllr
+from lir.metrics import calculate_lr_statistics
 from sklearn.metrics import accuracy_score
 from typing import List
 
@@ -381,7 +381,7 @@ def cllr(lrs, y_nhot, target_class):
     lrs2 = lrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)].flatten()
 
     if len(lrs1) > 0 and len(lrs2) > 0:
-        return calculate_cllr(lrs2, lrs1).cllr
+        return calculate_lr_statistics(lrs2, lrs1).cllr
     else:
         # no ground truth labels for the celltype, so cannot calculate the cllr.
         return 9999.0000
@@ -404,7 +404,7 @@ def append_lrs_for_all_folds(lrs_for_model, type):
             priors = list(data.lrs_after_calib.keys())
 
             for prior in priors:
-                prior_method = method + '_' + prior
+                prior_method = f'{method}_{prior}'
 
                 if prior_method in lrs_after_for_all_methods:
                     if type == 'test augm':

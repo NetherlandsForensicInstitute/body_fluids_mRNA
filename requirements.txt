@@ -5,7 +5,5 @@ sklearn
 tqdm
 xlrd
 xgboost
-keras
-tensorflow
-lir
+lir>=0.0.4
 seaborn

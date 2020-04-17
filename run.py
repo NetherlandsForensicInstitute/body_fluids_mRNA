@@ -39,11 +39,11 @@ Options:
 """
 
 params = {
-'binarize_list':[False, True],
+'binarize_list':[True],
 
 'remove_structural':True,
 
-'softmax_list':[True, False],
+'softmax_list':[True],
 
 'nsamples':(10, 10, 5),
 
@@ -58,17 +58,17 @@ params = {
 'models_list':[
     ['MLR', True],
     # ['MLR', False],
-    ['XGB', True],
+    # ['XGB', True],
     # ['DL', True],
-    ['MLP', True],
-    ['RF', True]
+    # ['MLP', True],
+    # ['RF', True]
     ],
 
 
 # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
 # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
 'priors_list':[
-    [10, 1, 1, 1, 1, 1, 1, 1],
+    # [10, 1, 1, 1, 1, 1, 1, 1],
     [1, 1, 1, 1, 1, 1, 1, 1],
 ]
 }
@@ -83,14 +83,15 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore") # to ignore RuntimeError: divide by zero.
     nfolds=10
 
-    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path = os.path.join('scratch','all_logreg_more_blood_seeded')
+    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva', 'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
+     'Semen.fertile and/or Semen.sterile', 'Skin']
+    save_path = os.path.join('scratch','all_cell_types')
 
-    shutil.rmtree(save_path,ignore_errors=True)
-    os.makedirs(save_path)
-    os.makedirs(os.path.join(save_path, 'plots'))
-    os.makedirs(os.path.join(save_path, 'picklesaves'))
-    nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
+    # shutil.rmtree(save_path,ignore_errors=True)
+    # os.makedirs(save_path)
+    # os.makedirs(os.path.join(save_path, 'plots'))
+    # os.makedirs(os.path.join(save_path, 'picklesaves'))
+    # nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
 
     makeplots(nfolds=nfolds, tc=target_classes_str, path=os.path.join(save_path, 'picklesaves'),
               savepath=save_path, **params)
