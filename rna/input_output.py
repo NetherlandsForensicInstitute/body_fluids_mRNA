@@ -1,7 +1,7 @@
 """
 Reads and manipulates datasets.
 """
-
+import csv
 import os
 
 import numpy as np
@@ -127,12 +127,14 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     X_single = np.array(X_single)
 
+    markers = list(df.columns)
     if remove_structural:
         X_single = remove_markers(X_single)
         n_features = n_features-4
+        markers = markers[:-4]
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
-           label_encoder, list(df.columns), list(df.index)
+           label_encoder, markers, list(df.index)
 
 
 def read_mixture_data(n_celltypes, label_encoder, binarize=True, remove_structural=True):
@@ -232,8 +234,11 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
         candidate_samples = data_for_this_celltype[idxs, :]
 
         if discard:
-            # TODO is make this at least one okay?
-            if np.sum(candidate_samples[:, -1]) < 1 or np.sum(candidate_samples[:, -2]) < 1 \
+            # after consultation: keep if at least 50% of housekeeping markers
+            # are detected
+            if np.sum(candidate_samples[:, -1]) + \
+                    np.sum(candidate_samples[:, -2]) < \
+                    candidate_samples.shape[0]/2 \
                     and 'Blank' not in celltype:
                 n_full_samples -= 1
                 n_discarded += 1
@@ -245,3 +250,20 @@ def get_data_for_celltype(celltype, data_for_this_celltype, indices_per_replicat
     return n_full_samples, X_for_this_celltype
 
 
+def save_data_table(X_single, celltypes, present_markers,
+                    save_path):
+    with open(save_path, 'w+') as f:
+        writer = csv.writer(f, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(['type'] + present_markers)
+        for i, cell_type in enumerate(set(celltypes)):
+            samples = X_single[np.array(celltypes)==cell_type]
+            if len(samples)>0:
+                if len(samples[0].shape)==1:
+                    total = np.sum(samples>0,  axis=0)
+                else:
+                    total = np.sum(np.array([np.sum(x>0, axis=0) for x in samples]),
+                axis=0)
+                number = np.sum([len(x) for x in samples])
+                writer.writerow([f'{cell_type.replace(".", " ")} ('
+                                 f'{np.sum(np.array(celltypes)==cell_type)})'] +
+                                [f'{t:.3f}' for t in total/number])

@@ -22,7 +22,8 @@ from rna.analytics import combine_samples, calculate_accuracy_all_target_classes
     calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
 from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
 from rna.constants import single_cell_types, marker_names
-from rna.input_output import get_data_per_cell_type, read_mixture_data
+from rna.input_output import get_data_per_cell_type, read_mixture_data, \
+    save_data_table
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
     plot_progress_of_metric, plot_coefficient_importances, plot_histograms_all_lrs_all_folds
@@ -37,14 +38,30 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
         get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=True)
+    
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
+    X_all, y_all, _, _, _, \
+    label_encoder_all, present_markers, _ = \
+        get_data_per_cell_type(single_cell_types= ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
+     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin', 'Skin.penile'),
+                               remove_structural=True)
+
+    save_data_table(X_all, [vec2string(y, label_encoder_all) for
+                               y in y_all],
+                    present_markers, os.path.join(save_path, 'single cell '
+                                                             'data.csv'))
     if retrain:
         model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
         X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
 
         X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, remove_structural=remove_structural)
+
+        save_data_table(X_mixtures, [vec2string(y, label_encoder).replace(' and/or ', '+') for y in
+                                     y_nhot_mixtures],
+                        present_markers, os.path.join(save_path, 'mixture '
+                                                             'data.csv'))
 
         augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
                                                             y_nhot_mixtures, n_celltypes, n_features,
