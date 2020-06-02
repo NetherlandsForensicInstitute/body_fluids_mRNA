@@ -18,10 +18,11 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from typing import List, Tuple
 
+from rna import constants
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
 from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
-from rna.constants import single_cell_types, marker_names
+from rna.constants import single_cell_types, marker_names, DEBUG
 from rna.input_output import get_data_per_cell_type, read_mixture_data, \
     save_data_table
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
@@ -30,7 +31,11 @@ from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplo
 from rna.lr_system import MarginalClassifier
 
 
-def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize=True, from_penile=False, prior=(1,1,1,1,1,1,1,1), model_name='best_MLR', remove_structural=True, save_path=None):
+def get_final_trained_mlr_model(tc, single_cell_types, retrain,
+                                n_samples_per_combination,
+                                binarize=True, from_penile=False,
+                                prior=(1,1,1,1,1,1,1,1), model_name='best_MLR',
+                                remove_structural=True, save_path=None):
     """
     computes or loads the MLR based on all data
     """
@@ -38,18 +43,12 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
         get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=True)
-    
+
     y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
     target_classes = string2vec(tc, label_encoder)
 
-    X_all, y_all, _, _, _, \
-    label_encoder_all, present_markers, _ = \
-        get_data_per_cell_type(single_cell_types= ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
-     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin', 'Skin.penile'),
-                               remove_structural=True)
-
-    save_data_table(X_all, [vec2string(y, label_encoder_all) for
-                               y in y_all],
+    save_data_table(X_single, [vec2string(y, label_encoder) for
+                               y in y_nhot_single],
                     present_markers, os.path.join(save_path, 'single cell '
                                                              'data.csv'))
     if retrain:
@@ -58,11 +57,12 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
 
         X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, remove_structural=remove_structural)
 
-        save_data_table(X_mixtures, [vec2string(y, label_encoder).replace(' and/or ', '+') for y in
+        save_data_table(
+            X_mixtures,
+            [vec2string(y, label_encoder).replace(' and/or ', '+') for y in
                                      y_nhot_mixtures],
-                        present_markers, os.path.join(save_path, 'mixture '
-                                                             'data.csv'))
-
+            present_markers,
+            os.path.join(save_path, 'mixture data.csv'))
         augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
                                                             y_nhot_mixtures, n_celltypes, n_features,
                                                             label_encoder, prior, [binarize],
@@ -74,15 +74,26 @@ def get_final_trained_mlr_model(tc, retrain, n_samples_per_combination, binarize
 
         model.fit_classifier(augmented_data.X_train_augmented, y_train)
         model.fit_calibration(augmented_data.X_calib_augmented, augmented_data.y_calib_nhot_augmented, target_classes)
-        pickle.dump(model, open('{}'.format(model_name), 'wb'))
+        pickle.dump(model, open('{}'.format(os.path.join(save_path,
+                                                         model_name)), 'wb'))
     else:
-        model = pickle.load(open('{}'.format(model_name), 'rb'))
+        model = pickle.load(open('{}'.format(os.path.join(save_path,
+                                                         model_name)), 'rb'))
 
-
-    compare_to_multiclass(model, np.array([[1,1,1,0,0,0,1,1,1,1,1,1,0,0,0], [0]*4+[1,1]+[0]*9, [0]*3+[1, 1,1, 1]+[0]*8]), remove_structural=remove_structural, tc=tc, save_path=save_path)
+    compare_to_multiclass(X_single, y_single, target_classes, tc, model,
+                          np.array([
+                              # (blood) and menstrual and vaginal
+                              [1,1,1,0,0,0,1,1,1,1,1,1,0,0,0],
+                              # nasal and saliva
+                              [0]*3+[1, 1,1, 1]+[0]*8,
+                              # blood, nasal, vaginal
+                              [1]*3 + [0] + [1] * 5 + [0] * 6
+                          ]), save_path=save_path)
 
     # plot the coefficients
-    plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
+    plot_coefficient_importances(
+        model, target_classes, present_markers, label_encoder,
+        savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
 
 
     t = np.argwhere(np.array(tc)=='Vaginal.mucosa and/or Menstrual.secretion').squeeze()
@@ -263,40 +274,55 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
             pickle.dump(coeffs[target_class_str], open(os.path.join(savepath, 'picklesaves/coeffs_{}_{}'.format(target_class_save, n)), 'wb'))
 
 
-def compare_to_multiclass(model: MarginalClassifier, samples, tc, remove_structural=True, binarize=True, save_path=None):
+def compare_to_multiclass(X_single, y_single, target_classes, tc,
+                          model: MarginalClassifier, samples,
+                          binarize=True, save_path=None):
     """
-    trains a multiclass model and compares its output to the given multilabel model, on a certain sample
+    trains a multiclass model and compares its output to the given
+    multilabel model, on list of samples
     """
-
-    mle = MultiLabelEncoder(len(single_cell_types))
-
-    # ======= Load data =======
-    X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
-        get_data_per_cell_type(single_cell_types=single_cell_types, remove_structural=remove_structural)
-    y_single = mle.transform_single(mle.nhot_to_labels(y_nhot_single))
-    target_classes = string2vec(tc, label_encoder)
-
     X = binarize_and_combine_samples(X_single, binarize)
 
     multi_class_model = LogisticRegression()
     multi_class_model.fit(X, y_single)
     for sample in samples:
-        sample=sample.reshape(1, -1)
-        multi_pred = multi_class_model.predict_proba(sample)[0]
-        prob_vag_menst = multi_pred[1]+multi_pred[7]
-        multi_log_lrs = np.log10(np.append(multi_pred/(1-multi_pred), prob_vag_menst/(1-prob_vag_menst)))
+        sample= np.array(sample).reshape(1, -1)
+        multi_pred_single = multi_class_model.predict_proba(sample)[0]
+        multi_pred_tc = []
+        for target_class in target_classes:
+            prob_any = np.sum(multi_pred_single[target_class == 1])
+            prob_max_not = np.max(multi_pred_single[target_class == 0])
+            multi_pred_tc.append(prob_any/prob_max_not)
+        multi_pred_tc=np.array(multi_pred_tc)
+        multi_log_lrs = np.log10(multi_pred_tc)
+        # alternatively, we do not do the max trick but divide by 1-p. This
+        # give indistinguishable results:
+        # multi_log_lrs = np.log10(multi_pred_tc/(1-multi_pred_tc))
+
         # take single cell target classes
         log_lrs = np.log10(model.predict_lrs(sample, target_classes))
         plt.figure()
-        df=pd.DataFrame({'multiclass log(LR)': multi_log_lrs, 'multi-label log(LR)': log_lrs[0]})
-        p =  sns.scatterplot(data=df, x='multiclass log(LR)', y= 'multi-label log(LR)')
+        df = pd.DataFrame({'multiclass log(LR)': multi_log_lrs,
+                           'multi-label log(LR)': log_lrs[0]})
+        p = sns.scatterplot(data=df, x='multiclass log(LR)',
+                            y='multi-label log(LR)')
 
         # add annotations one by one with a loop
         for line in range(0, df.shape[0]):
-            p.text(multi_log_lrs[line] + 0.2, log_lrs[0][line], tc[line], horizontalalignment='left', size='medium', color='black',
-                    weight='semibold')
+            p.text(multi_log_lrs[line], log_lrs[0][line],
+                   constants.single_cell_types_short[line],
+                   horizontalalignment='left',
+                   size='small', color='black')
 
+        # make square plot
+        ys = plt.ylim()
+        xs = plt.xlim()
+        maxs = [min(ys[0], xs[0]), max(ys[1], xs[1])]
+        plt.ylim(maxs)
+        plt.xlim(maxs)
+        plt.tight_layout()
         plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample)))
+        plt.close()
 
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
@@ -333,7 +359,6 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
             target_class_save = target_class_str.replace(" ", "_")
             target_class_save = target_class_save.replace(".", "_")
             target_class_save = target_class_save.replace("/", "_")
-
             accuracies_train[target_class_str][n, :, :, :, :] = pickle.load(
                 open(os.path.join(path, 'accuracies_train_{}_{}'.format(target_class_save, n)), 'rb'))
             accuracies_test[target_class_str][n, :, :, :, :] = pickle.load(
@@ -354,7 +379,7 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
             coeffs[target_class_str][n, :, :, :, :] = pickle.load(
                 open(os.path.join(path,'coeffs_{}_{}'.format(target_class_save, n)), 'rb'))
 
-    types_data = ['test augm', 'mixt']  # 'mixt' and/or 'test augm as mixt'
+    types_data = ['test augm', 'mixt']
 
     for type_data in types_data:
         lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods = append_lrs_for_all_folds(
@@ -369,37 +394,39 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
                                           label_encoder,
                                           savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
-
-        if len(priors_list) == 2:
-            plot_scatterplots_all_lrs_different_priors(lrs_after_for_all_methods, y_nhot_for_all_methods,
-                                                       target_classes, label_encoder,
-                                                       savefig=os.path.join(savepath,
-                                                                            'LRs_for_different_priors_{}'.format(
-                                                                                type_data)))
+    lrs_before_for_all_methods, lrs_after_for_all_methods, \
+    y_nhot_for_all_methods = append_lrs_for_all_folds(
+        lrs_for_model_per_fold, type='test augm')
+    if len(priors_list) > 1:
+        plot_scatterplots_all_lrs_different_priors(
+            lrs_after_for_all_methods, y_nhot_for_all_methods,
+            target_classes, label_encoder,
+            savefig=os.path.join(savepath, 'LRs_for_different_priors_{'
+                                           '}'.format(type_data)))
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
-        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
-                                savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
 
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, "accuracy",
-                               savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
-                                savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
         plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "$C_{llr}$",
                                savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, '$C_{llr}$',
-                                savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
         plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "$C_{llr}$",
                                savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "$C_{llr}$",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
-
-        plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
+        if DEBUG:
+            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
+                                   savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
+            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, "accuracy",
+                                   savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
+            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "$C_{llr}$",
+                                   savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
+            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
+                                    savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
+            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
+                                    savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
+            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, '$C_{llr}$',
+                                    savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+            plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
                                savefig=os.path.join(savepath, 'boxplot_coefficients_{}'.format(target_class_save)), ylim=[-3,3])
 

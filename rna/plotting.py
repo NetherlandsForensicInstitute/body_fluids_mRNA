@@ -20,14 +20,13 @@ from scipy.interpolate import interp1d
 import seaborn as sns
 
 # from rna.analytics import combine_samples
-from rna.constants import celltype_specific_markers
+from rna.constants import celltype_specific_markers, DEBUG
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 from rna.lr_system import get_mixture_columns_for_class
 
 from lir import plot, Xn_to_Xy
 from lir.plotting import plot_log_lr_distributions
 from lir.calibration import IsotonicCalibrator
-
 
 rc('text', usetex=False)
 
@@ -235,9 +234,11 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
     if n_target_classes > 1:
         n_rows = math.ceil(n_target_classes / 2)
         if title == 'after':
-            fig, axs = plt.subplots(n_rows, 2, figsize=(6, int(4 / 4 * n_target_classes)), sharex=True, sharey=False)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(12, int(2 *
+                                                               n_target_classes)), sharex=True, sharey=False)
         else:
-            fig, axs = plt.subplots(n_rows, 2, figsize=(6, int(4 / 4 * n_target_classes)), sharex=True, sharey=True)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(24, int(2 *
+                                                               n_target_classes)), sharex=True, sharey=True)
         # plt.suptitle('Histograms {} calibration'.format(title))
 
         j = 0
@@ -249,6 +250,7 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
 
         loglrs1 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 1), t]
         loglrs2 = loglrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0), t]
+        # at some point, lir should support this (with an axis handle):
         # loglrs_, y = Xn_to_Xy(loglrs1, loglrs2)
         # plot_log_lr_distributions(loglrs_, y, savefig = f'lrs_hist_{target_class}.png')
         # plot_log_lr_distributions(loglrs_, y, kind='tippett', savefig = f'lrs_tippet_{target_class}.png')
@@ -279,6 +281,7 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
             fig.legend(handles, labels, 'center right')
 
         elif n_rows > 1:
+                # plotting Tippett here
                 # axs[j, k].hist(loglrs1, color='orange', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h1")
                 # axs[j, k].hist(loglrs2, color='blue', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h2")
                 axs[j, k].axvline(0, color='k', linestyle='--')
@@ -314,44 +317,49 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
                 fig.legend(handles, labels, 'center right')
 
 
-
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
                                                label_encoder, show=None, savefig=None):
 
     methods_no_prior = []
-    for method in lrs_for_all_methods.keys():
-        methods_no_prior.append(method.split('[')[0])
+    for full_method_name in lrs_for_all_methods.keys():
+        methods_no_prior.append(full_method_name.split("'")[1])
     methods_no_prior = np.unique(methods_no_prior).tolist()
 
     test_dict = OrderedDict()
-    for method in methods_no_prior:
+    for full_method_name in methods_no_prior:
         for names in lrs_for_all_methods.keys():
-            if method in names:
-                if method in test_dict:
-                    test_dict[method].update({names: (lrs_for_all_methods[names], y_nhot_for_all_methods[names])})
+            if full_method_name in names:
+                if full_method_name in test_dict:
+                    test_dict[full_method_name].update(
+                        {names: (lrs_for_all_methods[names],
+                                 y_nhot_for_all_methods[names])})
                 else:
-                    test_dict[method] = {names: (lrs_for_all_methods[names], y_nhot_for_all_methods[names])}
+                    test_dict[full_method_name] = \
+                        {names: (lrs_for_all_methods[names],
+                                 y_nhot_for_all_methods[names])}
 
-    for keys, values in test_dict.items():
-        for t, target_class in enumerate(target_classes):
-
+    loglrs1_list =[]
+    loglrs2_list =[]
+    methods_list =[]
+    labels_list = []
+    priors_list = []
+    for t, target_class in enumerate(target_classes):
+        for method, values in test_dict.items():
             loglrs = OrderedDict()
             y_nhot = OrderedDict()
             full_name = []
             priors = []
-            methods=[]
-            for method, data in values.items():
-                loglrs[method] = np.log10(data[0][:, t])
-                y_nhot[method] = data[1]
-                full_name.append(method)
+            for full_method_name, data in values.items():
+                loglrs[full_method_name] = np.log10(data[0][:, t])
+                y_nhot[full_method_name] = data[1]
+                full_name.append(full_method_name)
 
-                priors.append('[' + method.split('[')[2])
-                methods.append(method.split("'")[1])
+                priors.append('[' + full_method_name.split('[')[2])
             assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
             # fig, axes = plt.subplots(nrows=len(priors)//2, ncols=1, figsize=(16, 10))
             fig = plt.plot(figsize=(5,20    ))
-            target_class = np.reshape(target_class, -1, 1)
+            # target_class = np.reshape(target_class, (-1, 1))
             labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
             # colors = ['orange' if l == 1.0 else 'blue' for l in labels]
@@ -360,56 +368,63 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
 
             # h1 = mpatches.Patch(color='orange', label='h1')
             # h2 = mpatches.Patch(color='blue', label='h2')
-            loglrs1_list =[]
-            loglrs2_list =[]
-            methods_list =[]
-            labels_list =[]
-            for i_method in range(len(priors)//2):
-                # make sure uniform priors always on bottom
+            for i_prior in range(len(priors)-1):
+                # convoluted way of saving the uniform prior results many
+                # times, to easily plot later
                 if any(str([1] * len(target_class)) in x for x in priors):
                     index1 = priors.index(str([1] * len(target_class)))
-                    index2 = 1-index1+i_method*2
-                    index1+=i_method*2
-                    loglrs1 = loglrs[full_name[index1]]
-                    loglrs2 = loglrs[full_name[1 - index1]]
-                else:
-                    index1 = i_method*2
-                    index2 = 1+i_method*2
+                    index2 = i_prior
+                    if index2>index1:
+                        index2+=1
+                    if index2 == index1:
+                        continue
                     loglrs1 = loglrs[full_name[index1]]
                     loglrs2 = loglrs[full_name[index2]]
+                else:
+                    raise ValueError('should have baseline uniform prior to '
+                                     'plot')
 
-                loglrs1_list+=list(loglrs1)
-                loglrs2_list+=list(loglrs2)
+                loglrs1_list += list(loglrs1)
+                loglrs2_list += list(loglrs2)
 
-                methods_list+= [methods[i_method*2]] * len(labels)
-                labels_list+=list(labels.squeeze())
+                methods_list += [method] * len(labels)
+                labels_list += list(labels.squeeze())
+                priors_list += [prior2string(priors[index2], label_encoder)] \
+                               * len(labels)
 
-            df = pd.DataFrame({'label': labels_list, 'method': methods_list,
-                               'log(LR) {}'.format(prior2string(priors[index1], label_encoder)): loglrs1_list,
-                               'log(LR) {}'.format(prior2string(priors[index2], label_encoder)): loglrs2_list,
-                               })
-            sns.set(font_scale=1.5, rc={'text.usetex': False})
+        df = pd.DataFrame({'label': labels_list, 'method': methods_list,
+                           'prior': priors_list,
+                           'log(LR) uniform': loglrs1_list,
+                           'log(LR) adjusted baseline': loglrs2_list,
+                           })
+        sns.set(font_scale=1.5, rc={'text.usetex': False})
 
-            grid = sns.relplot(data=df, x='log(LR) {}'.format(prior2string(priors[index1], label_encoder)),
-                            y = 'log(LR) {}'.format(prior2string(priors[index2], label_encoder)),
-                           kind='scatter', col='method', hue = 'label', style='label', legend=False)
-            grid.map(sns.lineplot, y=[-15,15], x=[-15,15])
+        grid = sns.relplot(data=df, x='log(LR) uniform', y='log(LR) adjusted baseline',
+                       kind='scatter', col='prior', row='method', hue='label',
+                       style='label', legend=False,
+                       facet_kws={'margin_titles': True})
 
-            plt.xlim(-5,5)
-            plt.ylim(-5,5)
+        grid.map(sns.lineplot, y=[-15, 15], x=[-15, 15])
+        # [plt.setp(ax.texts, text="") for ax in
+        #  p.axes.flat]  # remove the original texts
 
-            target_class_str = vec2string(target_class, label_encoder)
-            target_class_save = target_class_str.replace(" ", "_")
-            target_class_save = target_class_save.replace(".", "_")
-            target_class_save = target_class_save.replace("/", "_")
-            if savefig is not None:
-                # plt.tight_layout()
-                plt.savefig(savefig + '_' + keys + '_' + target_class_save)
-                plt.close()
-            if show or savefig is None:
-                plt.tight_layout()
-                plt.show()
+        plt.setp(grid.fig.texts, text="")
 
+        grid.set_titles(row_template='{row_name}', col_template='{col_name}')
+        plt.xlim(-5, 10)
+        plt.ylim(-5, 10)
+
+        target_class_str = vec2string(target_class, label_encoder)
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
+        if savefig is not None:
+            # plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save)
+            plt.close()
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
 
 
 def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, handles, ax=None):
@@ -954,32 +969,30 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
     return fpr_method, tpr_method
 
 
-
-
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
 
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
+        if DEBUG or len(celltype)>1:
+            intercept, coefficients = model.get_coefficients(t, target_class)
+            if not intercept:
+                return
+            plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
 
-        intercept, coefficients = model.get_coefficients(t, target_class)
-        if not intercept:
-            return
-        plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
 
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
 
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
+            if savefig is not None:
+                plt.tight_layout()
+                plt.savefig(savefig + '_' + target_class_save)
+            if show or savefig is None:
+                plt.tight_layout()
+                plt.show()
 
-        if savefig is not None:
-            plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
-        if show or savefig is None:
-            plt.tight_layout()
-            plt.show()
-
-        plt.close()
+            plt.close()
 
 
 def plot_coefficient_importance(intercept, coefficients, present_markers, celltypes):
@@ -1019,13 +1032,16 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         barlist[marker_index].set_color('navy')
         barlist[marker_index].set_hatch("/")
     try:
-        barlist[marker_indices[0]].set_label('cell type specific')
+        barlist[marker_indices[0]].set_label('body fluid specific')
     except IndexError:
         pass
     plt.yticks(x, present_markers)
-
-    plt.title('Max, base 10log LR = {:.1f}, {:.1f}'.format(max_base, intercept))
-    plt.xlabel('10log Coefficient value')
+    if DEBUG:
+        plt.title('Max, base 10log LR = {:.1f}, {:.1f}'.format(max_base, intercept))
+    plt.xlabel('Coefficient')
+    if not DEBUG:
+        # to get same axes on penile/no penile
+        plt.xlim([-1, 3])
     plt.ylabel('Marker names')
 
     plt.legend(loc='lower right')
@@ -1382,3 +1398,48 @@ def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds)
 #     """
 #     plt.matshow(combine_samples(X))
 #     plt.savefig('single_cell_type_measurements_after_QC')
+
+
+def plot_sankey_data():
+    """
+    no actual analysis, just visualising precomputed numbers
+    :return:
+    """
+    import plotly.graph_objects as go
+
+    node_colors = [[0,0,0],
+                   [255, 100, 60], [50, 50, 255], [100, 100, 100],
+                   [255, 50, 20], [255,120,80], [50, 50, 255]]
+
+    targets=[1, 2, 3, 4, 5, 6, 6, 4, 5]
+    values = [13, 18, 21, 6, 7, 18, 11, 8, 2]
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(
+            # pad = 15,
+            # thickness = 20,
+            # line = dict(color = "black", width = 2),
+            label=["traces",
+                   "indication", "no indication", "no reliable statement possible",
+                   "moderate", 'moderately strong', 'LR<1'],
+            color=[f'rgba({col[0]}, '
+                   f'{col[1]}, '
+                   f'{col[2]}, 1)'
+                   for col in node_colors]
+        ),
+        link=dict(
+            source=[0, 0, 0, 1, 1, 2, 3, 3, 3],
+            target=targets,
+            value=values,
+            color=[f'rgba({node_colors[target][0]}, '
+                   f'{node_colors[target][1]}, '
+                   f'{node_colors[target][2]}, .2)'
+                   for target in targets],
+            label=values
+        ))])
+
+    # fig.update_layout(
+    #     font=dict(size = 10, color = 'white'),
+    #     plot_bgcolor='black',
+    #     paper_bgcolor='black'
+    # )
+    fig.show(width=100)

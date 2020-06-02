@@ -15,7 +15,8 @@ def string2vec(list_of_strings, label_encoder):
     :return: n_mixures x n_celltypes matrix
     """
 
-    target_classes = np.zeros((len(list_of_strings), len(single_cell_types)))
+    target_classes = np.zeros((len(list_of_strings),
+                               len(label_encoder.classes_)))
     for i, list_item in enumerate(list_of_strings):
         celltypes = list_item.split(' and/or ')
         for celltype in celltypes:

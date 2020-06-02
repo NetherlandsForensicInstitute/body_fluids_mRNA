@@ -5,5 +5,5 @@ sklearn
 tqdm
 xlrd
 xgboost
-lir>=0.0.4
+lir>=0.0.3
 seaborn

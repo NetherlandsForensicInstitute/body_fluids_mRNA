@@ -6,7 +6,8 @@ import os
 import rna.constants as constants
 import numpy as np
 
-from rna.analysis import nfold_analysis, makeplots, get_final_trained_mlr_model
+from rna.analysis import makeplots, get_final_trained_mlr_model, nfold_analysis
+from rna.plotting import plot_sankey_data
 
 """
 Settings
@@ -39,67 +40,122 @@ Options:
 """
 
 params = {
-'binarize_list':[True],
+    'binarize_list': [True, False],
+    'remove_structural': True,
+    'softmax_list': [True, False],
 
-'remove_structural':True,
+    'nsamples': (10, 10, 5),
 
-'softmax_list':[True],
+    'test_size': 0.2,
 
-'nsamples':(10, 10, 5),
+    'calibration_size': 0.5,
 
-'test_size':0.2,
+    'calibration_on_loglrs': True,
 
-'calibration_size':0.5,
+    'from_penile': False,
+    # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
-'calibration_on_loglrs':True,
-
-'from_penile':False, # !only checked for 'MLR' and softmax=False whether from_penile=True works!
-
-'models_list':[
-    ['MLR', True],
-    # ['MLR', False],
-    # ['XGB', True],
-    # ['DL', True],
-    # ['MLP', True],
-    # ['RF', True]
+    'models_list': [
+        ['MLR', True],
+        # ['MLR', False],
+        # ['XGB', True],
+        # ['DL', True],
+        ['MLP', True],
+        ['RF', True],
+        ['SVM', True]
     ],
 
-
-# NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
-# it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
-'priors_list':[
-    # [10, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1],
-]
+    # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
+    # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
+    'priors_list': [
+        [1, 1, 1, 1, 1, 1, 1, 1],
+    ]
 }
-
-
-
 
 if __name__ == '__main__':
     random.seed(42)
     np.random.seed(42)
 
-    warnings.filterwarnings("ignore") # to ignore RuntimeError: divide by zero.
-    nfolds=10
+    warnings.filterwarnings(
+        "ignore")  # to ignore RuntimeError: divide by zero.
+    nfolds = 10
 
-    target_classes_str = ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva', 'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
-     'Semen.fertile and/or Semen.sterile', 'Skin']
-    save_path = os.path.join('scratch','all_cell_types')
+    scenarios = []
 
-    # shutil.rmtree(save_path,ignore_errors=True)
-    # os.makedirs(save_path)
-    # os.makedirs(os.path.join(save_path, 'plots'))
-    # os.makedirs(os.path.join(save_path, 'picklesaves'))
-    # nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
+    # fig 2, 3
+    target_classes_vm = \
+        ['Vaginal.mucosa and/or Menstrual.secretion']
+    save_path_vm = os.path.join('scratch', 'vm_all_clf')
+    updates = {}
+    scenarios.append((target_classes_vm, save_path_vm, updates))
 
-    makeplots(nfolds=nfolds, tc=target_classes_str, path=os.path.join(save_path, 'picklesaves'),
-              savepath=save_path, **params)
+    # fig 4
+    target_classes_priors = \
+        ['Vaginal.mucosa and/or Menstrual.secretion']
+    save_path_priors = os.path.join('scratch', 'vm_priors_all_clf')
+    param_update_priors = {'priors_list': [[10, 1, 1, 1, 1, 1, 1, 1],
+                                           [1, 1, 10, 1, 1, 1, 1, 1],
+                                           [1, 1, 1, 1, 1, 1, 10, 1],
+                                           [1, 1, 1, 1, 1, 1, 1, 1], ],
+                           'binarize_list': [True],
+                           'softmax_list': [False],
+                           }
+    scenarios.append((target_classes_priors, save_path_priors,
+                      param_update_priors))
 
+    # fig 5
+    target_classes_all = \
+        ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva',
+         'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
+         'Semen.fertile and/or Semen.sterile', 'Skin']
+    save_path_all = os.path.join('scratch', 'all_cell_types_mlr')
+    param_update_all = {'models_list': [['MLR', True], ],
+                        'priors_list': [[1, 1, 1, 1, 1, 1, 1, 1], ],
+                        'binarize_list': [True],
+                        'softmax_list': [False],
+                        }
+    scenarios.append((target_classes_all, save_path_all,
+                      param_update_all))
 
-    # save_path = 'final_model'
-    # os.makedirs(save_path, exist_ok=True)
-    # get_final_trained_mlr_model(tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(constants.single_cell_types)), retrain=True, n_samples_per_combination=10,
-    #                             binarize=True, from_penile=False, prior=[10]+[1]*7, model_name=
-    #                       constants.model_names['Vaginal mucosa and/or Menstrual secretion no Skin Penile'], save_path=save_path)
+    for target_classes_str, save_path, updates in scenarios:
+        params.update(updates)
 
+        shutil.rmtree(save_path, ignore_errors=True)
+        os.makedirs(save_path)
+        os.makedirs(os.path.join(save_path, 'plots'))
+        os.makedirs(os.path.join(save_path, 'picklesaves'))
+        nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
+
+        makeplots(nfolds=nfolds, tc=target_classes_str,
+                  path=os.path.join(save_path, 'picklesaves'),
+                  savepath=save_path, **params)
+
+    # fig 6a, fig 7
+    save_path = os.path.join('final_model', 'no_penile')
+    os.makedirs(save_path, exist_ok=True)
+    get_final_trained_mlr_model(
+        tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(
+            constants.single_cell_types)),
+        single_cell_types=constants.single_cell_types,
+        retrain=True,
+        n_samples_per_combination=10,
+        binarize=True, from_penile=False, prior=[1] + [1] * 7,
+        model_name='vagmenstr_no_penile', save_path=save_path)
+
+    # fig 6b, table 1
+    save_path = os.path.join('final_model', 'with_penile')
+    os.makedirs(save_path, exist_ok=True)
+    sct = ['Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
+           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin',
+           'Skin.penile']
+    get_final_trained_mlr_model(
+        tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] +
+                  list(constants.single_cell_types)),
+        single_cell_types=sct,
+        retrain=True,
+        n_samples_per_combination=10,
+        binarize=True, from_penile=True, prior=[1] + [1] * 8,
+        model_name='vagmenstr_with_penile', save_path=save_path)
+
+    # fig 8?
+    plot_sankey_data()

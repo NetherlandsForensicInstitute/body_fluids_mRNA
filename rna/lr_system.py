@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 # from xgboost import XGBClassifier
 
 from rna.constants import single_cell_types
@@ -85,7 +86,6 @@ class MarginalClassifier():
 
 
 class MarginalMLPClassifier(MarginalClassifier):
-
     def __init__(self, calibrator=LogitCalibrator, activation='relu',
                  random_state=0, max_iter=500, MAX_LR=10):
         self._classifier = MLPClassifier(activation=activation, random_state=random_state, max_iter=max_iter)
@@ -101,7 +101,6 @@ class MarginalMLPClassifier(MarginalClassifier):
 
 
 class MarginalRFClassifier(MarginalClassifier):
-
     def __init__(self, calibrator=LogitCalibrator, multi_label='ovr', MAX_LR=10):
         if multi_label=='ovr':
             self._classifier = OneVsRestClassifier(RandomForestClassifier(class_weight='balanced', max_depth=3))
@@ -115,6 +114,22 @@ class MarginalRFClassifier(MarginalClassifier):
         # if self._classifier.activation == 'logistic':
         #     if y.shape[1] == 1:
         #         y = np.ravel(y)
+        self._classifier.fit(X, y)
+
+
+class MarginalSVMClassifier(MarginalClassifier):
+
+    def __init__(self, calibrator=LogitCalibrator, multi_label='ovr', MAX_LR=10):
+        if multi_label=='ovr':
+            self._classifier = OneVsRestClassifier(SVC(probability=True,
+                class_weight='balanced'))
+        else:
+            self._classifier = SVC(class_weight='balanced', probability=True)
+        self._calibrator = calibrator
+        self._calibrators_per_target_class = {}
+        self.MAX_LR = MAX_LR
+
+    def fit_classifier(self, X, y):
         self._classifier.fit(X, y)
 
 
@@ -354,7 +369,7 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
         else:  # sigmoid
             if len(target_classes) > 1:
                 prob_target_class = prob[:, i].flatten()
-                prob_target_class = np.reshape(prob_target_class, -1, 1)
+                # prob_target_class = np.reshape(prob_target_class, (-1, 1))
                 lrs[:, i] = prob_target_class / (1 - prob_target_class)
             else:
                 # When only one target class some classifiers predict the positive and negative label (i.e. output two probs)

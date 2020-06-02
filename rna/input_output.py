@@ -259,11 +259,13 @@ def save_data_table(X_single, celltypes, present_markers,
             samples = X_single[np.array(celltypes)==cell_type]
             if len(samples)>0:
                 if len(samples[0].shape)==1:
+                    # mixture dataset, replicates are already combined
                     total = np.sum(samples>0,  axis=0)
+                    number = len(samples)
                 else:
                     total = np.sum(np.array([np.sum(x>0, axis=0) for x in samples]),
                 axis=0)
-                number = np.sum([len(x) for x in samples])
+                    number = np.sum([len(x) for x in samples])
                 writer.writerow([f'{cell_type.replace(".", " ")} ('
                                  f'{np.sum(np.array(celltypes)==cell_type)})'] +
                                 [f'{t:.3f}' for t in total/number])

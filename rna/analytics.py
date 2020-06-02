@@ -11,11 +11,11 @@ from lir.metrics import calculate_lr_statistics
 from sklearn.metrics import accuracy_score
 from typing import List
 
-from rna.constants import nhot_matrix_all_combinations
-from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, MarginalXGBClassifier, MarginalDLClassifier, \
-    MarginalRFClassifier
+from rna.constants import nhot_matrix_all_combinations, DEBUG
+from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, \
+    MarginalXGBClassifier, MarginalDLClassifier, \
+    MarginalRFClassifier, MarginalSVMClassifier
 from rna.plotting import plot_calibration_process, plot_insights_cllr, plot_coefficient_importances
-
 
 
 def combine_samples(data_for_class: List):
@@ -117,6 +117,12 @@ def clf_with_correct_settings(clf_no_settings, softmax: bool, n_classes: int, wi
         else:
             classifier = MarginalMLPClassifier(activation='logistic')
 
+    elif clf_no_settings == 'SVM':
+        if softmax:
+            classifier = MarginalSVMClassifier()
+        else:
+            classifier = MarginalSVMClassifier(multi_label='ovr')
+
     elif clf_no_settings == 'MLR':
         if softmax:
             classifier = MarginalMLRClassifier(multi_class='multinomial', solver='newton-cg')
@@ -178,7 +184,7 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
                          X_test_augmented, X_test_as_mixtures_augmented, X_mixtures, target_classes, model, mle,
                          softmax, calibration_on_loglrs, do_calibration=with_calibration)
 
-        if output_folder:
+        if output_folder and DEBUG:
             # calibration data
             plot_calibration_process(model.predict_lrs(X_calib_augmented, target_classes, with_calibration=False),
                                      y_calib_nhot_augmented, model._calibrators_per_target_class, None, target_classes,
@@ -245,13 +251,15 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
     # Plot the values of the coefficients to see if MLR uses the correct features (markers).
     if output_folder:
         try:
-            if classifier == 'MLR':
-                plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
-                                             savefig=os.path.join(output_folder, 'plots',
-                                                                  'coefficient_importance_{}'.format(
-                                                                      method_name_prior)))
+            if DEBUG:
+                if classifier == 'MLR':
+                    plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
+                                                 savefig=os.path.join(output_folder, 'plots',
+                                                                      'coefficient_importance_{}'.format(
+                                                                          method_name_prior)))
 
-            plot_insights_cllr(lrs_after_calib, y_test_nhot_augmented, target_classes, label_encoder,
+                plot_insights_cllr(lrs_after_calib,
+                                        y_test_nhot_augmented, target_classes, label_encoder,
                                savefig=os.path.join(output_folder, 'plots',
                                                     'insights_cllr_calculation_{}'.format(method_name_prior)))
         except:
