@@ -7,3 +7,4 @@ xlrd
 xgboost
 lir>=0.0.3
 seaborn
+plotly

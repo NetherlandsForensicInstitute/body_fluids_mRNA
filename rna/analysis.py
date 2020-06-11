@@ -401,32 +401,32 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
         plot_scatterplots_all_lrs_different_priors(
             lrs_after_for_all_methods, y_nhot_for_all_methods,
             target_classes, label_encoder,
-            savefig=os.path.join(savepath, 'LRs_for_different_priors_{'
-                                           '}'.format(type_data)))
-    for t, target_class in enumerate(target_classes):
-        target_class_str = vec2string(target_class, label_encoder)
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
+            savefig=os.path.join(savepath, 'LRs_for_different_priors_{}'.format(type_data)))
+    if nfolds > 1:
+        for t, target_class in enumerate(target_classes):
+            target_class_str = vec2string(target_class, label_encoder)
+            target_class_save = target_class_str.replace(" ", "_")
+            target_class_save = target_class_save.replace(".", "_")
+            target_class_save = target_class_save.replace("/", "_")
 
 
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "$C_{llr}$",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
-        plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "$C_{llr}$",
-                               savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
-        if DEBUG:
-            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
-                                   savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
-            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, "accuracy",
-                                   savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
-            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "$C_{llr}$",
-                                   savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
-            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
-                                    savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
-            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
-                                    savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
-            plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, '$C_{llr}$',
-                                    savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
-            plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
-                               savefig=os.path.join(savepath, 'boxplot_coefficients_{}'.format(target_class_save)), ylim=[-3,3])
+            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, "$C_{llr}$",
+                                   savefig=os.path.join(savepath, 'boxplot_cllr_test_{}'.format(target_class_save)))
+            plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_mixtures[target_class_str], label_encoder, "$C_{llr}$",
+                                   savefig=os.path.join(savepath, 'boxplot_cllr_mixtures_{}'.format(target_class_save)))
+            if DEBUG:
+                plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
+                                       savefig=os.path.join(savepath, 'boxplot_accuracy_train_{}'.format(target_class_save)))
+                plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, "accuracy",
+                                       savefig=os.path.join(savepath, 'boxplot_accuracy_test_{}'.format(target_class_save)))
+                plot_boxplot_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test_as_mixtures[target_class_str], label_encoder, "$C_{llr}$",
+                                       savefig=os.path.join(savepath, 'boxplot_cllr_test_as_mixt_{}'.format(target_class_save)))
+                plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_train[target_class_str], label_encoder, 'accuracy',
+                                        savefig=os.path.join(savepath, 'progress_accuracy_train_{}'.format(target_class_save)))
+                plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, accuracies_test[target_class_str], label_encoder, 'accuracy',
+                                        savefig=os.path.join(savepath, 'progress_accuracy_test_{}'.format(target_class_save)))
+                plot_progress_of_metric(binarize_list, softmax_list, models_list, priors_list, cllr_test[target_class_str], label_encoder, '$C_{llr}$',
+                                        savefig=os.path.join(savepath, 'progress_cllr_test_{}'.format(target_class_save)))
+                plot_boxplot_of_metric(binarize_list, [False], [[a, True] for a in ['intercept']+marker_names], priors_list, coeffs[target_class_str], label_encoder, "log LR",
+                                   savefig=os.path.join(savepath, 'boxplot_coefficients_{}'.format(target_class_save)), ylim=[-3,3])
 

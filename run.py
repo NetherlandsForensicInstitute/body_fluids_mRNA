@@ -56,13 +56,11 @@ params = {
     # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
     'models_list': [
-        ['MLR', True],
-        # ['MLR', False],
-        # ['XGB', True],
-        # ['DL', True],
         ['MLP', True],
+        ['MLR', True],
         ['RF', True],
-        ['SVM', True]
+        ['SVM', True],
+        ['XGB', True],
     ],
 
     # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
@@ -78,21 +76,20 @@ if __name__ == '__main__':
 
     warnings.filterwarnings(
         "ignore")  # to ignore RuntimeError: divide by zero.
-    nfolds = 10
 
     scenarios = []
 
-    # fig 2, 3
+    # fig 2, 4
     target_classes_vm = \
         ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path_vm = os.path.join('scratch', 'vm_all_clf')
+    save_path_vm = os.path.join('output', 'vm_all_clf')
     updates = {}
-    scenarios.append((target_classes_vm, save_path_vm, updates))
+    scenarios.append((target_classes_vm, save_path_vm, updates, 10))
 
-    # fig 4
+    # fig 5
     target_classes_priors = \
         ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path_priors = os.path.join('scratch', 'vm_priors_all_clf')
+    save_path_priors = os.path.join('output', 'vm_priors_all_clf')
     param_update_priors = {'priors_list': [[10, 1, 1, 1, 1, 1, 1, 1],
                                            [1, 1, 10, 1, 1, 1, 1, 1],
                                            [1, 1, 1, 1, 1, 1, 10, 1],
@@ -101,24 +98,26 @@ if __name__ == '__main__':
                            'softmax_list': [False],
                            }
     scenarios.append((target_classes_priors, save_path_priors,
-                      param_update_priors))
+                      param_update_priors, 1))
 
-    # fig 5
+    # fig 3
     target_classes_all = \
         ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva',
          'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
          'Semen.fertile and/or Semen.sterile', 'Skin']
-    save_path_all = os.path.join('scratch', 'all_cell_types_mlr')
+    save_path_all = os.path.join('output', 'all_cell_types_mlr')
     param_update_all = {'models_list': [['MLR', True], ],
                         'priors_list': [[1, 1, 1, 1, 1, 1, 1, 1], ],
                         'binarize_list': [True],
                         'softmax_list': [False],
                         }
     scenarios.append((target_classes_all, save_path_all,
-                      param_update_all))
+                      param_update_all, 10))
 
-    for target_classes_str, save_path, updates in scenarios:
+    for target_classes_str, save_path, updates, nfolds in scenarios:
         params.update(updates)
+        random.seed(42)
+        np.random.seed(42)
 
         shutil.rmtree(save_path, ignore_errors=True)
         os.makedirs(save_path)
@@ -130,7 +129,10 @@ if __name__ == '__main__':
                   path=os.path.join(save_path, 'picklesaves'),
                   savepath=save_path, **params)
 
-    # fig 6a, fig 7
+    random.seed(42)
+    np.random.seed(42)
+
+    # fig 7a, fig 8
     save_path = os.path.join('final_model', 'no_penile')
     os.makedirs(save_path, exist_ok=True)
     get_final_trained_mlr_model(
@@ -142,7 +144,10 @@ if __name__ == '__main__':
         binarize=True, from_penile=False, prior=[1] + [1] * 7,
         model_name='vagmenstr_no_penile', save_path=save_path)
 
-    # fig 6b, table 1
+    random.seed(42)
+    np.random.seed(42)
+
+    # fig 7b, table 1
     save_path = os.path.join('final_model', 'with_penile')
     os.makedirs(save_path, exist_ok=True)
     sct = ['Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
@@ -157,5 +162,5 @@ if __name__ == '__main__':
         binarize=True, from_penile=True, prior=[1] + [1] * 8,
         model_name='vagmenstr_with_penile', save_path=save_path)
 
-    # fig 8?
+    # fig 6
     plot_sankey_data()

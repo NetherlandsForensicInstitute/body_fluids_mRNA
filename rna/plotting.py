@@ -24,8 +24,6 @@ from rna.constants import celltype_specific_markers, DEBUG
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
 from rna.lr_system import get_mixture_columns_for_class
 
-from lir import plot, Xn_to_Xy
-from lir.plotting import plot_log_lr_distributions
 from lir.calibration import IsotonicCalibrator
 
 rc('text', usetex=False)
@@ -358,16 +356,10 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
             assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
             # fig, axes = plt.subplots(nrows=len(priors)//2, ncols=1, figsize=(16, 10))
-            fig = plt.plot(figsize=(5,20    ))
+            fig = plt.plot(figsize=(9, 15))
             # target_class = np.reshape(target_class, (-1, 1))
             labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
-            # colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-            # colors_positive = ['orange'] * int(np.sum(labels))
-            # colors_negative = ['blue'] * int((len(labels) - np.sum(labels)))
-
-            # h1 = mpatches.Patch(color='orange', label='h1')
-            # h2 = mpatches.Patch(color='blue', label='h2')
             for i_prior in range(len(priors)-1):
                 # convoluted way of saving the uniform prior results many
                 # times, to easily plot later
@@ -393,24 +385,25 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                                * len(labels)
 
         df = pd.DataFrame({'label': labels_list, 'method': methods_list,
-                           'prior': priors_list,
+                           'baseline': priors_list,
                            'log(LR) uniform': loglrs1_list,
                            'log(LR) adjusted baseline': loglrs2_list,
                            })
         sns.set(font_scale=1.5, rc={'text.usetex': False})
 
         grid = sns.relplot(data=df, x='log(LR) uniform', y='log(LR) adjusted baseline',
-                       kind='scatter', col='prior', row='method', hue='label',
+                       kind='scatter', col='baseline', row='method', hue='label',
                        style='label', legend=False,
                        facet_kws={'margin_titles': True})
 
         grid.map(sns.lineplot, y=[-15, 15], x=[-15, 15])
-        # [plt.setp(ax.texts, text="") for ax in
-        #  p.axes.flat]  # remove the original texts
+        [plt.setp(ax.texts, text="") for ax in
+         grid.axes.flat]  # remove the original texts
 
         plt.setp(grid.fig.texts, text="")
 
         grid.set_titles(row_template='{row_name}', col_template='{col_name}')
+        grid.set_axis_labels('log(LR) uniform baseline', 'log(LR) adjusted baseline')
         plt.xlim(-5, 10)
         plt.ylim(-5, 10)
 
@@ -418,6 +411,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
+
         if savefig is not None:
             # plt.tight_layout()
             plt.savefig(savefig + '_' + target_class_save)
@@ -503,7 +497,12 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
                         metric_list+=list(n_metric[:, i, j, k, p].squeeze())
 
 
-    df = pd.DataFrame({'multi-label strategy': probs_list, 'binarization': trans_list, 'prior': priors_list, 'model': models_list, name_metric: metric_list})
+    df = pd.DataFrame({
+        'multi-label strategy': probs_list,
+        'binarization': trans_list,
+        'prior': priors_list,
+        'model': models_list,
+        name_metric: metric_list})
     sns.set(font_scale=1.5, rc={'text.usetex': False})
     sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
                hue='model', col='binarization',
@@ -511,7 +510,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
     plt.ylim(ylim)
 
     if savefig is not None:
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.savefig(savefig)
         plt.close()
     if show or savefig is None:
@@ -970,7 +969,7 @@ def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
 
 
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
-
+    plt.figure(figsize=(5, 5))
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
@@ -979,7 +978,6 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
             if not intercept:
                 return
             plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
-
 
             target_class_save = target_class_str.replace(" ", "_")
             target_class_save = target_class_save.replace(".", "_")
@@ -1409,18 +1407,18 @@ def plot_sankey_data():
 
     node_colors = [[0,0,0],
                    [255, 100, 60], [50, 50, 255], [100, 100, 100],
-                   [255, 50, 20], [255,120,80], [50, 50, 255]]
+                   [255, 80, 100], [255, 100, 90], [255,120,80], [50, 50, 255]]
 
-    targets=[1, 2, 3, 4, 5, 6, 6, 4, 5]
+    targets=[1, 2, 3, 5, 6, 7, 7, 4, 5]
     values = [13, 18, 21, 6, 7, 18, 11, 8, 2]
     fig = go.Figure(data=[go.Sankey(
         node=dict(
             # pad = 15,
             # thickness = 20,
             # line = dict(color = "black", width = 2),
-            label=["traces",
-                   "indication", "no indication", "no reliable statement possible",
-                   "moderate", 'moderately strong', 'LR<1'],
+            label=["52 traces",
+                   "indication for presence of ...", "no indication for presence of ...", "no reliable statement possible",
+                   'LR 1-10: slight support', "LR 10-100: moderate support", 'LR>100: moderately strong support', 'LR<1'],
             color=[f'rgba({col[0]}, '
                    f'{col[1]}, '
                    f'{col[2]}, 1)'

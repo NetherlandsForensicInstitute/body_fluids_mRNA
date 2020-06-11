@@ -8,4 +8,5 @@ calibrated_model
 mlpmodel
 .idea/
 scratch/
+output/
 final_model

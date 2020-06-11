@@ -90,7 +90,7 @@ def bool2str_softmax(softmax):
 def prior2string(prior, label_encoder):
     """
     Converts a string vector of integers into a string. For example if the vector is '[1 10 1 1 1 1]' this
-    will be transformed into 'Cell type 1 10x more likely'.
+    will be transformed into 'Cell type 1 more likely'.
 
     :param prior: str of vector representing the distribution
     :param label_encoder:
@@ -120,7 +120,7 @@ def prior2string(prior, label_encoder):
 
         name = label_encoder.inverse_transform([index_of_relevant_prior])[0]
 
-        return '{} {}x {} likely'.format(name, value, difference)
+        return '{} {} likely'.format(name, difference).replace('.',' ')
 
 
 class AugmentedData():

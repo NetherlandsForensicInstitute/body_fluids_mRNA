@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 # import keras
 import numpy as np
-from lir.metrics import calculate_lr_statistics
+from lir import calculate_cllr
 from sklearn.metrics import accuracy_score
 from typing import List
 
@@ -389,7 +389,7 @@ def cllr(lrs, y_nhot, target_class):
     lrs2 = lrs[np.argwhere(np.max(np.multiply(y_nhot, target_class), axis=1) == 0)].flatten()
 
     if len(lrs1) > 0 and len(lrs2) > 0:
-        return calculate_lr_statistics(lrs2, lrs1).cllr
+        return calculate_cllr(lrs2, lrs1).cllr
     else:
         # no ground truth labels for the celltype, so cannot calculate the cllr.
         return 9999.0000
