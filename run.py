@@ -44,7 +44,7 @@ params = {
     'remove_structural': True,
     'softmax_list': [True, False],
 
-    'nsamples': (10, 10, 5),
+    'nsamples': (100, 100, 50),
 
     'test_size': 0.2,
 
@@ -114,20 +114,20 @@ if __name__ == '__main__':
     scenarios.append((target_classes_all, save_path_all,
                       param_update_all, 10))
 
-    for target_classes_str, save_path, updates, nfolds in scenarios:
-        params.update(updates)
-        random.seed(42)
-        np.random.seed(42)
-
-        shutil.rmtree(save_path, ignore_errors=True)
-        os.makedirs(save_path)
-        os.makedirs(os.path.join(save_path, 'plots'))
-        os.makedirs(os.path.join(save_path, 'picklesaves'))
-        nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
-
-        makeplots(nfolds=nfolds, tc=target_classes_str,
-                  path=os.path.join(save_path, 'picklesaves'),
-                  savepath=save_path, **params)
+    # for target_classes_str, save_path, updates, nfolds in scenarios:
+    #     params.update(updates)
+    #     random.seed(42)
+    #     np.random.seed(42)
+    #
+    #     shutil.rmtree(save_path, ignore_errors=True)
+    #     os.makedirs(save_path)
+    #     os.makedirs(os.path.join(save_path, 'plots'))
+    #     os.makedirs(os.path.join(save_path, 'picklesaves'))
+    #     nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
+    #
+    #     makeplots(nfolds=nfolds, tc=target_classes_str,
+    #               path=os.path.join(save_path, 'picklesaves'),
+    #               savepath=save_path, **params)
 
     random.seed(42)
     np.random.seed(42)
@@ -135,14 +135,15 @@ if __name__ == '__main__':
     # fig 7a, fig 8
     save_path = os.path.join('final_model', 'no_penile')
     os.makedirs(save_path, exist_ok=True)
+    sct = ['Blood', 'Saliva', 'Vaginal.mucosa',
+           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin']
     get_final_trained_mlr_model(
-        tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(
-            constants.single_cell_types)),
-        single_cell_types=constants.single_cell_types,
+        tc=sorted(sct),
+        single_cell_types=sct,
         retrain=True,
         n_samples_per_combination=10,
-        binarize=True, from_penile=False, prior=[1] + [1] * 7,
-        model_name='vagmenstr_no_penile', save_path=save_path)
+        binarize=True, from_penile=False, prior=[1] + [1] * 6,
+        model_name='vag_no_penile', save_path=save_path)
 
     random.seed(42)
     np.random.seed(42)

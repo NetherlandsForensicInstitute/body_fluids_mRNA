@@ -96,7 +96,7 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
 
 
-    t = np.argwhere(np.array(tc)=='Vaginal.mucosa and/or Menstrual.secretion').squeeze()
+    t = np.argwhere(np.array(tc)=='Vaginal.mucosa').squeeze()
     intercept, coefficients = model.get_coefficients(t, target_classes[t].squeeze())
     all_coefficients = np.append(intercept, coefficients).tolist()
     all_coefficients_str = [str(coef) for coef in all_coefficients]

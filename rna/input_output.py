@@ -163,23 +163,29 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, remove_structur
     X_mixtures = []
     y_nhot_mixtures = np.zeros((0, n_celltypes))
     for mixture_celltype in list(mixture_label_encoder.classes_):
-        data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
-        rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
+        try:
+            data_for_this_celltype = np.array(df.loc[mixture_celltype], dtype=float)
+            rvset_for_this_celltype = np.array(rv.loc[mixture_celltype]).flatten()
 
-        n_full_samples, X_for_this_celltype = get_data_for_celltype(mixture_celltype, data_for_this_celltype,
-                                                                    indices_per_replicate, rvset_for_this_celltype,
-                                                                    True)
 
-        for repeated_measurements in X_for_this_celltype:
-            X_mixtures.append(repeated_measurements)
-        n_per_mixture_celltype[mixture_celltype] = n_full_samples
+            n_full_samples, X_for_this_celltype = get_data_for_celltype(mixture_celltype, data_for_this_celltype,
+                                                                        indices_per_replicate, rvset_for_this_celltype,
+                                                                        True)
 
-        celltypes = mixture_celltype.split('+')
-        y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_celltypes))
-        for celltype in celltypes:
-            y_nhot_for_this_celltype[:, label_encoder.transform([celltype])] = 1
+            celltypes = mixture_celltype.split('+')
+            y_nhot_for_this_celltype = np.zeros(((n_full_samples), n_celltypes))
+            for celltype in celltypes:
+                if celltype not in label_encoder.classes_:
+                    raise TypeError
+                y_nhot_for_this_celltype[:, label_encoder.transform([celltype])] = 1
 
-        y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
+            for repeated_measurements in X_for_this_celltype:
+                X_mixtures.append(repeated_measurements)
+            n_per_mixture_celltype[mixture_celltype] = n_full_samples
+
+            y_nhot_mixtures = np.vstack((y_nhot_mixtures, y_nhot_for_this_celltype))
+        except TypeError:
+            print('did not find {}'.format(celltype))
 
     X_mixtures = combine_samples(X_mixtures)
     if not binarize:

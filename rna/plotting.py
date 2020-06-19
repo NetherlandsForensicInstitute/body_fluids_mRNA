@@ -973,7 +973,7 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
-        if DEBUG or len(celltype)>1:
+        if len(celltype)>0:
             intercept, coefficients = model.get_coefficients(t, target_class)
             if not intercept:
                 return
