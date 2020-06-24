@@ -1014,7 +1014,7 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
     sorted_indices = np.argsort(coefficients)
     coefficients = coefficients[sorted_indices]
     present_markers = np.array(present_markers)[sorted_indices].tolist()
-    x = np.linspace(1, len(coefficients), len(coefficients))
+    x = np.linspace(1, len(coefficients)+2, len(coefficients)+2)
 
     # get the indices of the celltype specific markers
     marker_indices = []
@@ -1024,22 +1024,22 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
                 marker_indices.append(present_markers.index(marker))
     marker_indices = np.unique(marker_indices)
 
-    barlist = plt.barh(x, coefficients, color='grey', alpha=0.6, label='other')
+    barlist = plt.barh(list(x), [intercept, 0] + list(coefficients), color='grey', alpha=0.6, label='other')
     for marker_index in marker_indices:
         # highlight the markers that are celltype specific
-        barlist[marker_index].set_color('navy')
-        barlist[marker_index].set_hatch("/")
+        barlist[marker_index+2].set_color('navy')
+        barlist[marker_index+2].set_hatch("/")
     try:
-        barlist[marker_indices[0]].set_label('body fluid specific')
+        barlist[marker_indices[0]+2].set_label('body fluid specific')
     except IndexError:
         pass
-    plt.yticks(x, present_markers)
+    plt.yticks(x, ['intercept', ''] + present_markers)
     if DEBUG:
         plt.title('Max, base 10log LR = {:.1f}, {:.1f}'.format(max_base, intercept))
     plt.xlabel('Coefficient')
     if not DEBUG:
         # to get same axes on penile/no penile
-        plt.xlim([-1, 3])
+        plt.xlim([-2, 3.3])
     plt.ylabel('Marker names')
 
     plt.legend(loc='lower right')
@@ -1418,7 +1418,7 @@ def plot_sankey_data():
             # line = dict(color = "black", width = 2),
             label=["52 traces",
                    "indication for presence of ...", "no indication for presence of ...", "no reliable statement possible",
-                   'LR 1-10: slight support', "LR 10-100: moderate support", 'LR>100: moderately strong support', 'LR<1'],
+                   'LR 2-10: weak support', "LR 10-100: moderate support", 'LR>100: moderately strong support', 'LR<1'],
             color=[f'rgba({col[0]}, '
                    f'{col[1]}, '
                    f'{col[2]}, 1)'
