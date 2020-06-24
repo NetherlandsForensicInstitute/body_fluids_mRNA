@@ -255,7 +255,7 @@ def save_data_table(X_single, celltypes, present_markers,
     with open(save_path, 'w+') as f:
         writer = csv.writer(f, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(['type'] + present_markers)
-        for i, cell_type in enumerate(set(celltypes)):
+        for _, cell_type in enumerate(sorted(list(set(celltypes)))):
             samples = X_single[np.array(celltypes)==cell_type]
             if len(samples)>0:
                 if len(samples[0].shape)==1:
