@@ -232,8 +232,7 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
     if n_target_classes > 1:
         n_rows = math.ceil(n_target_classes / 2)
         if title == 'after':
-            fig, axs = plt.subplots(n_rows, 2, figsize=(12, int(2 *
-                                                               n_target_classes)), sharex=True, sharey=False)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(11, 11), sharex=True, sharey=False)
         else:
             fig, axs = plt.subplots(n_rows, 2, figsize=(24, int(2 *
                                                                n_target_classes)), sharex=True, sharey=True)
@@ -287,16 +286,20 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
                 n = np.arange(1, len(loglrs2) + 1) / np.float(len(loglrs2))
                 print(len(loglrs2))
                 Xs = np.sort(loglrs2.squeeze())[::-1]
-                axs[j, k].step(Xs, n, color='blue', label='h2', alpha=.5)
+                axs[j, k].step(Xs, n, color='blue', label='H2', alpha=.5)
 
                 n = np.arange(1, len(loglrs1) + 1) / np.float(len(loglrs1))
                 Xs = np.sort(loglrs1.squeeze())[::-1]
-                axs[j, k].step(Xs, n, color='orange', label='h1', alpha=.5)
+                axs[j, k].step(Xs, n, color='orange', label='H1', alpha=.5)
 
 
 
 
-                axs[j, k].set_title(celltype.lower().replace('.', ' '))
+                axs[j, k].set_title(celltype.lower().replace('.', ' ').
+                                    replace('menstrual secretion', 'menstr. secr.').
+                                    replace('fertile', 'fert.').
+                                    replace('sterile', 'ster.').
+                                    replace('vaginal mucosa', 'vag. muc.'))
 
                 if (t % 2) == 0:
                     k = 1
