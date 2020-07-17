@@ -1410,25 +1410,29 @@ def plot_sankey_data():
 
     node_colors = [[0,0,0],
                    [255, 100, 60], [50, 50, 255], [100, 100, 100],
-                   [255, 80, 100], [255, 100, 90], [255,120,80], [50, 50, 255]]
+                   [100,100,100],
+                   [200, 120, 100], [220, 120, 90], [255,120,80], [50, 50, 255]]
 
-    targets=[1, 2, 3, 5, 6, 7, 7, 4, 5]
-    values = [13, 18, 21, 6, 7, 18, 11, 8, 2]
-    fig = go.Figure(data=[go.Sankey(
+    sources = [0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 3]
+    targets = [1, 2, 3, 6, 7, 4, 8, 4, 5, 8, 6]
+    values = [34, 23, 29, 2, 32, 1, 22, 2, 8, 16, 3]
+    fig = go.Figure(data=[go.Sankey(arrangement='perpendicular',
         node=dict(
             # pad = 15,
             # thickness = 20,
             # line = dict(color = "black", width = 2),
-            label=["52 traces",
-                   "indication for presence of ...", "no indication for presence of ...", "no reliable statement possible",
-                   'LR 2-10: weak support', "LR 10-100: moderate support", 'LR>100: moderately strong support', 'LR<1'],
+            label=[f"{sum(values[:3])} traces",
+                   "indication for presence of ...", "no indication for presence of ...",
+                   "no reliable statement possible",
+                   'LR 0.5-2',
+                   'LR 2-10: weak support', "LR 10-100: moderate support", 'LR>100: moderately strong support', 'LR<0.5'],
             color=[f'rgba({col[0]}, '
                    f'{col[1]}, '
                    f'{col[2]}, 1)'
                    for col in node_colors]
         ),
         link=dict(
-            source=[0, 0, 0, 1, 1, 2, 3, 3, 3],
+            source=sources,
             target=targets,
             value=values,
             color=[f'rgba({node_colors[target][0]}, '
