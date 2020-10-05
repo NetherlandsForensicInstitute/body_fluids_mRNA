@@ -68,9 +68,9 @@ def bool2str_binarize(binarize):
     :return: str
     """
     if binarize == True:
-        return 'binarized'
+        return 'dichotomized'
     elif binarize == False:
-        return 'not binarized'
+        return 'not dichotomized'
 
 
 def bool2str_softmax(softmax):

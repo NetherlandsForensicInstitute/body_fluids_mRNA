@@ -502,13 +502,13 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
 
     df = pd.DataFrame({
         'multi-label strategy': probs_list,
-        'binarization': trans_list,
+        'values': trans_list,
         'prior': priors_list,
         'model': models_list,
         name_metric: metric_list})
     sns.set(font_scale=1.5, rc={'text.usetex': False})
     sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
-               hue='model', col='binarization',
+               hue='model', col='values',
                kind='box', legend=True, legend_out =True, ci=None)
     plt.ylim(ylim)
 
