@@ -1,16 +1,12 @@
 from functools import partial
 
 import numpy as np
-# import tensorflow as tf
-# from keras import Input, Model
-# from keras.layers import Dense, Dropout
 from lir import LogitCalibrator, ELUBbounder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
-# from xgboost import XGBClassifier
 from xgboost import XGBClassifier
 
 from rna.constants import single_cell_types
@@ -68,7 +64,6 @@ class MarginalClassifier():
             lrs_per_target_class = convert_prob_to_marginal_per_class(ypred_proba, target_classes, self.MAX_LR,
                                                                       priors_numerator, priors_denominator)
 
-
         if with_calibration:
             try:
                 for i, target_class in enumerate(target_classes):
@@ -83,7 +78,6 @@ class MarginalClassifier():
                 lrs_per_target_class = lrs_per_target_class
 
         return np.nan_to_num(lrs_per_target_class, nan=10**(-self.MAX_LR-1), posinf=10**self.MAX_LR, neginf=10**(-self.MAX_LR))
-
 
 
 class MarginalMLPClassifier(MarginalClassifier):
@@ -158,11 +152,9 @@ class MarginalMLRClassifier(MarginalClassifier):
         :return:
         """
         if len(self._classifier.coef_) == 2 ** 8:
-            # TODO: Is this correct for MLP with softmax?
-            # NO
             # the marginal takes the sum over many probabilities. taking the log does not yield anything nice it seems
             # (although the mean will probably correlate)
-            return None, None
+            raise NotImplementedError
             # indices_target_class = get_mixture_columns_for_class(target_class, None)
             # intercept = np.mean(model._classifier.intercept_[indices_target_class])
             # coefficients = np.mean(model._classifier.coef_[indices_target_class, :], axis=0)
@@ -211,124 +203,6 @@ class MarginalXGBClassifier(MarginalClassifier):
             #
             # plot_tree(self._classifier._first_estimator, num_trees=10)
             # plt.show()
-
-
-class MarginalDLClassifier(MarginalClassifier):
-
-    def __init__(self, n_classes, activation_layer, optimizer, loss, epochs, units=80, n_features=15,
-                 calibrator=partial(ELUBbounder, first_step_calibrator=LogitCalibrator()), MAX_LR=10):
-        self.units = units
-        self.n_classes = n_classes
-        self.n_features = n_features
-        self.activation_layer = activation_layer
-        self.optimizer = optimizer
-        self.loss = loss
-        self.epochs = epochs
-        self._classifier = self.create_model()
-        self._calibrator = calibrator
-        self._calibrators_per_target_class = {}
-        self.MAX_LR = MAX_LR
-
-    def build_model(self, units, n_classes, n_features, activation_layer):
-        """
-        Builds deep learning model
-
-        :param units: (relative) number of units
-        :param n_classes number of classes
-        :param n_features: number of features
-        :return: a keras model
-        """
-        drop = 0.05
-
-        # inout shape
-        x = Input(shape=(n_features,))
-        # flatten input shape (i.e. remove the ,1)
-        # first dense (hidden) layer
-        cnn = Dense(units // 4, activation="sigmoid")(x)
-        # dropout
-        cnn = Dropout(rate=drop)(cnn)
-        # second dense (hidden) layer
-        cnn = Dense(units, activation="sigmoid")(cnn)
-
-        # # adjusted DL:
-        # input=500
-        # drop = 0.5
-        # x = Input(shape=(n_features, ))
-        # cnn = Dense(units//4, activation="sigmoid")(x)
-        # cnn = Dropout(rate=drop)(cnn)
-        # cnn = Dense(units, activation="sigmoid")(cnn)
-        # cnn = Dense(units//2, activation="sigmoid")(cnn)
-
-        # output layer (corresponding to the number of classes)
-        y = Dense(n_classes, activation=activation_layer)(cnn)
-
-        # define inputs and outputs of the model
-        model = Model(inputs=x, outputs=y)
-
-        return model
-
-    def compile_model(self, model, optimizer, loss):
-        """
-        compile a keras model using an optimizer and a loss function
-
-        :param model: a keras model
-        :param optimizer: a string or optimizer class that is supported by keras
-        :param loss: a string or loss class that is supported by keras
-        """
-        model.compile(optimizer=optimizer, loss=loss, metrics=[self._accuracy_em])
-
-    def create_model(self):
-        """
-        Create keras/tf model based on the number of classes, features and the the number of units in the model
-
-        :param arguments: arguments as parsed by docopt (including `--units` and `--features`)
-        :param config: confidence object with specific information regarding the data
-        :param n_classes: number of classes in the output layer
-        :return: A compiled keras model
-        """
-        # build model
-        model = self.build_model(units=self.units, n_classes=self.n_classes, n_features=self.n_features,
-                                 activation_layer=self.activation_layer)
-        # compile model
-        self.compile_model(model, optimizer=self.optimizer, loss=self.loss)
-        # model.summary()
-        return model
-
-    def _accuracy_exact_match(self, y_true, y_pred, threshold: float = .5):
-        """
-        Custom keras metric that mirrors the sklearn.metrics.accuracy_score, that is only samples that have the correct
-        labels for each class are scored as 1. If not the sample is scored as 0.
-        From: https://stackoverflow.com/questions/46799261/how-to-create-an-exact-match-eval-metric-op-for-tensorflow
-        :param y_true: Tensor with the the true labels
-        :param y_pred: Tensor with the predicted labels
-        :param threshold: Threshold  used to classify a prediction as 1/0
-        :return: float that represents the accuracy
-        """
-        # check if prediction are above threshold
-        predictions = tf.to_float(tf.greater_equal(y_pred, threshold))
-        # check if predictions match ground truth
-        pred_match = tf.equal(predictions, tf.round(y_true))
-        # reduce to mean
-        exact_match = tf.reduce_min(tf.to_float(pred_match), axis=1)
-
-        return exact_match
-
-    def _accuracy_em(self, *args):
-        """
-        wrapper for _accuracy_exact_match
-        :param args: input from metric evaluation provided by keras
-        :return: float that represents the accuracy
-        """
-        return tf.reduce_mean(self._accuracy_exact_match(*args))
-
-
-    def fit_classifier(self, X, y):
-        self._classifier.fit(X, y, epochs=self.epochs, verbose=0)
-
-
-
-
-
 
 
 def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_numerator=None, priors_denominator=None):

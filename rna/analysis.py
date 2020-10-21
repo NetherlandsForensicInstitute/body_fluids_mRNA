@@ -7,9 +7,6 @@ import pickle
 import csv
 
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from collections import OrderedDict
 
@@ -18,7 +15,6 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from typing import List, Tuple
 
-from rna import constants
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
 from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
@@ -27,7 +23,7 @@ from rna.input_output import get_data_per_cell_type, read_mixture_data, \
     save_data_table
 from rna.utils import vec2string, string2vec, bool2str_binarize, bool2str_softmax, LrsBeforeAfterCalib
 from rna.plotting import plot_scatterplots_all_lrs_different_priors, plot_boxplot_of_metric, \
-    plot_progress_of_metric, plot_coefficient_importances, plot_histograms_all_lrs_all_folds
+    plot_progress_of_metric, plot_coefficient_importances, plot_property_all_lrs_all_folds, plot_multiclass_comparison
 from rna.lr_system import MarginalClassifier
 
 
@@ -109,17 +105,9 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         coefs_writer.writerow(all_coefficients_strr)
 
 
-def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool], priors_list: List[List], binarize_list: List[bool], test_size: float, calibration_size: float, remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
-    # if from_penile == True:
-    #     if True in softmax_list:
-    #         raise ValueError("The results following from these settings have not been validated and hence cannot be "
-    #                          "relied on. Make sure 'softmax' is set to False if 'from_penile' is {}".format(
-    #             from_penile))
-    #     for models_and_calib in models_list:
-    #         if 'MLP' in models_and_calib or 'XGB' in models_and_calib or 'DL' in models_and_calib:
-    #             raise ValueError("The results following from these settings have not validated and hence cannot be "
-    #                              "relied on. The model cannot be {} if 'from_penile' is {}. Either adjust the model "
-    #                              "to 'MLR' or set 'from_penile=False'.".format(models_and_calib[0], from_penile))
+def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool],
+                   priors_list: List[List], binarize_list: List[bool], test_size: float, calibration_size: float,
+                   remove_structural: bool, calibration_on_loglrs: bool, nsamples: Tuple[int, int, int]):
 
     mle = MultiLabelEncoder(len(single_cell_types))
     baseline_prior = str(priors_list[0])
@@ -276,7 +264,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
 
 def compare_to_multiclass(X_single, y_single, target_classes, tc,
                           model: MarginalClassifier, samples,
-                          binarize=True, save_path=None):
+                          binarize=True, save_path=None, alternative = None):
     """
     trains a multiclass model and compares its output to the given
     multilabel model, on list of samples
@@ -292,6 +280,10 @@ def compare_to_multiclass(X_single, y_single, target_classes, tc,
         for target_class in target_classes:
             prob_any = np.sum(multi_pred_single[target_class == 1])
             prob_max_not = np.max(multi_pred_single[target_class == 0])
+            if alternative is not None:
+                #   eg H2 = does not contain Y, contains X
+                # NB not implement for the multilabel model
+                prob_max_not = np.sum(multi_pred_single[alternative[0] == 1])
             multi_pred_tc.append(prob_any/prob_max_not)
         multi_pred_tc=np.array(multi_pred_tc)
         multi_log_lrs = np.log10(multi_pred_tc)
@@ -301,28 +293,7 @@ def compare_to_multiclass(X_single, y_single, target_classes, tc,
 
         # take single cell target classes
         log_lrs = np.log10(model.predict_lrs(sample, target_classes))
-        plt.figure()
-        df = pd.DataFrame({'multiclass log(LR)': multi_log_lrs,
-                           'multi-label log(LR)': log_lrs[0]})
-        p = sns.scatterplot(data=df, x='multiclass log(LR)',
-                            y='multi-label log(LR)')
-
-        # add annotations one by one with a loop
-        for line in range(0, df.shape[0]):
-            p.text(multi_log_lrs[line], log_lrs[0][line],
-                   constants.single_cell_types_short[line],
-                   horizontalalignment='left',
-                   size='small', color='black')
-
-        # make square plot
-        ys = plt.ylim()
-        xs = plt.xlim()
-        maxs = [min(ys[0], xs[0]), max(ys[1], xs[1])]
-        plt.ylim(maxs)
-        plt.xlim(maxs)
-        plt.tight_layout()
-        plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample)))
-        plt.close()
+        plot_multiclass_comparison(log_lrs, multi_log_lrs, sample, save_path)
 
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):
@@ -387,13 +358,13 @@ def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list
 
         # plot_pavs_all_methods(lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods,
         #                           target_classes, label_encoder, savefig=os.path.join(savepath, 'pav_{}'.format(type_data)))
-        #
-        # # plot_rocs(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder)
-        #           # savefig=os.path.join(savepath, 'roc_{}'.format(type_data)))
-        #
-        plot_histograms_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
-                                          label_encoder,
-                                          savefig=os.path.join(savepath, 'histograms_after_calib_{}'.format(type_data)))
+
+        for kind in ['roc', 'histogram']:
+            plot_property_all_lrs_all_folds(lrs_after_for_all_methods, y_nhot_for_all_methods, target_classes,
+                                        label_encoder, kind=kind,
+                                        savefig=os.path.join(savepath, f'{kind}_{type_data}'))
+
+
     lrs_before_for_all_methods, lrs_after_for_all_methods, \
     y_nhot_for_all_methods = append_lrs_for_all_folds(
         lrs_for_model_per_fold, type='test augm')

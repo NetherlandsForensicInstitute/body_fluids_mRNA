@@ -3,11 +3,11 @@ import shutil
 import warnings
 import os
 
-import rna.constants as constants
 import numpy as np
 
+from rna import constants
 from rna.analysis import makeplots, get_final_trained_mlr_model, nfold_analysis
-from rna.plotting import plot_sankey_data
+from rna.plotting import plot_sankey_data, calibration_example
 
 """
 Settings
@@ -56,15 +56,16 @@ params = {
     # !only checked for 'MLR' and softmax=False whether from_penile=True works!
 
     'models_list': [
-        ['MLP', True],
         ['MLR', True],
-        ['RF', True],
+        ['MLP', True],
         ['SVM', True],
+        ['RF', True],
         ['XGB', True],
     ],
 
-    # NB the prior is currently used to adjust the number of samples of certain type in the training data. This system just looks at relative numbers
-    # it could/should also be used to encode the 0 and 1 options, as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
+    # NB the prior is currently used to adjust the number of samples of certain type in the training data.
+    # This system just looks at relative numbers it could/should also be used to encode the 0 and 1 options,
+    # as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
     'priors_list': [
         [1, 1, 1, 1, 1, 1, 1, 1],
     ]
@@ -118,16 +119,20 @@ if __name__ == '__main__':
         params.update(updates)
         random.seed(42)
         np.random.seed(42)
+        plot_path = os.path.join(save_path, 'plots')
 
         shutil.rmtree(save_path, ignore_errors=True)
         os.makedirs(save_path)
-        os.makedirs(os.path.join(save_path, 'plots'))
+        os.makedirs(plot_path)
         os.makedirs(os.path.join(save_path, 'picklesaves'))
         nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
 
+        # shutil.rmtree(plot_path, ignore_errors=True)
+        # os.makedirs(plot_path)
+
         makeplots(nfolds=nfolds, tc=target_classes_str,
                   path=os.path.join(save_path, 'picklesaves'),
-                  savepath=save_path, **params)
+                  savepath=os.path.join(save_path, 'plots'), **params)
 
     random.seed(42)
     np.random.seed(42)
@@ -164,3 +169,6 @@ if __name__ == '__main__':
 
     # fig 6
     plot_sankey_data()
+
+    # plot example calibration
+    calibration_example('output')

@@ -41,3 +41,7 @@ celltype_specific_markers['Semen.sterile'] = ['SEMG1', 'KLK3', 'PRM1']
 celltype_specific_markers['Nasal.mucosa'] = ['STATH', 'BPIFA1']
 celltype_specific_markers['Skin'] = [None]
 DEBUG=False
+
+DPI=300
+# width of column in inches
+COLWIDTH=8.9/2.54

@@ -3,28 +3,28 @@ Plotting functions.
 """
 
 import math
+import os
+import string
+
 import matplotlib
 
 import scipy
 import numpy as np
 import pandas as pd
+from lir import Xn_to_Xy, plot, plot_score_distribution_and_calibrator_fit, Xy_to_Xn
 
 from matplotlib import rc, pyplot as plt, patches as mpatches
-# from matplotlib import colors as mcolors
-# from matplotlib.cm import get_cmap
 from collections import OrderedDict
 from sklearn.metrics import roc_curve, auc
 from itertools import cycle
 from scipy.interpolate import interp1d
-# from scipy.misc import derivative
 import seaborn as sns
 
-# from rna.analytics import combine_samples
-from rna.constants import celltype_specific_markers, DEBUG
+from rna import constants
+from rna.constants import celltype_specific_markers, DEBUG, COLWIDTH
 from rna.utils import vec2string, prior2string, bool2str_binarize, bool2str_softmax
-from rna.lr_system import get_mixture_columns_for_class
 
-from lir.calibration import IsotonicCalibrator
+from lir.calibration import IsotonicCalibrator, LogitCalibrator
 
 rc('text', usetex=False)
 
@@ -98,6 +98,18 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
     axes[0, 1].set_xlabel(xlabel)
     axes[0, 1].set_ylabel('Density')
     axes[0, 1].set_xlim(min_val, max_val)
+
+    # plt.figure(figsize=(10, 10), dpi=100)
+    # x = np.arange(-10, 10, .1)
+    # calibrator.transform(x)
+    # plt.hist(data1, bins=20, alpha=.25, density=True, label='class 0')
+    # plt.hist(data2, bins=20, alpha=.25, density=True, label='class 1')
+    # plt.plot(x, calibrator.p1, label='fit class 1')
+    # plt.plot(x, calibrator.p0, label='fit class 0')
+    # plt.savefig(f'calib_test_{celltype}')
+    # plt.close()
+    #
+    # return
 
     # 3 KDE curves
     axes[1, 0].plot(uncalibrated_lrs,  calibrated_lrs / ( 1 + calibrated_lrs), color='orange', label='p1')
@@ -205,12 +217,14 @@ def plot_calibration_process_per_target_class(lr, y_nhot, calibrator, true_lrs, 
         axes[3, 1].set_ylabel('Density')
 
 
-def plot_histograms_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
-                                      show=None, savefig=None):
+def plot_property_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_methods, target_classes, label_encoder,
+                                    kind='histogram',  # one of histogram, roc
+                                    show=None, savefig=None):
 
     for method in lrs_for_all_methods.keys():
 
-        plot_histogram_lr_all_folds(lrs_for_all_methods[method], y_nhot_for_all_methods[method], target_classes, label_encoder)
+        plot_property_lrs_all_folds(lrs_for_all_methods[method], y_nhot_for_all_methods[method], target_classes,
+                                    label_encoder, kind)
 
         if savefig is not None:
             matplotlib.rcParams['text.usetex'] = False
@@ -224,22 +238,20 @@ def plot_histograms_all_lrs_all_folds(lrs_for_all_methods, y_nhot_for_all_method
         plt.close()
 
 
-def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bins=30, title='after', density=True):
+def plot_property_lrs_all_folds(lrs, y_nhot, target_classes, label_encoder,
+                                kind, n_bins=30, title='after', density=True):
 
     loglrs = np.log10(lrs)
     n_target_classes = len(target_classes)
-
     if n_target_classes > 1:
         n_rows = math.ceil(n_target_classes / 2)
         if title == 'after':
-            fig, axs = plt.subplots(n_rows, 2, figsize=(11, 11), sharex=True, sharey=False)
+            fig, axs = plt.subplots(n_rows, 2, figsize=(COLWIDTH*2, COLWIDTH*2), sharex=True, sharey=False)
         else:
-            fig, axs = plt.subplots(n_rows, 2, figsize=(24, int(2 *
-                                                               n_target_classes)), sharex=True, sharey=True)
-        # plt.suptitle('Histograms {} calibration'.format(title))
+            fig, axs = plt.subplots(n_rows, 2, figsize=(COLWIDTH*2, COLWIDTH*2*2/3), sharex=True, sharey=True)
 
-        j = 0
-        k = 0
+    j = 0
+    k = 0
 
     for t, target_class in enumerate(target_classes):
 
@@ -252,6 +264,9 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
         # plot_log_lr_distributions(loglrs_, y, savefig = f'lrs_hist_{target_class}.png')
         # plot_log_lr_distributions(loglrs_, y, kind='tippett', savefig = f'lrs_tippet_{target_class}.png')
         if n_target_classes == 1:
+            if kind != 'histogram':
+                return
+                raise NotImplemented
             plt.hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
             plt.hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
             plt.title(celltype)
@@ -263,6 +278,9 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
             plt.legend(loc='upper right')
 
         elif n_rows == 1:
+            if kind != 'histogram':
+                return
+                raise NotImplemented
             axs[t].hist(loglrs1, color='orange', density=density, bins=n_bins, label="h1", alpha=0.5)
             axs[t].hist(loglrs2, color='blue', density=density, bins=n_bins, label="h2", alpha=0.5)
             axs[t].set_title(celltype)
@@ -275,16 +293,16 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
             else:
                 fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
 
-            fig.legend(handles, labels, 'center right')
+            fig.legend(handles, labels, 'lower right')
 
         elif n_rows > 1:
+            if kind == 'histogram':
                 # plotting Tippett here
                 # axs[j, k].hist(loglrs1, color='orange', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h1")
                 # axs[j, k].hist(loglrs2, color='blue', histtype='step', cumulative=-1, density=density, bins=n_bins, label="h2")
                 axs[j, k].axvline(0, color='k', linestyle='--')
 
                 n = np.arange(1, len(loglrs2) + 1) / np.float(len(loglrs2))
-                print(len(loglrs2))
                 Xs = np.sort(loglrs2.squeeze())[::-1]
                 axs[j, k].step(Xs, n, color='blue', label='H2', alpha=.5)
 
@@ -292,30 +310,38 @@ def plot_histogram_lr_all_folds(lrs, y_nhot, target_classes, label_encoder, n_bi
                 Xs = np.sort(loglrs1.squeeze())[::-1]
                 axs[j, k].step(Xs, n, color='orange', label='H1', alpha=.5)
 
-
-
-
-                axs[j, k].set_title(celltype.lower().replace('.', ' ').
-                                    replace('menstrual secretion', 'menstr. secr.').
-                                    replace('fertile', 'fert.').
-                                    replace('sterile', 'ster.').
-                                    replace('vaginal mucosa', 'vag. muc.'))
-
-                if (t % 2) == 0:
-                    k = 1
+                x_label="10log(LR)"
+                if density:
+                    y_label="Cumulative density"
                 else:
-                    k = 0
-                    j = j + 1
+                    y_label="Frequency"
 
                 handles, labels = axs[0, 0].get_legend_handles_labels()
-
-                fig.text(0.5, 0.002, "10log(LR)", ha='center')
-                if density:
-                    fig.text(0.002, 0.5, "Cumulative density", va='center', rotation='vertical')
-                else:
-                    fig.text(0.002, 0.5, "Frequency", va='center', rotation='vertical')
-
                 fig.legend(handles, labels, 'center right')
+
+            elif kind=='roc':
+                auc=plot_roc(*Xn_to_Xy(loglrs2, loglrs1), axs[j,k])
+                x_label = 'False positive rate'
+                y_label = 'True positive rate'
+            else:
+                raise ValueError(f'unknown plot kind {kind}')
+            title = celltype.lower().replace('.', ' ').replace('menstrual secretion', 'MS').replace(
+                'semen fertile and/or semen sterile', 'semen\n(sterile and/or fertile)').replace(
+                'vaginal mucosa', 'VM')
+            if kind=='roc' and auc:
+                title += f'\nAUC={auc:.2f}, FP={np.mean(loglrs2 > 0):.2f}, FN={np.mean(loglrs1 < 0):.2f}'
+            axs[j, k].set_title(title, fontdict={'fontsize': 12})
+
+            if (t % 2) == 0:
+                k = 1
+            else:
+                k = 0
+                j = j + 1
+
+            fig.text(0.5, 0.004, x_label, ha='center')
+            fig.text(0.002, 0.5, y_label, va='center', rotation='vertical')
+
+
 
 
 def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_all_methods, target_classes,
@@ -359,7 +385,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
             assert np.array_equal(y_nhot[full_name[0]], y_nhot[full_name[1]])
 
             # fig, axes = plt.subplots(nrows=len(priors)//2, ncols=1, figsize=(16, 10))
-            fig = plt.plot(figsize=(9, 15))
+
             # target_class = np.reshape(target_class, (-1, 1))
             labels = np.max(np.multiply(y_nhot[full_name[0]], target_class), axis=1)
 
@@ -386,7 +412,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 labels_list += list(labels.squeeze())
                 priors_list += [prior2string(priors[index2], label_encoder)] \
                                * len(labels)
-
+        fig = plt.plot(figsize=(COLWIDTH * 2, COLWIDTH * 2 * 5 / 3))
         df = pd.DataFrame({'label': labels_list, 'method': methods_list,
                            'baseline': priors_list,
                            'log(LR) uniform': loglrs1_list,
@@ -406,46 +432,29 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
         plt.setp(grid.fig.texts, text="")
 
         grid.set_titles(row_template='{row_name}', col_template='{col_name}')
-        grid.set_axis_labels('log(LR) uniform baseline', 'log(LR) adjusted baseline')
+        # grid.set_axis_labels('log(LR) - uniform background levels', 'log(LR) - adjusted background levels')
         plt.xlim(-5, 10)
+        plt.xticks([-4,-2,0,2,4,6,8])
         plt.ylim(-5, 10)
+        for i, axis in enumerate(grid.axes.flat):
+            axis.text(-.0, 1.0, string.ascii_uppercase[i], transform=axis.transAxes,
+                      size=20, weight='bold')
 
         target_class_str = vec2string(target_class, label_encoder)
         target_class_save = target_class_str.replace(" ", "_")
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
+        plt.text(0.5, 0.004, 'log(LR) - uniform background levels', ha='center')
+        plt.text(0.002, 0.5, 'log(LR) - adjusted background levels', va='center', rotation='vertical')
+
         if savefig is not None:
             # plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
+            plt.savefig(savefig + '_' + target_class_save, dpi=constants.DPI)
             plt.close()
         if show or savefig is None:
             plt.tight_layout()
             plt.show()
-
-
-def plot_scatterplot_lrs_different_priors(loglrs, diagonal_coordinates, colors, handles, ax=None):
-
-    ax = ax
-
-    rect_neg = mpatches.Rectangle((-8, -8), 8, 8, color='blue', alpha=0.1, linewidth=0)
-    rect_pos1 = mpatches.Rectangle((-8, 0), 19, 11, color='orange', alpha=0.1, linewidth=0)
-    rect_pos2 = mpatches.Rectangle((0, -8), 11, 8, color='orange', alpha=0.1, linewidth=0)
-
-    ax.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-    ax.scatter(loglrs[0], loglrs[1], s=3, color=colors, alpha=0.2)
-    ax.add_patch(rect_neg)
-    ax.add_patch(rect_pos1)
-    ax.add_patch(rect_pos2)
-    ax.set_xlim(min(diagonal_coordinates), max(diagonal_coordinates))
-    ax.set_ylim(min(diagonal_coordinates), max(diagonal_coordinates))
-
-    try:
-        ax.legend(handles=[handles[0], handles[1]], loc=0)
-    except TypeError:
-        ax.legend(handles=[handles], loc=0)
-
-    return ax
 
 
 def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, prior_to_plot=None, savefig=None, show=None, ylim=[0,1]):
@@ -481,7 +490,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
     k_models = n_metric.shape[3]
     p_priors = n_metric.shape[4]
 
-    fig = plt.figure(figsize=(14, 7))
+    fig = plt.figure(figsize=(COLWIDTH*2, COLWIDTH))
     ax = plt.subplot(111)
     trans_list = []
     probs_list = []
@@ -507,14 +516,18 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         'model': models_list,
         name_metric: metric_list})
     sns.set(font_scale=1.5, rc={'text.usetex': False})
-    sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
+    g = sns.factorplot(data=df, x='multi-label strategy', y=name_metric,
                hue='model', col='values',
                kind='box', legend=True, legend_out =True, ci=None)
     plt.ylim(ylim)
 
+    for i,axis in enumerate(g.axes.flat):
+        axis.text(-.01,1.05, string.ascii_uppercase[i], transform=axis.transAxes,
+            size=25, weight='bold')
+
     if savefig is not None:
         # plt.tight_layout()
-        plt.savefig(savefig)
+        plt.savefig(savefig, dpi=constants.DPI)
         plt.close()
     if show or savefig is None:
         plt.tight_layout()
@@ -585,7 +598,7 @@ def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_e
 
     if savefig is not None:
         plt.tight_layout()
-        plt.savefig(savefig)
+        plt.savefig(savefig, dpi=constants.DPI)
         plt.close()
     if show or savefig is None:
         plt.tight_layout()
@@ -609,6 +622,11 @@ def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, meth
         loglrs_after = np.log10(lrs_after[:, t])
         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
 
+        if not any(labels) or all(labels):
+            # cant do much with only positive or negative labels
+            continue
+
+
         if np.array_equal(loglrs_before, loglrs_after):
             fig, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(8, 7))
             plot_pav(loglrs_before, labels, 'Before calibration', axs1)
@@ -629,15 +647,11 @@ def plot_pavs(lrs_before, lrs_after, y_nhot, target_classes, label_encoder, meth
         if method_name is not None:
             target_class_save =  method_name + '_' + target_class_save
 
-        if savefig is not None:
-            plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
-            plt.close()
-        if show or savefig is None:
-            plt.tight_layout()
-            plt.show()
+        plot(lrs_after[:, t], labels, show_scatter=True, on_screen=False,
+             path=savefig + '_' + target_class_save+'_after')
 
-        plt.close(fig)
+        plot(lrs_before[:, t], labels, show_scatter=True, on_screen=False,
+             path=savefig + '_' + target_class_save+'_before')
 
 
 def plot_pav(loglr, labels, title, ax, show_scatter=True):
@@ -836,33 +850,11 @@ def plot_insight_cllr(lrs, labels, savefig=None, show=None):
 
     if savefig is not None:
         plt.tight_layout()
-        plt.savefig(savefig)
+        plt.savefig(savefig, dpi=constants.DPI)
         plt.close()
     if show or savefig is None:
         plt.tight_layout()
         plt.show()
-
-
-def plot_rocs(lrs_all_methods, y_nhot_all_methods, target_classes, label_encoder, savefig=None, show=None):
-
-    for t, target_class in enumerate(target_classes):
-        target_class_str = vec2string(target_class, label_encoder)
-        fpr, tpr = plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class)
-
-        derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class)
-
-        target_class_save = target_class_str.replace(" ", "_")
-        target_class_save = target_class_save.replace(".", "_")
-        target_class_save = target_class_save.replace("/", "_")
-
-        if savefig is not None:
-            plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
-        if show or savefig is None:
-            plt.tight_layout()
-            plt.show()
-
-        plt.close()
 
 
 def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, target_class):
@@ -926,52 +918,22 @@ def derivative_of_roc_is_lr(lrs_all_methods, y_nhot_all_methods, fpr, tpr, t, ta
     fig.show()
 
 
-def plot_roc(lrs_all_methods, y_nhot_all_methods, t, target_class):
+def plot_roc(lrs, y_true, ax):
 
-    n_methods = len(lrs_all_methods.keys())
-    fpr = dict()
-    tpr = dict()
-    fpr_method = dict()
-    tpr_method = dict()
-    roc_auc = dict()
-    method_name = dict()
-    for i, method in enumerate(lrs_all_methods.keys()):
-        # TODO: On probs or lrs?
-        lrs = np.log10(lrs_all_methods[method][:, t])
-        # probs = lrs_all_methods[method][:, t] / (1 + lrs_all_methods[method][:, t])
-        y_nhot = y_nhot_all_methods[method]
-        labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-
-        fpr[i], tpr[i], _ = roc_curve(labels, lrs)
-        fpr_method[method], tpr_method[method], _ = roc_curve(labels, lrs)
-        roc_auc[i] = auc(fpr[i], tpr[i])
-
-        method = method.replace("_", " ")
-        method_name[i] = method
+    fpr, tpr, _ = roc_curve(y_true, lrs)
+    roc_auc = auc(fpr, tpr)
 
     lw=1.5
-    colors=cycle(('lightcoral', 'orangered', 'chocolate', 'orange', 'goldenrod', 'yellow', 'greenyellow',
-                    'darkolivegreen', 'springgreen', 'turquoise', 'teal', 'darkturquoise',
-                    'deepskyblue', 'steelblue', 'cornflowerblue', 'midnightblue', 'blue', 'slateblue', 'blueviolet',
-                    'violet', 'magenta', 'deeppink', 'crimson'))
-    linestyle = cycle(('-', '-.', '--', ':', '-.'))
-
-    plt.figure(figsize=(14, 7))
-    for i in range(n_methods):
-        plt.plot(fpr[i], tpr[i], color=next(colors), lw=lw, linestyle=next(linestyle),
-                 label='method {0} (area = {1:0.2f})'''.format(method_name[i], roc_auc[i]))
-    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+    ax.plot(fpr, tpr, color='k', lw=lw, linestyle='-',
+                 label='AUC={:0.2f}'.format(roc_auc))
+    ax.plot([0, 1], [0, 1], 'k--', lw=lw)
     plt.xlim([-0.05, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("ROC")
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-    return fpr_method, tpr_method
+    return roc_auc
 
 
 def plot_coefficient_importances(model, target_classes, present_markers, label_encoder, savefig=None, show=None):
+    plt.figure(figsize=(COLWIDTH, COLWIDTH))
     plt.figure(figsize=(5, 5))
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
@@ -988,7 +950,7 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
 
             if savefig is not None:
                 plt.tight_layout()
-                plt.savefig(savefig + '_' + target_class_save)
+                plt.savefig(savefig + '_' + target_class_save, dpi=constants.DPI)
             if show or savefig is None:
                 plt.tight_layout()
                 plt.show()
@@ -1045,7 +1007,7 @@ def plot_coefficient_importance(intercept, coefficients, present_markers, cellty
         plt.xlim([-2, 3.3])
     plt.ylabel('Marker names')
 
-    plt.legend(loc='lower right')
+    # plt.legend(loc='lower right')
 
 
 def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, target_classes, label_encoder, show=None,
@@ -1074,7 +1036,7 @@ def plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs, target_c
 
         if savefig is not None:
             plt.tight_layout()
-            plt.savefig(savefig + '_' + target_class_save)
+            plt.savefig(savefig + '_' + target_class_save, dpi=constants.DPI)
         if show or savefig is None:
             plt.tight_layout()
             plt.show()
@@ -1097,308 +1059,6 @@ def plot_lrs_with_bootstrap_ci_per_target_class(lrs, lower_bounds, upper_bounds)
     plt.fill_between(X, llower_bounds, lupper_bounds, color='gray')
     plt.xlabel('number of samples in test data')
     plt.ylabel('10logLR')
-
-
-
-
-# def plot_per_feature(model, augmented_data, target_classes, present_markers, train=True, savefig=None, show=None):
-#
-#
-#     present_markers = present_markers[:-4]
-#     augmented_data = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]']
-#     if train:
-#         X = augmented_data.X_train_augmented
-#         y_nhot = augmented_data.y_train_nhot_augmented
-#         title='Train'
-#     else:
-#         X = augmented_data.X_test_augmented
-#         y_nhot = augmented_data.y_test_nhot_augmented
-#         title='Test'
-#
-#     for t, target_class in enumerate(target_classes):
-#         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-#
-#         h1 = mpatches.Patch(color='orange', label='h1')
-#         h2 = mpatches.Patch(color='blue', label='h2')
-#
-#         colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-#         # colors_test = ['orange' if l == 1.0 else 'blue' for l in labels_test]
-#
-#         # coefficients = model['[1, 1, 1, 1, 1, 1, 1, 1]']._classifier.coef_[t, :]
-#
-#         fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(12, 9))
-#         plt.suptitle(title)
-#         j = 0
-#         k = 0
-#         for i, marker in enumerate(present_markers):
-#             # # xrange = np.linspace(min(X[:, i]), max(X[:, i]))
-#             # # xrange_test = np.linspace(min(X_test_augm_markers), max(X_test_augm_markers))
-#             #
-#             axes[j, k].scatter(X[:, i], labels, color=colors, s=1.5)
-#             # axes[j, k].set_xlim(np.linspace(min(X), max(X), 10))
-#             # # axes[i].plot(xrange_train, 1 / (1 + np.exp(-(coefficient * xrange_train))), color='darkgray', lw=2)
-#             axes[j, k].set_title(marker)
-#             axes[j, k].set_yticks([0, 1])
-#
-#             k += 1
-#             if i == 3:
-#                 k = 0
-#                 j = 1
-#             elif i == 7:
-#                 k = 0
-#                 j = 2
-#             elif i == 11:
-#                 k = 0
-#                 j = 3
-#
-#         plt.tight_layout()
-#         plt.show()
-#
-#         # plt.legend(handles=[h1, h2], loc='center left', bbox_to_anchor=(1, 0.5))
-
-
-# TODO: Not sure if correct
-# def plot_feature_values_classes(model, augmented_data, target_classes, present_markers, savefig=None, show=None):
-#
-#     augmented_data = augmented_data['[1, 1, 1, 1, 1, 1, 1, 1]']
-#     y_nhot_train = augmented_data.y_train_nhot_augmented
-#     y_nhot_test = augmented_data.y_test_nhot_augmented
-#
-#     markers = ['CYP2B7P1', 'BPIFA1', 'MUC4', 'MYOZ1']
-#     # present_markers = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',
-#     #                    'MMP11', 'SEMG1', 'KLK3', 'PRM1', 'RPS4Y1', 'XIST', 'ACTB', '18S-rRNA']
-#     indices_markers = []
-#     for marker in markers:
-#         indices_markers.append(present_markers.index(marker))
-#
-#     for t, target_class in enumerate(target_classes):
-#         labels_train = np.max(np.multiply(y_nhot_train, target_class), axis=1)
-#         labels_test = np.max(np.multiply(y_nhot_test, target_class), axis=1)
-#
-#         h1 = mpatches.Patch(color='orange', label='h1')
-#         h2 = mpatches.Patch(color='blue', label='h2')
-#
-#         colors_train = ['orange' if l == 1.0 else 'blue' for l in labels_train]
-#         colors_test = ['orange' if l == 1.0 else 'blue' for l in labels_test]
-#
-#         coefficients = model['[1, 1, 1, 1, 1, 1, 1, 1]']._classifier.coef_[t, :]
-#
-#         fig_train, axes_train = plt.subplots(nrows=1, ncols=len(markers))
-#         plt.suptitle('Train')
-#         fig_test, axes_test = plt.subplots(nrows=1, ncols=len(markers))
-#         plt.suptitle('Test')
-#         for i, index_marker in enumerate(indices_markers):
-#             marker_name = present_markers[index_marker]
-#             coefficient = coefficients[index_marker]
-#
-#             X_train_augm_markers = augmented_data.X_train_augmented[:, index_marker]
-#             X_test_augm_markers = augmented_data.X_test_augmented[:, index_marker]
-#
-#             xrange_train = np.linspace(min(X_train_augm_markers), max(X_train_augm_markers))
-#             xrange_test = np.linspace(min(X_test_augm_markers), max(X_test_augm_markers))
-#
-#             axes_train[i].scatter(X_train_augm_markers, labels_train, color=colors_train)
-#             axes_train[i].plot(xrange_train, 1 / (1 + np.exp(-(coefficient*xrange_train))), color='darkgray', lw=2)
-#             axes_train[i].set_title(marker_name)
-#             axes_train[i].set_yticks([0, 1])
-#
-#             axes_test[i].scatter(X_test_augm_markers, labels_test, color=colors_test)
-#             axes_test[i].plot(xrange_test, 1 / (1 + np.exp(-(coefficient * xrange_test))), color='darkgray', lw=2)
-#             axes_test[i].set_title(marker_name)
-#             axes_test[i].set_yticks([0, 1])
-#
-#         plt.legend(handles=[h1, h2], loc='center left', bbox_to_anchor=(1, 0.5))
-#         plt.tight_layout()
-#         plt.show()
-
-
-
-
-
-
-
-
-
-
-
-# TODO: Make this function work (?)
-# def plot_for_experimental_mixture_data(X_mixtures, y_mixtures, y_mixtures_matrix, inv_test_map, classes_to_evaluate,
-#                                        mixtures_in_classes_of_interest, n_single_cell_types_no_penile, dists):
-#     """
-#     for each mixture category that we have measurements on, plot the
-#     distribution of marginal LRs for each cell type, as well as for the special
-#     combinations (eg vaginal+menstrual) also plot LRs as a function of distance
-#     to nearest data point also plot experimental measurements together with LRs
-#     found and distance in a large matrix plot
-#
-#     :param X_mixtures: N_experimental_mixture_samples x N_markers array of
-#         observations
-#     :param y_mixtures: N_experimental_mixture_samples array of int mixture labels
-#     :param y_mixtures_matrix:  N_experimental_mixture_samples x
-#         (N_single_cell_types + N_combos) n_hot encoding
-#     :param inv_test_map: dict: mixture label -> mixture name
-#     :param classes_to_evaluate: list of str, classes to evaluate
-#     :param mixtures_in_classes_of_interest:  list of lists, specifying for each
-#         class in classes_to_evaluate which mixture labels contain these
-#     :param n_single_cell_types_no_penile: int: number of single cell types
-#         excluding penile skin
-#     :param dists: N_experimental_mixture_samples iterable of distances to
-#         nearest augmented data point. Indication of whether the point may be an
-#         outlier (eg measurement error or problem with augmentation scheme)
-#     """
-#     y_prob = model.predict_lrs(X_mixtures, )
-#     y_prob_per_class = convert_prob_per_mixture_to_marginal_per_class(
-#         y_prob, mixtures_in_classes_of_interest, classes_map_updated, MAX_LR)
-#
-#     log_lrs_per_class = np.log10(y_prob_per_class / (1 - y_prob_per_class))
-#     plt.subplots(3, 3, figsize=(18, 9))
-#     for i, i_clas in enumerate(set(y_mixtures)):
-#         indices_experiments = [j for j in range(len(y_mixtures)) if y_mixtures[j] == i_clas]
-#         plt.subplot(3, 3, i + 1)
-#         plt.xlim([-MAX_LR - .5, MAX_LR + .5])
-#         bplot = plt.boxplot(log_lrs_per_class[indices_experiments, :], vert=False,
-#                             labels=classes_to_evaluate, patch_artist=True)
-#
-#         for j, (patch, cla) in enumerate(zip(bplot['boxes'], classes_to_evaluate)):
-#             if j < n_single_cell_types_no_penile:
-#                 # single cell type
-#                 if cla in inv_test_map[i_clas]:
-#                     patch.set_facecolor('black')
-#             else:
-#                 # sample 'Vaginal.mucosa and/or Menstrual.secretion'
-#                 for comb_class in cla.split(' and/or '):
-#                     if comb_class in inv_test_map[i_clas]:
-#                         patch.set_facecolor('black')
-#         plt.title(inv_test_map[i_clas])
-#     plt.savefig('mixtures_boxplot')
-#
-#     plt.subplots(3, 3, figsize=(18, 9))
-#     for i in range(y_mixtures_matrix.shape[1]):
-#         plt.subplot(3, 3, i + 1)
-#         plt.ylim([-MAX_LR - .5, MAX_LR + .5])
-#         plt.scatter(
-#             dists + np.random.random(len(dists)) / 20,
-#             log_lrs_per_class[:, i],
-#             color=['red' if iv else 'blue' for iv in y_mixtures_matrix[:, i]],
-#             alpha=0.1
-#         )
-#         plt.ylabel('LR')
-#         plt.xlabel('distance to nearest data point')
-#         plt.title(classes_to_evaluate[i])
-#     plt.savefig('LRs_as_a_function_of_distance')
-#
-#     plt.figure()
-#     plt.matshow(
-#         np.append(
-#             np.append(X_mixtures, log_lrs_per_class, axis=1),
-#             np.expand_dims(np.array([d*5 for d in dists]), axis=1),
-#             axis=1))
-#     plt.savefig('mixtures binned data and log lrs')
-
-# TODO: Want to keep this?
-# def plot_scatterplot_all_lrs_before_after_calib(lrs_before_for_all_methods, lrs_after_for_all_methods,
-#                                                 y_nhot_for_all_methods, target_classes, label_encoder, show=None,
-#                                                 savefig=None):
-#     """
-#     For each method plots the lrs
-#
-#     :param lrs_before_for_all_methods:
-#     :param lrs_after_for_all_methods:
-#     :param y_nhot_for_all_methods:
-#     :param target_classes:
-#     :param label_encoder:
-#     :param show:
-#     :param savefig:
-#     :return:
-#     """
-#
-#     for method in lrs_before_for_all_methods.keys():
-#         plot_scatterplot_lr_before_after_calib(lrs_before_for_all_methods[method], lrs_after_for_all_methods[method],
-#                                                y_nhot_for_all_methods[method], target_classes, label_encoder)
-#
-#         if savefig is not None:
-#             plt.tight_layout()
-#             plt.savefig(savefig + '_' + method)
-#             plt.close()
-#         if show or savefig is None:
-#             plt.tight_layout()
-#             plt.show()
-
-
-# def plot_scatterplot_lr_before_after_calib(lrs_before, lrs_after, y_nhot, target_classes, label_encoder):
-#
-#     loglrs_before = np.log10(lrs_before)
-#     loglrs_after = np.log10(lrs_after)
-#
-#     n_target_classes = len(target_classes)
-#
-#     if n_target_classes > 1:
-#         n_rows = int(n_target_classes / 2)
-#         fig, axs = plt.subplots(n_rows, 2, figsize=(9, int(9 / 4 * n_target_classes)), sharex=True, sharey=False)
-#
-#         j = 0
-#         k = 0
-#
-#     for i, target_class in enumerate(target_classes):
-#
-#         celltype = vec2string(target_class, label_encoder)
-#
-#         min_vals = [min(loglrs_before), min(loglrs_after)]
-#         max_vals = [max(loglrs_before), max(loglrs_after)]
-#         diagonal_coordinates = np.linspace(min(min_vals), max(max_vals))
-#
-#         target_class = np.reshape(target_class, -1, 1)
-#         labels = np.max(np.multiply(y_nhot, target_class), axis=1)
-#
-#         colors = ['orange' if l == 1.0 else 'blue' for l in labels]
-#
-#         if n_target_classes == 1:
-#
-#             plt.scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             plt.plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             plt.title(celltype)
-#             plt.xlim(min(min_vals), max(max_vals))
-#             plt.ylim(min(min_vals), max(max_vals))
-#
-#             plt.xlabel("lrs before")
-#             plt.ylabel("lrs after")
-#
-#         elif n_target_classes == 2:
-#             axs[i].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             axs[i].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             axs[i].set_title(celltype)
-#             axs[i].set_xlim(min(min_vals), max(max_vals))
-#             axs[i].set_ylim(min(min_vals), max(max_vals))
-#
-#             fig.text(0.5, 0.04, "lrs before", ha='center')
-#             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
-#
-#         elif n_target_classes > 2:
-#             axs[j, k].scatter(loglrs_before[:, i], loglrs_after[:, i], s=3, color=colors, alpha=0.5)
-#             axs[j, k].plot(diagonal_coordinates, diagonal_coordinates, 'k--', linewidth=1)
-#             axs[j, k].set_title(celltype)
-#             axs[j, k].set_xlim(min(min_vals), max(max_vals))
-#             axs[j, k].set_ylim(min(min_vals), max(max_vals))
-#
-#             if (i % 2) == 0:
-#                 k = 1
-#             else:
-#                 k = 0
-#                 j = j + 1
-#
-#             fig.text(0.5, 0.04, "lrs before", ha='center')
-#             fig.text(0.04, 0.5, "lrs after", va='center', rotation='vertical')
-
-
-# TODO: Make this funtion work?
-# def plot_data(X):
-#     """
-#     plots the raw data points
-#
-#     :param X: N_samples x N_observations_per_sample x N_markers measurements
-#     """
-#     plt.matshow(combine_samples(X))
-#     plt.savefig('single_cell_type_measurements_after_QC')
 
 
 def plot_sankey_data():
@@ -1448,3 +1108,84 @@ def plot_sankey_data():
     #     paper_bgcolor='black'
     # )
     fig.show(width=100)
+
+
+def calibration_example(savepath):
+    factor = 10
+    uncalibrated_lrs_h1 = np.array(
+        [.01 * factor] + [.1 * factor]*10 + [1 * factor]*100 + [10 * factor] * 100 + [100 * factor] * 100)
+    uncalibrated_lrs_h2 = factor / (uncalibrated_lrs_h1/factor)
+    X, y = Xn_to_Xy(uncalibrated_lrs_h2, uncalibrated_lrs_h1)
+    X = np.log10(X)
+    calibrator = LogitCalibrator()
+    calibrator.fit(X, y)
+    fig, ax = plt.subplots(2, 2, figsize=(COLWIDTH*2*2, COLWIDTH*2))
+    x = np.arange(-1, 3, .01)
+    transformed = calibrator.transform(x)
+    points0, points1 = Xy_to_Xn(X, y)
+    points = np.unique(points0)
+    ax[0,0].hist(points1, bins=sorted([p-.01 for p in points]+[p+.1 for p in points]),
+                 alpha=.7, density=False, label='H_1', color='orange')
+    ax[0,0].hist(points0, bins=sorted([p-.1 for p in points]+[p+.01 for p in points]),
+                 alpha=.7, density=False, label='H_2', color='blue')
+    ax[0,0].set_xlabel('log(s)')
+    ax[0,0].set_ylabel('density')
+    ax[0,0].set_yticks([])
+
+    ax[0,1].scatter(points1+np.random.random(points1.size)/5-0.1, np.ones(points1.shape), s=5, color='orange')
+    ax[0,1].scatter(points0+np.random.random(points0.size)/5-0.1, np.zeros(points0.shape), s=5, color='blue')
+    ax[0,1].plot(x, calibrator.p1, color='k')
+    ax[0,1].set_yticks([0,1])
+    ax[0,1].set_xlabel('log(s)')
+    ax[0,1].set_ylabel('logistic regression fit')
+
+    points0, points1 = Xy_to_Xn(np.log10(calibrator.transform(X)), y)
+    points = np.unique(points0)
+    ax[1,1].hist(points1, bins=sorted([p-.01 for p in points]+[p+.1 for p in points]),
+                 alpha=.7, density=False, label='H_1', color='orange')
+    ax[1,1].hist(points0, bins=sorted([p-.1 for p in points]+[p+.01 for p in points]),
+                 alpha=.7, density=False, label='H_2', color='blue')
+    ax[1,1].set_xlabel('calibrated log(LR)')
+    ax[1,1].set_ylabel('density')
+    ax[1,1].set_xticks(points)
+    ax[1,1].set_xticklabels([f'{p:2.2f}' for p in points])
+    ax[1,1].set_yticks([])
+
+    ax[1,0].plot(x, np.log10(transformed), color='k')
+    ax[1,0].set_xlabel('log(s)')
+    # ax[1,0].set_xlabel('uncalibrated log(LR)')
+    ax[1,0].set_ylabel('calibrated log(LR)')
+    ax[1,0].set_xticks([-1,0,1,2,3])
+
+    for i,axis in enumerate(ax.flat):
+        axis.text(-.1,1.1, string.ascii_uppercase[i], transform=axis.transAxes,
+            size=20, weight='bold')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(savepath, 'calibration_example'), dpi=constants.DPI)
+    plt.close()
+
+
+def plot_multiclass_comparison(log_lrs, multi_log_lrs, sample, save_path):
+    plt.style.use('ggplot')
+
+    plt.figure(figsize=(COLWIDTH, COLWIDTH))
+    df = pd.DataFrame({'multiclass log(LR)': multi_log_lrs,
+                       'multi-label log(LR)': log_lrs[0]})
+    p = sns.scatterplot(data=df, x='multiclass log(LR)',
+                        y='multi-label log(LR)')
+    # add annotations one by one with a loop
+    for line in range(0, df.shape[0]):
+        p.text(multi_log_lrs[line], log_lrs[0][line],
+               constants.single_cell_types_short[line],
+               horizontalalignment='left',
+               size='small', color='black')
+    # make square plot
+    ys = plt.ylim()
+    xs = plt.xlim()
+    maxs = [min(ys[0], xs[0]), max(ys[1], xs[1])]
+    plt.ylim(maxs)
+    plt.xlim(maxs)
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample)), dpi=constants.DPI)
+    plt.close()

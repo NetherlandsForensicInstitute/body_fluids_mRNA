@@ -13,8 +13,7 @@ from typing import List
 
 from rna.constants import nhot_matrix_all_combinations, DEBUG
 from rna.lr_system import MarginalMLPClassifier, MarginalMLRClassifier, \
-    MarginalXGBClassifier, MarginalDLClassifier, \
-    MarginalRFClassifier, MarginalSVMClassifier
+    MarginalXGBClassifier, MarginalRFClassifier, MarginalSVMClassifier
 from rna.plotting import plot_calibration_process, plot_insights_cllr, plot_coefficient_importances
 
 
@@ -223,36 +222,11 @@ def perform_analysis(X_train_augmented, y_train_nhot_augmented, X_calib_augmente
             "LRs before and after calibration are not the same, even though 'with calibration' is {}".format(
                 with_calibration)
 
-        # bootstrap LRs
-        # B = 1
-        # all_lrs_after_calib_bs = np.zeros([lrs_after_calib.shape[0], lrs_after_calib.shape[1], B])
-        # for b in range(B):
-        #     # throw away random 20% from train data
-        #     # sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=int(0.8 * X_train.shape[0]), replace=False)
-        #
-        #     # sample with replacement
-        #     # TODO: Take into account equal size for h1 and h2
-        #     sample_indices = np.random.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=True)
-        #
-        #     X_train_bs = X_train[sample_indices, :]
-        #     y_train_bs = y_train[sample_indices, :]
-        #
-        #     _, _, lrs_after_calib_bs, _, _, _, _ = generate_lrs(X_train_bs, y_train_bs, X_calib, y_calib,
-        #                                                         X_test_augmented, y_test_nhot_augmented,
-        #                                                         X_test_as_mixtures_augmented, X_mixtures,
-        #                                                         target_classes, model, model_tc, mle, softmax,
-        #                                                         calibration_on_loglrs)
-        #     all_lrs_after_calib_bs[:, :, b] = lrs_after_calib_bs
-        #
-        # # TODO: Think what to do with upper and lower bounds
-        # lower_bounds_tc, upper_bounds_tc = plot_lrs_with_bootstrap_ci(lrs_after_calib, all_lrs_after_calib_bs,
-        #                                                               target_classes, label_encoder)
-
-    # Plot the values of the coefficients to see if MLR uses the correct features (markers).
     if output_folder:
         try:
             if DEBUG:
                 if classifier == 'MLR':
+                    # Plot the values of the coefficients to see if MLR uses the correct features (markers).
                     plot_coefficient_importances(model, target_classes, present_markers, label_encoder,
                                                  savefig=os.path.join(output_folder, 'plots',
                                                                       'coefficient_importance_{}'.format(
@@ -453,28 +427,3 @@ def append_lrs_for_all_folds(lrs_for_model, type):
                         y_nhot_for_all_methods[prior_method] = data.y_mixtures_nhot
 
     return lrs_before_for_all_methods, lrs_after_for_all_methods, y_nhot_for_all_methods
-
-# TODO: Check if want to keep
-# def use_repeated_measurements_as_single(X_single, y_nhot_single, y_single):
-#     """
-#     Treats each repeated measurement as an individual sample and transforms the
-#     original data sets accordingly.
-#     """
-#
-#     N = X_single.size
-#     X_single_nrp = []
-#     y_nhot_single_nrp = []
-#     y_single_nrp = []
-#     for i in range(N):
-#         n = X_single[i].shape[0]
-#         y_nhot_single_i = np.tile(y_nhot_single[i, :], (n, 1))
-#         y_single_nrp.extend(y_single[i].tolist() * n)
-#         for j in range(n):
-#             X_single_nrp.append(X_single[i][j])
-#             y_nhot_single_nrp.append(y_nhot_single_i[j, :])
-#
-#     X_single_nrp = np.asarray(X_single_nrp)
-#     y_nhot_single_nrp = np.asarray(y_nhot_single_nrp)
-#     y_single_nrp = np.asarray(y_single_nrp)
-#
-#     return X_single_nrp, y_nhot_single_nrp, y_single_nrp
