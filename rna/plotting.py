@@ -412,7 +412,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
                 labels_list += list(labels.squeeze())
                 priors_list += [prior2string(priors[index2], label_encoder)] \
                                * len(labels)
-        fig = plt.plot(figsize=(COLWIDTH * 2, COLWIDTH * 2 * 5 / 3))
+        fig = plt.figure(figsize=(COLWIDTH * 2, COLWIDTH * 2 * 5 / 3))
         df = pd.DataFrame({'label': labels_list, 'method': methods_list,
                            'baseline': priors_list,
                            'log(LR) uniform': loglrs1_list,
@@ -445,8 +445,10 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
         target_class_save = target_class_save.replace(".", "_")
         target_class_save = target_class_save.replace("/", "_")
 
-        plt.text(0.5, 0.004, 'log(LR) - uniform background levels', ha='center')
-        plt.text(0.002, 0.5, 'log(LR) - adjusted background levels', va='center', rotation='vertical')
+        # this no longer seems to work - added the labels manually
+        # plt.text(0.5, 0.004, 'log(LR) - uniform background levels', ha='center', transform=fig.transFigure)
+        # plt.text(0.002, 0.5, 'log(LR) - adjusted background levels', va='center', rotation='vertical',
+        #          transform=fig.transFigure)
 
         if savefig is not None:
             # plt.tight_layout()
@@ -1166,18 +1168,19 @@ def calibration_example(savepath):
     plt.close()
 
 
-def plot_multiclass_comparison(log_lrs, multi_log_lrs, sample, save_path):
+def plot_multiclass_comparison(log_lrs, multi_log_lrs, labels, sample, save_path, x_label='multiclass log(LR)',
+                               y_label='multi-label log(LR)'):
     plt.style.use('ggplot')
 
     plt.figure(figsize=(COLWIDTH, COLWIDTH))
-    df = pd.DataFrame({'multiclass log(LR)': multi_log_lrs,
-                       'multi-label log(LR)': log_lrs[0]})
-    p = sns.scatterplot(data=df, x='multiclass log(LR)',
-                        y='multi-label log(LR)')
+    df = pd.DataFrame({x_label: multi_log_lrs,
+                       y_label: log_lrs})
+    p = sns.scatterplot(data=df, x=x_label,
+                        y=y_label)
     # add annotations one by one with a loop
     for line in range(0, df.shape[0]):
-        p.text(multi_log_lrs[line], log_lrs[0][line],
-               constants.single_cell_types_short[line],
+        p.text(multi_log_lrs[line], log_lrs[line],
+               labels[line],
                horizontalalignment='left',
                size='small', color='black')
     # make square plot
@@ -1186,6 +1189,10 @@ def plot_multiclass_comparison(log_lrs, multi_log_lrs, sample, save_path):
     maxs = [min(ys[0], xs[0]), max(ys[1], xs[1])]
     plt.ylim(maxs)
     plt.xlim(maxs)
+    locs, labels = plt.yticks()  # Get locations and labels
+    plt.xticks(locs)
+    plt.ylim(maxs)
+    plt.xlim(maxs)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample)), dpi=constants.DPI)
+    plt.savefig(os.path.join(save_path, 'loglrs_for_' + str(sample).replace('.', '_')), dpi=constants.DPI)
     plt.close()

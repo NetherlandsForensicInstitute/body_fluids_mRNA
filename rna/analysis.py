@@ -15,6 +15,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from typing import List, Tuple
 
+from rna import constants
 from rna.analytics import combine_samples, calculate_accuracy_all_target_classes, cllr, \
     calculate_lrs_for_different_priors, append_lrs_for_all_folds, clf_with_correct_settings
 from rna.augment import MultiLabelEncoder, augment_splitted_data, binarize_and_combine_samples
@@ -31,7 +32,11 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
                                 n_samples_per_combination,
                                 binarize=True, from_penile=False,
                                 prior=(1,1,1,1,1,1,1,1), model_name='best_MLR',
-                                remove_structural=True, save_path=None):
+                                remove_structural=True, save_path=None,
+                                alternative_hypothesis=None,
+                                # blood, nasal, vaginal
+                                samples_to_evaluate=np.array([[1] * 3 + [0] + [1] * 5 + [0] * 6])):
+
     """
     computes or loads the MLR based on all data
     """
@@ -45,8 +50,8 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
 
     save_data_table(X_single, [vec2string(y, label_encoder) for
                                y in y_nhot_single],
-                    present_markers, os.path.join(save_path, 'single cell '
-                                                             'data.csv'))
+                    present_markers, os.path.join(save_path, 'single cell data.csv'))
+
     if retrain:
         model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
         X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
@@ -62,11 +67,12 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
                                                             y_nhot_mixtures, n_celltypes, n_features,
                                                             label_encoder, prior, [binarize],
-                                                            from_penile, [n_samples_per_combination]*3)
+                                                            from_penile, [n_samples_per_combination]*3,
+                                                            disallowed_mixtures=None)
 
         indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
         y_train = np.array([np.max(np.array(augmented_data.y_train_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
-        y_calib = np.array([np.max(np.array(augmented_data.y_calib_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        # y_calib = np.array([np.max(np.array(augmented_data.y_calib_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
 
         model.fit_classifier(augmented_data.X_train_augmented, y_train)
         model.fit_calibration(augmented_data.X_calib_augmented, augmented_data.y_calib_nhot_augmented, target_classes)
@@ -76,23 +82,51 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         model = pickle.load(open('{}'.format(os.path.join(save_path,
                                                          model_name)), 'rb'))
 
+    if alternative_hypothesis:
+        # also plot LRs of our hypothesis pairs against LRs when H2 is more specific
+        implied_target = string2vec(['Vaginal.mucosa and/or Menstrual.secretion'], label_encoder)
+        alternative_target = string2vec(alternative_hypothesis, label_encoder)
+        # at least one of H1 or alternative should be present, disallow absence of all:
+        disallowed_mixtures = (-implied_target - alternative_target).astype(np.int)
+
+        X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
+
+        X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder,
+                                                                               binarize=binarize,
+                                                                               remove_structural=remove_structural)
+
+        augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
+                                                            y_nhot_mixtures, n_celltypes, n_features,
+                                                            label_encoder, prior, [binarize],
+                                                            from_penile, [n_samples_per_combination]*3,
+                                                            disallowed_mixtures=disallowed_mixtures)
+
+        indices = [np.argwhere(target_classes[i, :] == 1).flatten().tolist() for i in range(target_classes.shape[0])]
+        y_train = np.array([np.max(np.array(augmented_data.y_train_nhot_augmented[:, indices[i]]), axis=1) for i in range(len(indices))]).T
+        specific_model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
+        specific_model.fit_classifier(augmented_data.X_train_augmented, y_train)
+        specific_model.fit_calibration(augmented_data.X_calib_augmented, augmented_data.y_calib_nhot_augmented, target_classes)
+
+        log_lrs = []
+        specific_log_lrs = []
+        for sample in samples_to_evaluate:
+            log_lrs.append(np.log10(model.predict_lrs([sample], target_classes))[0][-1])
+            specific_log_lrs.append(np.log10(specific_model.predict_lrs([sample], target_classes))[0][-1])
+        plot_multiclass_comparison(specific_log_lrs,
+                                   log_lrs,
+                                   ['blood+nas+vag', 'menstr','indication of menstr', 'blood', 'semen'],
+                                   'specific_hypothesis',
+                                   save_path, x_label='log(LR)', y_label='log(LR) H2: blood')
+
     compare_to_multiclass(X_single, y_single, target_classes, tc, model,
-                          np.array([
-                              # (blood) and menstrual and vaginal
-                              [1,1,1,0,0,0,1,1,1,1,1,1,0,0,0],
-                              # nasal and saliva
-                              [0]*3+[1, 1,1, 1]+[0]*8,
-                              # blood, nasal, vaginal
-                              [1]*3 + [0] + [1] * 5 + [0] * 6
-                          ]), save_path=save_path)
+                          samples_to_evaluate, save_path=save_path, alternative_target=None)
 
     # plot the coefficients
     plot_coefficient_importances(
         model, target_classes, present_markers, label_encoder,
         savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
 
-
-    t = np.argwhere(np.array(tc)=='Vaginal.mucosa and/or Menstrual.secretion').squeeze()
+    t = np.argwhere(np.array(tc) == 'Vaginal.mucosa and/or Menstrual.secretion').squeeze()
     intercept, coefficients = model.get_coefficients(t, target_classes[t].squeeze())
     all_coefficients = np.append(intercept, coefficients).tolist()
     all_coefficients_str = [str(coef) for coef in all_coefficients]
@@ -158,7 +192,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
                 augmented_data[str(priors)] = augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test,
                                                                     y_nhot_mixtures, n_celltypes, n_features,
                                                                     label_encoder, priors, binarize_list,
-                                                                    from_penile, nsamples)
+                                                                    from_penile, nsamples, disallowed_mixtures=None)
 
             # ======= Transform data accordingly =======
             if binarize:
@@ -264,7 +298,7 @@ def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax
 
 def compare_to_multiclass(X_single, y_single, target_classes, tc,
                           model: MarginalClassifier, samples,
-                          binarize=True, save_path=None, alternative = None):
+                          binarize=True, save_path=None, alternative_target=None):
     """
     trains a multiclass model and compares its output to the given
     multilabel model, on list of samples
@@ -280,10 +314,8 @@ def compare_to_multiclass(X_single, y_single, target_classes, tc,
         for target_class in target_classes:
             prob_any = np.sum(multi_pred_single[target_class == 1])
             prob_max_not = np.max(multi_pred_single[target_class == 0])
-            if alternative is not None:
-                #   eg H2 = does not contain Y, contains X
-                # NB not implement for the multilabel model
-                prob_max_not = np.sum(multi_pred_single[alternative[0] == 1])
+            if alternative_target is not None:
+                prob_max_not = np.sum(multi_pred_single[alternative_target[0] == 1])
             multi_pred_tc.append(prob_any/prob_max_not)
         multi_pred_tc=np.array(multi_pred_tc)
         multi_log_lrs = np.log10(multi_pred_tc)
@@ -293,7 +325,7 @@ def compare_to_multiclass(X_single, y_single, target_classes, tc,
 
         # take single cell target classes
         log_lrs = np.log10(model.predict_lrs(sample, target_classes))
-        plot_multiclass_comparison(log_lrs, multi_log_lrs, sample, save_path)
+        plot_multiclass_comparison(log_lrs[0], multi_log_lrs, constants.single_cell_types_short, sample, save_path)
 
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):

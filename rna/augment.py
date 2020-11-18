@@ -38,7 +38,6 @@ def construct_random_samples(X, y, n, classes_to_include, n_features, binarize):
             sampled_sample = data_for_class[j][np.random.randint(n_in_class)[0]]
             n_replicates = len(sampled_sample)
             sampled.append(sampled_sample[np.random.permutation(n_replicates)])
-        # TODO thus lower replicates for more cell types. is this an issue?
         smallest_replicates = min([len(sample) for sample in sampled])
 
         combined_sample = []
@@ -85,8 +84,29 @@ def only_use_same_combinations_as_in_mixtures(X_augmented, y_nhot, y_nhot_mixtur
     return X_as_mixt, y_nhot_as_mixt
 
 
+def mixture_is_compatible_with_H1_H2_or_both(classes_in_current_mixture, disallowed_mixtures):
+    """
+    returns True if the current mixture is compatible with H1, H2 or both. If returns false, the mixture should not
+    be in the augmented data, as it cannot exist under either H1 or H2.
+    """
+    if disallowed_mixtures is None:
+        return True
+    for disallowed_mixture in disallowed_mixtures:
+        match_mixture = True
+        for i, val in enumerate(disallowed_mixture):
+            if val == 1:
+                if i not in classes_in_current_mixture:
+                    match_mixture = False
+            if val == -1:
+                if i in classes_in_current_mixture:
+                    match_mixture = False
+        if match_mixture:
+            return False
+    return True
+
+
 def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, label_encoder, prior=None, binarize=False,
-                 from_penile=False):
+                 from_penile=False, disallowed_mixtures=None):
     """
     Generate data for the power set of single cell types.
 
@@ -102,10 +122,15 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
         original signal values but normalize (/1000).
     :param from_penile: bool: if True generate sample that always also contain penile skin and if False will never
         contain penile skin.
+    :param disallowed_mixtures: list of vectors of length n_celltype. each of the vectors specifies a combination of
+       celltypes that is inconsistent with either H1 or H2. 1 indicates presence, 0 absence, -1 irrelevance. Eg
+       [[1,0,-1,-1,-1]] indicates there should be no mixtures that have the first cell type and lack the second cell
+       type
     :return: n_experiments x n_markers array,
              n_experiments x n_celltypes matrix of 0, 1 indicating for each augmented sample which single cell type it
                 was made up of. Does not contain column for penile skin
     """
+    assert disallowed_mixtures is None or all([len(dm)==n_celltypes for dm in disallowed_mixtures])
     if not from_penile:
         n_celltypes_without_penile = n_celltypes
     else:
@@ -183,20 +208,25 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
                 Np = 1
 
             end = round(begin + N_SAMPLES_PER_COMBINATION * Np)
-            if not from_penile:
-                for i_celltype in range(len(label_encoder.classes_)):
-                    if binary[-i_celltype - 1] == '1':
-                        y_nhot_augmented[begin:end, i_celltype] = 1
-            else:
-                for i_celltype in range(len(label_encoder.classes_)):
-                    if binary[-i_celltype - 1] == '1':
-                        y_nhot_augmented[begin:end, classes_map[i_celltype]] = 1
-                y_nhot_augmented[begin:end, int(label_encoder.transform(['Skin.penile']))] = 1
+            if mixture_is_compatible_with_H1_H2_or_both(classes_in_current_mixture, disallowed_mixtures):
 
-            X_augmented = np.append(X_augmented,
-                                    construct_random_samples(X, y, end - begin, classes_in_current_mixture, n_features,
-                                                             binarize=binarize), axis=0)
-            begin = end
+                if not from_penile:
+                    for i_celltype in range(len(label_encoder.classes_)):
+                        if binary[-i_celltype - 1] == '1':
+                            y_nhot_augmented[begin:end, i_celltype] = 1
+                else:
+                    for i_celltype in range(len(label_encoder.classes_)):
+                        if binary[-i_celltype - 1] == '1':
+                            y_nhot_augmented[begin:end, classes_map[i_celltype]] = 1
+                    y_nhot_augmented[begin:end, int(label_encoder.transform(['Skin.penile']))] = 1
+
+                X_augmented = np.append(X_augmented,
+                                        construct_random_samples(X, y, end - begin, classes_in_current_mixture, n_features,
+                                                                 binarize=binarize), axis=0)
+                begin = end
+            else:
+                # mixture is not compatible, shorten y_nhot_augmented
+                y_nhot_augmented = np.delete(y_nhot_augmented, np.arange(begin,end), 0)
 
         if not binarize:
             X_augmented = X_augmented / 1000
@@ -208,7 +238,7 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
 
 
 def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_nhot_mixtures, n_celltypes, n_features,
-                          label_encoder, prior, binarize, from_penile, nsamples) -> AugmentedData:
+                          label_encoder, prior, binarize, from_penile, nsamples, disallowed_mixtures) -> AugmentedData:
     """
     Creates augmented samples for train, calibration and test data and saves it within a class.
     NB priors are always uniform for test data
@@ -228,20 +258,27 @@ def augment_splitted_data(X_train, y_train, X_calib, y_calib, X_test, y_test, y_
         original signal values but normalize (/1000).
     :param from_penile: bool: if True generate sample that always also contain penile skin and if False will never
         contain penile skin.
+    :param disallowed_mixtures: list of vectors of length n_celltype. each of the vectors specifies a combination of
+       celltypes that is inconsistent with either H1 or H2. 1 indicates presence, 0 absence, -1 irrelevance. Eg
+       [[1,0,-1,-1,-1]] indicates there should be no mixtures that have the first cell type and lack the second cell
+       type
     :return: class with augmented samples for train, calibration, test and test as mixtures
     """
 
     X_train_augmented, y_train_nhot_augmented = augment_data(X_train, y_train, n_celltypes, n_features,
                                                              nsamples[0], label_encoder, prior,
-                                                             binarize=binarize, from_penile=from_penile)
+                                                             binarize=binarize, from_penile=from_penile,
+                                                             disallowed_mixtures=disallowed_mixtures)
     X_calib_augmented, y_calib_nhot_augmented = augment_data(X_calib, y_calib, n_celltypes, n_features,
                                                              nsamples[1], label_encoder, prior,
-                                                             binarize=binarize, from_penile=from_penile)
+                                                             binarize=binarize, from_penile=from_penile,
+                                                             disallowed_mixtures=disallowed_mixtures)
     # use uniform priors for test data
     if not X_test is None:
         X_test_augmented, y_test_nhot_augmented = augment_data(X_test, y_test, n_celltypes, n_features,
                                                                nsamples[2], label_encoder, [1] * n_celltypes,
-                                                               binarize=binarize, from_penile=from_penile)
+                                                               binarize=binarize, from_penile=from_penile,
+                                                               disallowed_mixtures=disallowed_mixtures)
         X_test_as_mixtures_augmented, y_test_as_mixtures_nhot_augmented = only_use_same_combinations_as_in_mixtures(
             X_test_augmented, y_test_nhot_augmented, y_nhot_mixtures)
         print('test:', X_test_augmented.shape)

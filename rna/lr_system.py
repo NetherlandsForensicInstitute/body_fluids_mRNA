@@ -250,6 +250,7 @@ def convert_prob_to_marginal_per_class(prob, target_classes, MAX_LR, priors_nume
                 # When only one target class some classifiers predict the positive and negative label (i.e. output two probs)
                 # and others predict only the probability of the positive label. With the following try and except statement
                 # catch this.
+                assert prob.shape[1] == len(target_classes) or len(target_classes)==1 and prob.shape[1]==2
                 try:
                     lrs[:, i] = prob[:, 1] / prob[:, 0]
                 except:
