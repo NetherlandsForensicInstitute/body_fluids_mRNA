@@ -40,7 +40,7 @@ by one system in which background levels can be specified per body fluid per hyp
 #### Credits    
 This repository is based on the work by Naomi Voerman, which she performed for 
 her Master's thesis '[_A probabilistic approach to quantify the strength of evidence of presence of body fluids from RNA 
-data using a multi-label method_][1]. 
+data using a multi-label method_][1]'. 
 
 [1]: https://www.universiteitleiden.nl/binaries/content/assets/science/mi/scripties/statscience/2019-2020/finalversion_masterthesis_naomivoerman_s2072661.pdf
 
