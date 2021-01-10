@@ -27,40 +27,18 @@ deep learning model (in 'dl-implementation'). The model achieved comparable perf
 higher complexity, and would have required detailed explanations if included in the paper. 
 Furthermore, we looked at a situation where the defense proposes an alternative (e.g. 
 sample contains blood, not menstrual secretion), which changed results little.
-## Background levels
 
 To compute LRs we need to have knowledge on background levels, which can depend
 on non-disputed facts of the case. These background levels are a form of prior, and referenced as such
 in the code. They should not be confused with the prior odds, that depend on 
 additional case-specific information and does not lie within the domain of 
-the forensic scientist. 
-
-For historic reasons, there are two ways to specify background levels. These should be replaced
-by one system in which background levels can be specified per background level per hypothesis.
-
-**background levels as proportions**
-Within the data augmentation process, the same number of samples for all possible combinations of body fluids are created.
-This means that the model will learn that the probability of each of these combinations occurring is the same for all 
-combinations. This is the same as assuming uniform priors. However, in reality this will not be the case. For this reason
-we wanted to test whether non-uniform priors would have an significant effect on the likelihood ratios that the
-model(s) calculate. This is done via the number of samples created in data augmentation process. Within `run.py`
-the variable `priors` may be adjusted in the following way (for simplicity assuming
-body fluids are (
-['blood', 'saliva', 'nasal mucosa']):
-* `[10, 1, 1]` : blood is 10x more likely
-* `[1, 7, 1]` : saliva is 7x more likely
-* `[1, 10, 10]` : blood is 10x less likely
-* `[8, 8, 1]` : nasal mucosa is 8x less likely
-
-Note this is a legacy way of defining priors/background levels and can be improved
-
-**background levels of 1 or 0**
-Currently, priors 0 or 1 are handled as one huge exceptional case for penile skin. To enable this, make your priors
-one longer (in run.py) and add 'Skin.penile' to the body fluids in constants. Yes, I know.
-
+the forensic scientist'. 
+For historic reasons, there are two limited ways to specify background levels,
+either through the 'priors_list' or using the flag 'from_penile'. These should be replaced
+by one system in which background levels can be specified per body fluid per hypothesis.
 
 #### Credits    
 This repository is based on the work by Naomi Voerman, which she performed for 
 her Master's thesis '_A probabilistic approach to quantify the strength of evidence of presence of body fluids from RNA 
-data using a multi-label method_'
+data using a multi-label method_'.
 
