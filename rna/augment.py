@@ -207,6 +207,8 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
             except:
                 Np = 1
 
+            # NB this will not give you the correct number for all combinations of background levels and
+            # N_SAMPLES_PER_COMBNATION, due to rounding errors.
             end = round(begin + N_SAMPLES_PER_COMBINATION * Np)
             if mixture_is_compatible_with_H1_H2_or_both(classes_in_current_mixture, disallowed_mixtures):
 

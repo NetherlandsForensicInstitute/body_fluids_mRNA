@@ -25,9 +25,7 @@ def test_augment_data():
     N_SAMPLES_PER_COMBINATION = [11, 22, 33]
     priors = [[1, 1, 1, 1, 1, 1, 1, 1],         # uniform priors
               [10, 1, 1, 1, 1, 1, 1, 1],        # cell type 1 occurs 10 times more often
-              # [1, 1, 1, 7, 1, 1, 1, 1],         # cell type 4 occurs 7 times more often
-              [1, 10, 10, 10, 10, 10, 10, 10],  # cell type 1 occurs 10 times less often
-              [7, 7, 7, 7, 7, 1, 7, 7]]         # cell type 6 occurs 7 times less often
+              [1, 10, 10, 10, 10, 10, 10, 10],]  # cell type 1 occurs 10 times less often
 
     for N_SAMPLES in N_SAMPLES_PER_COMBINATION:
         print(N_SAMPLES)

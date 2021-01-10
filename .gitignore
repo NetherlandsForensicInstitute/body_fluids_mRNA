@@ -9,3 +9,4 @@ mlpmodel
 scratch/
 output/
 final_model
+__pychache__
