@@ -149,7 +149,6 @@ if __name__ == '__main__':
         binarize=True, from_penile=False, prior=[1] + [1] * 7,
         model_name='vagmenstr_no_penile', save_path=save_path)
 
-
     random.seed(42)
     np.random.seed(42)
 
