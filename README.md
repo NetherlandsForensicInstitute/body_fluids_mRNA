@@ -24,7 +24,9 @@ Results are written to the folders 'output' and 'final_model'.
 
 There is additional code for experiments that did not make the paper. Most notable this includes a
 deep learning model (in 'dl-implementation'). The model achieved comparable performance at much 
-higher complexity, and would have required detailed explanations if included in the paper.
+higher complexity, and would have required detailed explanations if included in the paper. 
+Furthermore, we looked at a situation where the defense proposes an alternative (e.g. 
+sample contains blood, not menstrual secretion), which changed results little.
 ## Background levels
 
 To compute LRs we need to have knowledge on background levels, which can depend

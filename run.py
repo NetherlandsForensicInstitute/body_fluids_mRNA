@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # fig 3
     calibration_example('output')
 
-
+    # not included in paper; analysis of differently structured H1, H2 pair. (shows similar results)
     random.seed(42)
     np.random.seed(42)
 
