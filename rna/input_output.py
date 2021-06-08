@@ -27,7 +27,12 @@ def read_df(filename, nreplicates=None):
     # os.chdir('/Users/Naomi/Documents/Documenten - MacBook Pro van Naomi/statistical_science/jaar_2/internship/method')
 
     pd.options.mode.chained_assignment = None # to silence warning
-    raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
+    if filename.endswith('xlsx'):
+        raw_df = pd.read_excel(filename, delimiter=';', index_col=0)
+    elif filename.endswith('txt'):
+        raw_df = pd.read_csv(filename, delimiter='\t', index_col=0)
+    else:
+        raise TypeError(f'unknown file type for {filename}')
     try:
         rv = raw_df[['replicate_value']]
         df = raw_df.loc[:, (raw_df.columns.values != 'replicate_value')]
@@ -51,16 +56,25 @@ def read_df(filename, nreplicates=None):
                                                [i for i in range(1, nreplicates+1)][0:n_per_celltype[celltype] - len(replicates_for_this_celltype)]
                 rv_list.extend(replicates_for_this_celltype)
         rv = pd.DataFrame(rv_list, index=df.index)
-
+    # remove sex markers if present
+    if 'XIST' in df.columns:
+        del df['XIST']
+    if 'RPS4Y1' in df.columns:
+        del df['RPS4Y1']
     return df, rv
 
 
-def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_types=None, nreplicates=None,
+def get_data_per_cell_type(filenames=
+                           (
+                                   os.path.join('Datasets', 'Dataset 20210607.txt'),
+                                   os.path.join('Datasets', 'Dataset_NFI_rv.xlsx')
+                            ),
+                           single_cell_types=None, nreplicates=None,
                            ground_truth_known=True, remove_structural=True):
     """
     Returns data per specified cell types.
 
-    :param filename: name of file to read in, must include "_rv"
+    :param filenames: names of files to read in, must include "_rv"
     :param single_cell_types: iterable of strings of all single cell types that exist
     :param nreplicates: number of repeated measurements
     :param ground_truth_known: does this data file have labels for the real classes?
@@ -74,8 +88,12 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
         list containing al n_features marker names,
         list containing strings of all n_samples labels
     """
-
-    df, rv = read_df(filename, nreplicates)
+    df = pd.DataFrame()
+    rv = pd.DataFrame()
+    for filename in filenames:
+        dfs, rvs = read_df(filename, nreplicates)
+        df=df.append(dfs)
+        rv=rv.append(rvs)
 
     label_encoder = LabelEncoder()
     if single_cell_types:
@@ -129,9 +147,17 @@ def get_data_per_cell_type(filename='Datasets/Dataset_NFI_rv.xlsx', single_cell_
 
     markers = list(df.columns)
     if remove_structural:
-        X_single = remove_markers(X_single)
-        n_features = n_features-4
-        markers = markers[:-4]
+        # how many markers to remove?
+        if markers[-3] =='PRM1':
+            to_remove=2
+        elif markers[-5] == 'PRM1':
+            to_remove=4
+        else:
+            raise ValueError('unknown number of markers to remove!')
+        X_single = remove_markers(X_single, to_remove)
+        n_features = n_features-to_remove
+        markers = markers[:-to_remove]
+
 
     return X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, \
            label_encoder, markers, list(df.index)
@@ -186,7 +212,7 @@ def read_mixture_data(n_celltypes, label_encoder, binarize=True, remove_structur
         X_mixtures = X_mixtures / 1000
 
     if remove_structural:
-        X_mixtures = remove_markers(X_mixtures)
+        X_mixtures = remove_markers(X_mixtures, 2)
 
     assert X_mixtures.shape[0] == y_nhot_mixtures.shape[0]
 

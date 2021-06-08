@@ -139,9 +139,9 @@ def augment_data( X, y, n_celltypes, n_features, N_SAMPLES_PER_COMBINATION, labe
     if prior is None: # uniform priors, exception for penile skin (should be coded more generally!)
         prior = [1] * n_celltypes
 
-    assert len(prior) == n_celltypes, "Not all cell types are given a prior value" \
-                                      "Make sure the length of the list(s) in 'prior' in settings is equal to" \
-                                      "the number of cell types."
+    assert len(prior) == n_celltypes, f"Not all cell types are given a prior value" \
+                                      f"Make sure the length of the list(s) in 'prior' {len(prior)}) in settings is equal to" \
+                                      f"the number of cell types {n_celltypes}."
 
     if len(np.unique(prior)) == 1:
         ratio_relevant_prior = 0.5

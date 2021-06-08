@@ -136,7 +136,7 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
         present_markers.insert(0, 'intercept')
 
-        with open(os.path.join(save_path,'coefs_{}_{}_{}.csv'.format(tc[t],prior, model_name)), mode='w') as coefs:
+        with open(os.path.join(save_path,'coefs_{}_{}_{}.csv'.format(tc[t].replace('/', '_'), prior, model_name)), mode='w') as coefs:
             coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             coefs_writer.writerow(present_markers)
             coefs_writer.writerow(all_coefficients_strr)

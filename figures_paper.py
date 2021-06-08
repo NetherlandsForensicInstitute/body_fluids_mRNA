@@ -83,14 +83,15 @@ if __name__ == '__main__':
     # fig 4, 6
     target_classes_vm = \
         ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path_vm = os.path.join('output', 'vm_all_clf')
+    save_path_vm = os.path.join('output', 'validation_on_new_data', 'vm_all_clf')
     updates = {}
     scenarios.append((target_classes_vm, save_path_vm, updates, 10))
+
 
     # fig 7
     target_classes_priors = \
         ['Vaginal.mucosa and/or Menstrual.secretion']
-    save_path_priors = os.path.join('output', 'vm_priors_all_clf')
+    save_path_priors = os.path.join('output', 'validation_on_new_data', 'vm_priors_all_clf')
     param_update_priors = {'priors_list': [[10, 1, 1, 1, 1, 1, 1, 1],
                                            [1, 1, 10, 1, 1, 1, 1, 1],
                                            [1, 1, 1, 1, 1, 1, 10, 1],
@@ -101,12 +102,13 @@ if __name__ == '__main__':
     scenarios.append((target_classes_priors, save_path_priors,
                       param_update_priors, 1))
 
+
     # fig 5
     target_classes_all = \
         ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva',
          'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
-         'Semen.fertile and/or Semen.sterile', 'Skin']
-    save_path_all = os.path.join('output', 'all_cell_types_mlr')
+         'Semen.fertile and/or Semen.sterile', 'Saliva and/or Nasal.mucosa']
+    save_path_all = os.path.join('output', 'validation_on_new_data', 'all_cell_types_mlr')
     param_update_all = {'models_list': [['MLR', True], ],
                         'priors_list': [[1, 1, 1, 1, 1, 1, 1, 1], ],
                         'binarize_list': [True],
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     np.random.seed(42)
 
     # fig 8a, fig 9
-    save_path = os.path.join('final_model', 'no_penile')
+    save_path = os.path.join('final_model', 'validation_on_new_data', 'no_penile')
     os.makedirs(save_path, exist_ok=True)
     get_final_trained_mlr_model(
         tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(
@@ -146,14 +148,14 @@ if __name__ == '__main__':
         single_cell_types=constants.single_cell_types,
         retrain=True,
         n_samples_per_combination=10,
-        binarize=True, from_penile=False, prior=[1] + [1] * 7,
+        binarize=True, from_penile=False, prior=[1] * 8,
         model_name='vagmenstr_no_penile', save_path=save_path)
 
     random.seed(42)
     np.random.seed(42)
 
     # fig 8b, table 1
-    save_path = os.path.join('final_model', 'with_penile')
+    save_path = os.path.join('final_model', 'validation_on_new_data', 'with_penile')
     os.makedirs(save_path, exist_ok=True)
     sct = ['Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
            'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin',
@@ -178,7 +180,7 @@ if __name__ == '__main__':
     np.random.seed(42)
 
     # fig alternative H2
-    save_path = os.path.join('final_model', 'no_penile', 'H2=blood')
+    save_path = os.path.join('final_model', 'validation_on_new_data', 'no_penile', 'H2=blood')
     os.makedirs(save_path, exist_ok=True)
     get_final_trained_mlr_model(
         tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion'] + list(

@@ -76,33 +76,18 @@ if __name__ == '__main__':
     random.seed(42)
     np.random.seed(42)
 
-    save_path = os.path.join('final_model', 'no_penile_no_menstr')
+
+    save_path = os.path.join('output', 'all_data')
     sct = sorted(['Blood', 'Saliva', 'Vaginal.mucosa',
-           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin',
+           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Menstrual.secretion', 'Skin'
            ])
     os.makedirs(save_path, exist_ok=True)
     DEBUG=True
     get_final_trained_mlr_model(
-        tc=sct,
+        tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion']+sct),
         single_cell_types=sct,
         retrain=True,
         n_samples_per_combination=10,
         binarize=True, from_penile=False, prior=[1] * len(sct),
-        model_name='vagmenstr_no_penile_no_mentstr', save_path=save_path,
-        use_mixtures=False)
-
-
-    save_path = os.path.join('final_model', 'no_penile_vag')
-    sct = sorted(['Blood', 'Saliva', 'Vaginal.mucosa',
-           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin', 'Menstrual.secretion'
-           ])
-    os.makedirs(save_path, exist_ok=True)
-    DEBUG=True
-    get_final_trained_mlr_model(
-        tc=sct,
-        single_cell_types=sct,
-        retrain=True,
-        n_samples_per_combination=10,
-        binarize=True, from_penile=False, prior=[1] * len(sct),
-        model_name='vagmenstr_no_penile_with_mentstr', save_path=save_path,
+        model_name='vagmenstr_no_penile_new_data', save_path=save_path,
         use_mixtures=False)
