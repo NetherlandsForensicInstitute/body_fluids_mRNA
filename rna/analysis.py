@@ -41,6 +41,7 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
     """
     computes or loads the MLR based on all data
     """
+    softmax = False
     mle = MultiLabelEncoder(len(single_cell_types))
 
     X_single, y_nhot_single, n_celltypes, n_features, n_per_celltype, label_encoder, present_markers, present_celltypes = \
@@ -54,7 +55,7 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
                     present_markers, os.path.join(save_path, 'single cell data.csv'))
 
     if retrain:
-        model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
+        model = clf_with_correct_settings('MLR', softmax=softmax, n_classes=-1, with_calibration=True)
         X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
         if use_mixtures:
             X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder,
@@ -136,7 +137,7 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
         present_markers.insert(0, 'intercept')
 
-        with open(os.path.join(save_path,'coefs_{}_{}_{}.csv'.format(tc[t].replace('/', '_'), prior, model_name)), mode='w') as coefs:
+        with open(os.path.join(save_path, 'coefs_{}_{}.csv'.format(tc[t].replace('/', '_'), model_name)), mode='w') as coefs:
             coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             coefs_writer.writerow(present_markers)
             coefs_writer.writerow(all_coefficients_strr)

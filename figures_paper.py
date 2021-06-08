@@ -105,14 +105,11 @@ if __name__ == '__main__':
 
     # fig 5
     target_classes_all = \
-        ['Vaginal.mucosa and/or Menstrual.secretion', 'Saliva',
-         'Nasal.mucosa', 'Blood and/or Menstrual.secretion',
-         'Semen.fertile and/or Semen.sterile', 'Saliva and/or Nasal.mucosa']
+        ['Vaginal.mucosa and/or Menstrual.secretion', 'Blood and/or Menstrual.secretion',
+         'Semen.fertile and/or Semen.sterile', 'Saliva and/or Nasal.mucosa'] + list(constants.single_cell_types)
     save_path_all = os.path.join('output', 'validation_on_new_data', 'all_cell_types_mlr')
     param_update_all = {'models_list': [['MLR', True], ],
                         'priors_list': [[1, 1, 1, 1, 1, 1, 1, 1], ],
-                        'binarize_list': [True],
-                        'softmax_list': [False],
                         }
     scenarios.append((target_classes_all, save_path_all,
                       param_update_all, 10))
