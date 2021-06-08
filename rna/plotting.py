@@ -459,7 +459,7 @@ def plot_scatterplots_all_lrs_different_priors(lrs_for_all_methods, y_nhot_for_a
             plt.show()
 
 
-def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, prior_to_plot=None, savefig=None, show=None, ylim=[0,1]):
+def plot_boxplot_of_metric(binarize, softmax, models, n_metric, label_encoder, name_metric, prior_to_plot=None, savefig=None, show=None, ylim=[0,1]):
     def int2string_models(int, specify_which=None):
         if specify_which == None:
             raise ValueError("type must be set: 1 = transformation, 2 = probscalculations, 3 = model, 4 = prior")
@@ -476,15 +476,13 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
                 if int == i:
                     return models[i][0] if models[i][1] else models[i][0]+' uncal'
         elif specify_which == 4:
-            for i in range(len(priors)):
-                if int == i:
-                    return prior2string(str(priors[i]), label_encoder)
+            return 1
         else:
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 
 
     if not prior_to_plot:
-        prior_to_plot=priors[0]
+        prior_to_plot=1
 
     n_per_fold = n_metric.shape[0]
     i_transformations = n_metric.shape[1]
@@ -503,12 +501,11 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
         for j in range(j_probscalulations):
             for k in range(k_models):
                 for p in range(p_priors):
-                    if priors[p] == prior_to_plot:
-                        trans_list+=[int2string_models(i, 1)]*n_per_fold
-                        probs_list+=[int2string_models(j, 2)]*n_per_fold
-                        models_list+=[int2string_models(k, 3)]*n_per_fold
-                        priors_list+=[int2string_models(p, 4)]*n_per_fold
-                        metric_list+=list(n_metric[:, i, j, k, p].squeeze())
+                    trans_list+=[int2string_models(i, 1)]*n_per_fold
+                    probs_list+=[int2string_models(j, 2)]*n_per_fold
+                    models_list+=[int2string_models(k, 3)]*n_per_fold
+                    priors_list+=[int2string_models(p, 4)]*n_per_fold
+                    metric_list+=list(n_metric[:, i, j, k, p].squeeze())
 
 
     df = pd.DataFrame({
@@ -539,7 +536,7 @@ def plot_boxplot_of_metric(binarize, softmax, models, priors, n_metric, label_en
 
 
 
-def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_encoder, name_metric, savefig=None, show=None):
+def plot_progress_of_metric(binarize, softmax, models, n_metric, label_encoder, name_metric, savefig=None, show=None):
 
     def int2string_models(int, specify_which=None):
         if specify_which == None:
@@ -557,9 +554,7 @@ def plot_progress_of_metric(binarize, softmax, models, priors, n_metric, label_e
                 if int == i:
                     return models[i][0]
         elif specify_which == 4:
-            for i in range(len(priors)):
-                if int == i:
-                    return prior2string(str(priors[i]), label_encoder)
+            return 1
         else:
             raise ValueError("Value {} for variable 'specify which' does not exist".format(specify_which))
 

@@ -272,7 +272,7 @@ def calculate_lrs_for_different_priors(augmented_data, X_mixtures, target_classe
     lrs_after_calib_mixt = OrderedDict()
 
     for key, data in augmented_data.items():
-        method_name_prior = method_name + '_' + key
+        method_name_prior = method_name + '_' + str(key)
 
         X_train_augmented = data.X_train_augmented
         y_train_nhot_augmented = data.y_train_nhot_augmented

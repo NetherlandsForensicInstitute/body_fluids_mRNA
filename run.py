@@ -52,9 +52,6 @@ params = {
 
     'calibration_on_loglrs': True,
 
-    'from_penile': False,
-    # !only checked for 'MLR' and softmax=False whether from_penile=True works!
-
     'models_list': [
         ['MLR', True],
         ['MLP', True],
@@ -63,31 +60,73 @@ params = {
         ['XGB', True],
     ],
 
-    # NB the prior is currently used to adjust the number of samples of certain type in the training data.
-    # This system just looks at relative numbers it could/should also be used to encode the 0 and 1 options,
-    # as already exists but is not used in the augment_data function. For this, the values have to be between 0 and 1.
-    'priors_list': [
-        [1, 1, 1, 1, 1, 1, 1, 1],
-    ]
+    # 'priors_list': [
+    #     [1, 1, 1, 1, 1, 1, 1, 1],
+    # ]
 }
 
 if __name__ == '__main__':
 
+    scenarios=[]
+    target_classes_all = \
+        ['Vaginal.mucosa and/or Menstrual.secretion', 'Blood and/or Menstrual.secretion',
+         'Semen.fertile and/or Semen.sterile', 'Saliva and/or Nasal.mucosa'] + list(constants.single_cell_types)
+
+    always_include = []
+    always_exclude = ['Menstrual.secretion']
+
+    # make sure we don't query for something we condition on
+    for type in always_include+always_exclude:
+        target_classes_all.remove(type)
+
+    save_path = os.path.join('output', 'all_data', 'all_cell_types_mlr')
+
+    for types in [always_include, always_exclude]:
+        if types:
+            save_path=os.path.join(save_path, '+'.join(types))
+        else:
+            save_path=os.path.join(save_path, '_')
+
+    param_update_all = {'models_list': [['MLR', True], ],
+                        'priors0': always_exclude,
+                        'priors1': always_include,
+                        }
+    scenarios.append((target_classes_all, save_path,
+                      param_update_all, 10))
+
+    for target_classes_str, save_path, updates, nfolds in scenarios:
+        params.update(updates)
+        random.seed(42)
+        np.random.seed(42)
+        plot_path = os.path.join(save_path, 'plots')
+
+        # shutil.rmtree(save_path, ignore_errors=True)
+        # os.makedirs(save_path)
+        # os.makedirs(plot_path)
+        # os.makedirs(os.path.join(save_path, 'picklesaves'))
+        # nfold_analysis(nfolds=nfolds, tc=target_classes_str, savepath=save_path, **params)
+
+        # shutil.rmtree(plot_path, ignore_errors=True)
+        # os.makedirs(plot_path)
+
+        makeplots(nfolds=nfolds, tc=target_classes_str,
+                  path=os.path.join(save_path, 'picklesaves'),
+                  savepath=os.path.join(save_path, 'plots'), **params)
+
+
     random.seed(42)
     np.random.seed(42)
 
-
-    save_path = os.path.join('output', 'all_data')
-    sct = sorted(['Blood', 'Saliva', 'Vaginal.mucosa',
-           'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Menstrual.secretion', 'Skin'
-           ])
     os.makedirs(save_path, exist_ok=True)
     DEBUG=True
     get_final_trained_mlr_model(
-        tc=sorted(['Vaginal.mucosa and/or Menstrual.secretion']+sct),
-        single_cell_types=sct,
+        tc=target_classes_all,
         retrain=True,
         n_samples_per_combination=10,
-        binarize=True, from_penile=False, prior=[1] * len(sct),
-        model_name='vagmenstr_no_penile_new_data', save_path=save_path,
+        binarize=True,
+        priors1=always_include,
+        priors0=always_exclude,
+        model_name='all_cell_types',
+        save_path=save_path,
         use_mixtures=False)
+

@@ -2,11 +2,11 @@ import numpy as np
 
 single_cell_types = \
     ('Blood', 'Saliva', 'Vaginal.mucosa', 'Menstrual.secretion',
-     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin')
+     'Semen.fertile', 'Semen.sterile', 'Nasal.mucosa', 'Skin', 'Skin.penile')
 
 single_cell_types_short = sorted(['Vag muc/Menstr secr', 'Blood', 'Saliva',
                                   'Vag muc', 'Menstr secr', 'Semen fertile',
-                                  'Semen sterile', 'Nasal muc', 'Skin'])
+                                  'Semen sterile', 'Nasal muc', 'Skin', 'Skin penile'])
 
 # TODO: Remove last 4 marker names?
 marker_names = ['HBB', 'ALAS2', 'CD93', 'HTN3', 'STATH', 'BPIFA1', 'MUC4', 'MYOZ1', 'CYP2B7P1', 'MMP10', 'MMP7',
@@ -40,6 +40,7 @@ celltype_specific_markers['Semen.fertile'] = ['SEMG1', 'KLK3', 'PRM1']
 celltype_specific_markers['Semen.sterile'] = ['SEMG1', 'KLK3', 'PRM1']
 celltype_specific_markers['Nasal.mucosa'] = ['STATH', 'BPIFA1']
 celltype_specific_markers['Skin'] = [None]
+celltype_specific_markers['Skin.penile'] = [None]
 DEBUG=False
 
 DPI=300
