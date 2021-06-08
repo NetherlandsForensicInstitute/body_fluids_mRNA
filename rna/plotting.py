@@ -940,24 +940,23 @@ def plot_coefficient_importances(model, target_classes, present_markers, label_e
     for t, target_class in enumerate(target_classes):
         target_class_str = vec2string(target_class, label_encoder)
         celltype = target_class_str.split(' and/or ')
-        if DEBUG or len(celltype)>1:
-            intercept, coefficients = model.get_coefficients(t, target_class)
-            if not intercept:
-                return
-            plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
+        intercept, coefficients = model.get_coefficients(t, target_class)
+        if not intercept:
+            return
+        plot_coefficient_importance(intercept, coefficients, present_markers, celltype)
 
-            target_class_save = target_class_str.replace(" ", "_")
-            target_class_save = target_class_save.replace(".", "_")
-            target_class_save = target_class_save.replace("/", "_")
+        target_class_save = target_class_str.replace(" ", "_")
+        target_class_save = target_class_save.replace(".", "_")
+        target_class_save = target_class_save.replace("/", "_")
 
-            if savefig is not None:
-                plt.tight_layout()
-                plt.savefig(savefig + '_' + target_class_save, dpi=constants.DPI)
-            if show or savefig is None:
-                plt.tight_layout()
-                plt.show()
+        if savefig is not None:
+            plt.tight_layout()
+            plt.savefig(savefig + '_' + target_class_save, dpi=constants.DPI)
+        if show or savefig is None:
+            plt.tight_layout()
+            plt.show()
 
-            plt.close()
+        plt.close()
 
 
 def plot_coefficient_importance(intercept, coefficients, present_markers, celltypes):

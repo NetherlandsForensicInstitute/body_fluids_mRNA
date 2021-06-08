@@ -35,7 +35,8 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
                                 remove_structural=True, save_path=None,
                                 alternative_hypothesis=None,
                                 # blood, nasal, vaginal
-                                samples_to_evaluate=np.array([[1] * 3 + [0] + [1] * 5 + [0] * 6])):
+                                samples_to_evaluate=np.array([[1] * 3 + [0] + [1] * 5 + [0] * 6]),
+                                use_mixtures=True):
 
     """
     computes or loads the MLR based on all data
@@ -55,17 +56,19 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
     if retrain:
         model = clf_with_correct_settings('MLR', softmax=False, n_classes=-1, with_calibration=True)
         X_train, X_calib, y_train, y_calib = train_test_split(X_single, y_single, stratify=y_single, test_size=0.5)
+        if use_mixtures:
+            X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder,
+                                                                                   binarize=binarize,
+                                                                                   remove_structural=remove_structural)
 
-        X_mixtures, y_nhot_mixtures, mixture_label_encoder = read_mixture_data(n_celltypes, label_encoder, binarize=binarize, remove_structural=remove_structural)
-
-        save_data_table(
-            X_mixtures,
-            [vec2string(y, label_encoder).replace(' and/or ', '+') for y in
-                                     y_nhot_mixtures],
-            present_markers,
-            os.path.join(save_path, 'mixture data.csv'))
+            save_data_table(
+                X_mixtures,
+                [vec2string(y, label_encoder).replace(' and/or ', '+') for y in
+                                         y_nhot_mixtures],
+                present_markers,
+                os.path.join(save_path, 'mixture data.csv'))
         augmented_data = augment_splitted_data(X_train, y_train, X_calib, y_calib, None, None,
-                                                            y_nhot_mixtures, n_celltypes, n_features,
+                                                            None, n_celltypes, n_features,
                                                             label_encoder, prior, [binarize],
                                                             from_penile, [n_samples_per_combination]*3,
                                                             disallowed_mixtures=None)
@@ -126,17 +129,17 @@ def get_final_trained_mlr_model(tc, single_cell_types, retrain,
         model, target_classes, present_markers, label_encoder,
         savefig=os.path.join(save_path, 'coefs_{}_{}'.format(prior, model_name)), show=None)
 
-    t = np.argwhere(np.array(tc) == 'Vaginal.mucosa and/or Menstrual.secretion').squeeze()
-    intercept, coefficients = model.get_coefficients(t, target_classes[t].squeeze())
-    all_coefficients = np.append(intercept, coefficients).tolist()
-    all_coefficients_str = [str(coef) for coef in all_coefficients]
-    all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
-    present_markers.insert(0, 'intercept')
+    for t in range(len(target_classes)):
+        intercept, coefficients = model.get_coefficients(t, target_classes[t].squeeze())
+        all_coefficients = np.append(intercept, coefficients).tolist()
+        all_coefficients_str = [str(coef) for coef in all_coefficients]
+        all_coefficients_strr = [coef.replace('.', ',') for coef in all_coefficients_str]
+        present_markers.insert(0, 'intercept')
 
-    with open(os.path.join(save_path,'coefs_{}_{}.csv'.format(prior, model_name)), mode='w') as coefs:
-        coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        coefs_writer.writerow(present_markers)
-        coefs_writer.writerow(all_coefficients_strr)
+        with open(os.path.join(save_path,'coefs_{}_{}_{}.csv'.format(tc[t].replace('/', '_'), prior, model_name)), mode='w') as coefs:
+            coefs_writer = csv.writer(coefs, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            coefs_writer.writerow(present_markers)
+            coefs_writer.writerow(all_coefficients_strr)
 
 
 def nfold_analysis(nfolds, tc, savepath, from_penile: bool, models_list, softmax_list: List[bool],
@@ -325,7 +328,7 @@ def compare_to_multiclass(X_single, y_single, target_classes, tc,
 
         # take single cell target classes
         log_lrs = np.log10(model.predict_lrs(sample, target_classes))
-        plot_multiclass_comparison(log_lrs[0], multi_log_lrs, constants.single_cell_types_short, sample, save_path)
+        plot_multiclass_comparison(log_lrs[0], multi_log_lrs, tc, sample, save_path)
 
 
 def makeplots(tc, path, savepath, remove_structural: bool, nfolds, binarize_list, softmax_list, models_list, priors_list, **kwargs):

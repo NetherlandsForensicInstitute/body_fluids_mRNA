@@ -47,14 +47,14 @@ def vec2string(target_class, label_encoder):
     return celltype
 
 
-def remove_markers(X):
+def remove_markers(X, to_remove: int):
     """
     Removes the gender and control markers.
     """
     try:
-        X = X[:, :-4]
+        X = X[:, :-to_remove]
     except IndexError:
-        X = np.array([X[i][:, :-4] for i in range(X.shape[0])])
+        X = np.array([X[i][:, :-to_remove] for i in range(X.shape[0])])
 
     return X
 
