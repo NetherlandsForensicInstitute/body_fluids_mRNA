@@ -18,7 +18,7 @@ as described in the paper. If you find the software or data useful, please cite
 The datasets should be self explanatory. Note that the column 'replicate_value' specifies
 which replicates belong together - replicates from the same sample are numbered consecutively.
 
-Running `run.py` will generate all (data-based) figures in the accompanying article. 
+The code that corresponds exactly to the paper is tagged 'paper_version'. For this commit, running `run.py` will generate all (data-based) figures in the accompanying article. 
 The actual work is done in `analytics.py` and `analysis.py`.
 Results are written to the folders 'output' and 'final_model'.
 
